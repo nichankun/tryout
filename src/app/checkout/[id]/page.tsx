@@ -2,7 +2,7 @@
  * app/checkout/[id]/page.tsx — FIXED
  * [1] id divalidasi + notFound() + redirect jika sudah dimiliki
  * [2] key={benefit} bukan key={i}
- * [3] Pilihan metode pembayaran dipindah ke CheckoutPanel (Client Component)
+ * [3] Pilihan metode pembayaran dipindah ke CheckoutForm (Client Component)
  */
 
 import type { Metadata } from "next";
@@ -11,7 +11,7 @@ import { notFound, redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle2, ChevronLeft } from "lucide-react";
-import { CheckoutPanel } from "@/components/checkout/checkout-panel";
+import { CheckoutForm } from "@/components/checkout/checkout-form";
 
 interface CheckoutPageProps {
   params: Promise<{ id: string }>;
@@ -103,13 +103,11 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
 
             {/*
               ✅ [FIX 3] Pilihan metode pembayaran + tombol bayar
-              dipindah ke CheckoutPanel (Client Component) agar punya state
+              dipindah ke CheckoutForm (Client Component) agar punya state
               untuk metode yang dipilih, lalu diteruskan ke CheckoutButton
             */}
-            <CheckoutPanel
+            <CheckoutForm
               volumeId={volumeId}
-              price={price}
-              adminFee={adminFee}
               total={total}
             />
           </div>

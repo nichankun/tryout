@@ -1,110 +1,129 @@
 "use server";
 
+/**
+ * lib/actions/auth.ts
+ *
+ * ✅ Server Actions — berjalan 100% di server, tidak pernah ke client
+ * ✅ "use server" di top file = semua fungsi di file ini adalah Server Actions
+ *
+ * Di production: ganti mock dengan Prisma/Drizzle + bcrypt + set cookie session
+ *
+ * 📦 INSTALL:
+ *   npm install bcryptjs
+ *   npm install -D @types/bcryptjs
+ */
+
 import { cookies } from "next/headers";
-// import { db } from "@/lib/db";
-// import { users } from "@/lib/db/schema";
-// import { eq } from "drizzle-orm";
-// import bcrypt from "bcryptjs";
+import { redirect } from "next/navigation";
 
-// ✅ Extract constant — tidak hardcode di dua tempat
-const SESSION_COOKIE_NAME = "SESSION_COOKIE";
-const SESSION_COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax" as const,
-  maxAge: 60 * 60 * 24 * 7, // 7 hari
-  path: "/",
-};
+// Tipe return yang konsisten — null = sukses, object = error
+type ActionResult = { error: string } | null;
 
-// ✅ Validasi email helper — sama polanya dengan client-side
-function isValidEmail(email: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+// ─────────────────────────────────────────
+// LOGIN ACTION
+// ─────────────────────────────────────────
+export async function loginAction(formData: FormData): Promise<ActionResult> {
+  const email = formData.get("email");
+  const password = formData.get("password");
+
+  // Validasi input server-side — jangan percaya validasi HTML saja
+  if (typeof email !== "string" || !email.includes("@")) {
+    return { error: "invalid_email" };
+  }
+  if (typeof password !== "string" || password.length < 8) {
+    return { error: "invalid_credentials" };
+  }
+
+  // ── Production: ganti blok ini ──
+  // const user = await prisma.user.findUnique({ where: { email } });
+  // if (!user) return { error: "user_not_found" };
+  // const valid = await bcrypt.compare(password, user.passwordHash);
+  // if (!valid) return { error: "invalid_credentials" };
+
+  // Mock: email apapun dengan password >= 8 karakter dianggap login berhasil
+  const isMockValid = email.length > 0 && password.length >= 8;
+  if (!isMockValid) return { error: "invalid_credentials" };
+
+  // ── Set session cookie ──
+  const cookieStore = await cookies();
+  cookieStore.set("asn_session", "mock-session-token", {
+    httpOnly: true,   // tidak bisa diakses JavaScript — aman dari XSS
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 7, // 7 hari
+  });
+
+  // Mock: set volume 1 & 2 sebagai sudah dibeli
+  cookieStore.set("asn_purchased", "1,2", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 7,
+  });
+
+  return null; // null = sukses, client yang handle redirect
 }
 
-/**
- * Server Action: Login Pengguna
- */
-export async function loginAction(formData: FormData) {
-  const email = (formData.get("email") as string).trim().toLowerCase();
-  const password = formData.get("password") as string;
+// ─────────────────────────────────────────
+// REGISTER ACTION
+// ─────────────────────────────────────────
+export async function registerAction(formData: FormData): Promise<ActionResult> {
+  const name = formData.get("name");
+  const email = formData.get("email");
+  const password = formData.get("password");
 
-  // ✅ Validasi input
-  if (!email || !password) {
-    return { error: "EMAIL_PASSWORD_REQUIRED" };
+  // Validasi server-side
+  if (typeof name !== "string" || name.trim().length < 2) {
+    return { error: "invalid_name" };
   }
-  if (!isValidEmail(email)) {
-    return { error: "INVALID_EMAIL" };
+  if (typeof email !== "string" || !email.includes("@")) {
+    return { error: "invalid_email" };
+  }
+  if (typeof password !== "string" || password.length < 8) {
+    return { error: "weak_password" };
   }
 
-  try {
-    // ── 1. CARI USER DI DATABASE ──
-    // const user = await db.query.users.findFirst({
-    //   where: eq(users.email, email),
-    // });
-    // if (!user) return { error: "INVALID_CREDENTIALS" };
+  // ── Production: ganti blok ini ──
+  // const existing = await prisma.user.findUnique({ where: { email } });
+  // if (existing) return { error: "email_taken" };
+  // const hash = await bcrypt.hash(password, 12);
+  // const user = await prisma.user.create({
+  //   data: { name: name.trim(), email, passwordHash: hash }
+  // });
 
-    // ── 2. VERIFIKASI KATA SANDI ──
-    // const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
-    // if (!isPasswordValid) return { error: "INVALID_CREDENTIALS" };
+  // Mock: simulasi email sudah terdaftar
+  if (email === "test@asnpedia.com") return { error: "email_taken" };
 
-    // PLACEHOLDER — hapus setelah database dihubungkan
-    if (email !== "peserta@asnpedia.com" || password !== "password123") {
-      return { error: "INVALID_CREDENTIALS" };
-    }
+  // Set session setelah register — auto login
+  const cookieStore = await cookies();
+  cookieStore.set("asn_session", "mock-session-token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 7,
+  });
 
-    // ── 3. SET SESSION COOKIE ──
-    const cookieStore = await cookies();
-    cookieStore.set(SESSION_COOKIE_NAME, "token-sesi-dummy-skd-2026", SESSION_COOKIE_OPTIONS);
+  // User baru dapat vol 1 & 2 gratis
+  cookieStore.set("asn_purchased", "1,2", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 7,
+  });
 
-    return { error: null };
-  } catch (err) {
-    console.error("[loginAction]", err);
-    return { error: "SERVER_ERROR" };
-  }
+  return null;
 }
 
-/**
- * Server Action: Registrasi Pengguna Baru
- */
-export async function registerAction(formData: FormData) {
-  const name = (formData.get("name") as string).trim();
-  const email = (formData.get("email") as string).trim().toLowerCase();
-  const password = formData.get("password") as string;
-
-  // ✅ Validasi input — termasuk email yang sebelumnya tidak dicek
-  if (!name || !email || !password) {
-    return { error: "ALL_FIELDS_REQUIRED" };
-  }
-  if (name.length < 2) {
-    return { error: "NAME_TOO_SHORT" };
-  }
-  if (!isValidEmail(email)) {
-    return { error: "INVALID_EMAIL" };
-  }
-  if (password.length < 8) {
-    return { error: "PASSWORD_TOO_SHORT" };
-  }
-
-  try {
-    // ── 1. CEK EMAIL SUDAH TERDAFTAR ──
-    // const existingUser = await db.query.users.findFirst({
-    //   where: eq(users.email, email),
-    // });
-    // if (existingUser) return { error: "EMAIL_TAKEN" };
-
-    // ── 2. HASH KATA SANDI ──
-    // const hashedPassword = await bcrypt.hash(password, 10);
-
-    // ── 3. SIMPAN USER BARU ──
-    // await db.insert(users).values({ name, email, passwordHash: hashedPassword });
-
-    // ── 4. OTOMATIS LOGIN SETELAH DAFTAR ──
-    const cookieStore = await cookies();
-    cookieStore.set(SESSION_COOKIE_NAME, "token-sesi-dummy-skd-2026", SESSION_COOKIE_OPTIONS);
-
-    return { error: null };
-  } catch (err) {
-    console.error("[registerAction]", err);
-    return { error: "SERVER_ERROR" };
-  }
+// ─────────────────────────────────────────
+// LOGOUT ACTION
+// ─────────────────────────────────────────
+export async function logoutAction(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete("asn_session");
+  cookieStore.delete("asn_purchased");
+  redirect("/login");
 }

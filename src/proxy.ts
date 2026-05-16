@@ -1,63 +1,62 @@
 /**
- * proxy.ts  (root project, sejajar dengan app/)
+ * proxy.ts — Updated untuk NextAuth v5
+ *
+ * Menggunakan auth() dari NextAuth v5 untuk cek sesi,
+ * menggantikan pengecekan cookie manual sebelumnya.
+ *
+ * ✅ Next.js 16 — file bernama proxy.ts, export function proxy
  */
 
+import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const isProd = process.env.NODE_ENV === "production";
-const SESSION_COOKIE = isProd ? "__Secure-authjs.session-token" : "authjs.session-token";
-
-// Cookie berisi comma-separated volume ID yang sudah dibeli user (Contoh value: "1,2,5")
-const PURCHASED_COOKIE = "asn_purchased";
-
-// ── Route yang butuh login ──
 const PROTECTED_PREFIXES = ["/tryout", "/dashboard", "/checkout", "/riwayat"];
+const AUTH_ONLY_ROUTES   = ["/login", "/register"];
 
-// ── Route yang redirect ke dashboard kalau sudah login ──
-const AUTH_ONLY_ROUTES = ["/login", "/register"];
-
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const session = request.cookies.get(SESSION_COOKIE)?.value;
-  const isLoggedIn = Boolean(session);
+  // ✅ NextAuth v5 — auth() bisa dipanggil di proxy
+  const session = await auth();
+  const isLoggedIn = !!session?.user;
 
-  // ── 1. Sudah login → jangan tampilkan halaman auth ──
+  // Sudah login → jangan tampilkan halaman auth
   if (isLoggedIn && AUTH_ONLY_ROUTES.some((r) => pathname.startsWith(r))) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  // ── 2. Cek apakah route perlu proteksi ──
   const isProtected = PROTECTED_PREFIXES.some((r) => pathname.startsWith(r));
   if (!isProtected) return NextResponse.next();
 
-  // ── 3. Belum login → redirect ke halaman login ──
+  // Belum login → redirect ke login
   if (!isLoggedIn) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // ── 4. Cek kepemilikan volume (/tryout/[id] atau /tryout/[id]/hasil) ──
+  // Cek kepemilikan volume
   const tryoutMatch = pathname.match(/^\/tryout\/(\d+)/);
   if (tryoutMatch) {
     const volumeId = parseInt(tryoutMatch[1], 10);
 
-    const purchasedRaw = request.cookies.get(PURCHASED_COOKIE)?.value ?? "";
-    const purchasedIds = purchasedRaw
-      .split(",")
-      .map((s) => parseInt(s.trim(), 10))
-      .filter(Boolean);
+    // Production: cek dari DB via session.user.id
+    // const owned = await getUserOwnedVolumes(session.user.id);
+    // if (!owned.includes(volumeId)) {
+    //   return NextResponse.redirect(new URL(`/checkout/${volumeId}`, request.url));
+    // }
 
-    if (!purchasedIds.includes(volumeId)) {
+    // Fallback cookie untuk mock
+    const purchased = request.cookies.get("asn_purchased")?.value ?? "";
+    const ids = purchased.split(",").map(Number).filter(Boolean);
+    if (!ids.includes(volumeId)) {
       return NextResponse.redirect(
         new URL(`/checkout/${volumeId}`, request.url)
       );
     }
   }
 
-  // ── 5. Semua cek lolos ──
   return NextResponse.next();
 }
 

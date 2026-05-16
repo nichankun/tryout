@@ -7,23 +7,25 @@ import {
   boolean, 
   jsonb, 
   uuid,
-  primaryKey
+  primaryKey,
+  uniqueIndex, // ✅ [FIX 2] untuk unique constraint userAccess
+  index,       // ✅ [FIX 3] untuk index questions.packageId
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import type { AdapterAccountType } from "next-auth/adapters";
 
-// ── 1. USERS (Diperbarui untuk NextAuth) ──
+// ── 1. USERS ──────────────────────────────────────────────────────────────
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
-  emailVerified: timestamp("emailVerified", { mode: "date" }), // Wajib untuk NextAuth
-  image: text("image"), // Wajib untuk NextAuth (Foto profil Google)
-  passwordHash: text("password_hash"), // Dibuat opsional karena login Google tidak pakai password
+  emailVerified: timestamp("emailVerified", { mode: "date" }),
+  image: text("image"),
+  passwordHash: text("password_hash"), // opsional — Google login tidak pakai password
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// ── 2. TABEL WAJIB NEXTAUTH (Accounts, Sessions, Verification) ──
+// ── 2. TABEL WAJIB NEXTAUTH ───────────────────────────────────────────────
 export const accounts = pgTable(
   "account",
   {
@@ -70,61 +72,116 @@ export const verificationTokens = pgTable(
   })
 );
 
-// ── 3. PAKET TRYOUT (Volume) ──
+// ── 3. PAKET TRYOUT ───────────────────────────────────────────────────────
 export const tryoutPackages = pgTable("tryout_packages", {
   id: serial("id").primaryKey(),
-  title: text("title").notNull(), 
+  title: text("title").notNull(),
   description: text("description"),
   price: integer("price").notNull().default(0),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// ── 4. AKSES PEMBELIAN ──
-export const userAccess = pgTable("user_access", {
-  id: serial("id").primaryKey(),
-  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
-  packageId: integer("package_id").references(() => tryoutPackages.id).notNull(),
-  purchasedAt: timestamp("purchased_at").defaultNow(),
-});
+// ── 4. AKSES PEMBELIAN ────────────────────────────────────────────────────
+export const userAccess = pgTable(
+  "user_access",
+  {
+    id: serial("id").primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    packageId: integer("package_id")
+      .references(() => tryoutPackages.id)
+      .notNull(),
+    purchasedAt: timestamp("purchased_at").defaultNow(),
+  },
+  // ✅ [FIX 2] Unique constraint — user tidak bisa dapat akses duplikat volume yang sama
+  (table) => ({
+    userPackageIdx: uniqueIndex("user_access_user_package_idx").on(
+      table.userId,
+      table.packageId
+    ),
+  })
+);
 
-// ── 5. BANK SOAL ──
-export const questions = pgTable("questions", {
-  id: serial("id").primaryKey(),
-  packageId: integer("package_id").references(() => tryoutPackages.id).notNull(),
-  kategori: text("kategori", { enum: ['TWK', 'TIU', 'TKP'] }).notNull(),
-  pertanyaan: text("pertanyaan").notNull(),
-  pilihan: jsonb("pilihan").notNull(), 
-  pembahasan: text("pembahasan").notNull(),
-});
+// ── 5. BANK SOAL ──────────────────────────────────────────────────────────
+export const questions = pgTable(
+  "questions",
+  {
+    id: serial("id").primaryKey(),
+    packageId: integer("package_id")
+      .references(() => tryoutPackages.id)
+      .notNull(),
+    kategori: text("kategori", { enum: ["TWK", "TIU", "TKP"] }).notNull(),
+    pertanyaan: text("pertanyaan").notNull(),
+    pilihan: jsonb("pilihan").notNull(),
+    pembahasan: text("pembahasan").notNull(),
+  },
+  // ✅ [FIX 3] Index pada packageId — query filter soal per volume jadi cepat
+  (table) => ({
+    packageIdIdx: index("questions_package_id_idx").on(table.packageId),
+  })
+);
 
-// ── 6. RIWAYAT / HASIL UJIAN SISWA ──
+// ── 6. RIWAYAT UJIAN ──────────────────────────────────────────────────────
 export const tryoutHistories = pgTable("tryout_histories", {
   id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
-  packageId: integer("package_id").references(() => tryoutPackages.id).notNull(),
-  
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  packageId: integer("package_id")
+    .references(() => tryoutPackages.id)
+    .notNull(),
   skorTwk: integer("skor_twk").notNull().default(0),
   skorTiu: integer("skor_tiu").notNull().default(0),
   skorTkp: integer("skor_tkp").notNull().default(0),
   totalSkor: integer("total_skor").notNull().default(0),
   isLolos: boolean("is_lolos").notNull().default(false),
-  
-  jawabanSiswa: jsonb("jawaban_siswa").notNull(), 
-  
+  jawabanSiswa: jsonb("jawaban_siswa").notNull(),
   startTime: timestamp("start_time").defaultNow(),
   endTime: timestamp("end_time"),
 });
 
-// ── RELASI DRIZZLE ──
+// ── 7. ORDERS (Midtrans) ──────────────────────────────────────────────────
+// ✅ [FIX 1] Tabel orders wajib ada — direferensikan oleh webhook & payment route
+export const orders = pgTable("orders", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => `ASN-${Date.now()}`), // format: ASN-{volumeId}-{timestamp}
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  packageId: integer("package_id")
+    .references(() => tryoutPackages.id)
+    .notNull(),
+  amount: integer("amount").notNull(),
+  status: text("status", { enum: ["pending", "paid", "failed"] })
+    .notNull()
+    .default("pending"),
+  paymentMethod: text("payment_method"),
+  snapToken: text("snap_token"),
+  midtransOrderId: text("midtrans_order_id").unique(), // ✅ unique — untuk idempotency check
+  transactionId: text("transaction_id"),
+  paidAt: timestamp("paid_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// ── RELASI DRIZZLE ─────────────────────────────────────────────────────────
 export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
   sessions: many(sessions),
   access: many(userAccess),
   histories: many(tryoutHistories),
+  orders: many(orders),
 }));
 
 export const packagesRelations = relations(tryoutPackages, ({ many }) => ({
   questions: many(questions),
   access: many(userAccess),
+  orders: many(orders),
+}));
+
+export const ordersRelations = relations(orders, ({ one }) => ({
+  user: one(users, { fields: [orders.userId], references: [users.id] }),
+  package: one(tryoutPackages, { fields: [orders.packageId], references: [tryoutPackages.id] }),
 }));
