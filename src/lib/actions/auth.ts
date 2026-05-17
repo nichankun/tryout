@@ -109,7 +109,7 @@ export async function registerAction(formData: FormData): Promise<ActionResult> 
     const verificationLink = `${appUrl}/verify-email?token=${token}&email=${email}`;
 
     await resend.emails.send({
-      from: "ASNPedia <no-reply@asnpedia.bapendasultra.com>",
+      from: "ASNPedia <no-reply@asnpedia.bapendasultra.my.id>",
       to: email,
       subject: "Verifikasi Akun ASNPedia Anda",
       html: `
@@ -159,7 +159,7 @@ export async function forgotPasswordAction(formData: FormData): Promise<ActionRe
     const resetLink = `${appUrl}/reset-password?token=${token}&email=${email}`;
 
     await resend.emails.send({
-      from: "ASNPedia <no-reply@asnpedia.bapendasultra.com>",
+      from: "ASNPedia <no-reply@asnpedia.bapendasultra.my.id>",
       to: email,
       subject: "Atur Ulang Kata Sandi ASNPedia Anda",
       html: `
