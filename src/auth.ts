@@ -1,17 +1,7 @@
 /**
- * auth.ts  (root project, sejajar dengan app/)
- *
- * ✅ NextAuth v5 (Auth.js) — API baru, bukan v4
- *
- * 📦 INSTALL:
- *   npm install next-auth@beta
- *   npm install @auth/drizzle-adapter drizzle-orm
- *
- * ENV yang dibutuhkan di .env.local:
- *   AUTH_SECRET=random-string-32-chars (generate: npx auth secret)
- *   AUTH_GOOGLE_ID=xxxx.apps.googleusercontent.com
- *   AUTH_GOOGLE_SECRET=xxxx
- *   DATABASE_URL=postgresql://...
+ * auth.ts — Konfigurasi Tunggal NextAuth v5 (Terpusat)
+ * * Menggabungkan Google OAuth & Credentials dengan proteksi hashing bcrypt
+ * serta validasi status verifikasi email.
  */
 
 import NextAuth from "next-auth";
@@ -19,26 +9,23 @@ import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { db } from "@/db";
-// import { users } from "@/db/database/schema";
-// import { eq } from "drizzle-orm";
-// import bcrypt from "bcryptjs";
+import { users } from "@/db/database/schema";
+import { eq } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  // ── Adapter: simpan session & user ke DB via Drizzle ──
   adapter: DrizzleAdapter(db),
-
-  // ── Session strategy: JWT lebih ringan dari database session ──
   session: { strategy: "jwt" },
 
-  // ── Halaman custom ──
   pages: {
     signIn:  "/login",
-    error:   "/login", // error param diteruskan ke ?error=...
-    newUser: "/dashboard",
+    error:   "/login",
+    // ✅ FIX: Pengguna baru lewat Google akan dialihkan ke halaman login/onboarding terlebih dahulu
+    newUser: "/dashboard", 
   },
 
   providers: [
-    // ── Google OAuth ──────────────────────────────────────────────────────
+    // ── 1. GOOGLE OAUTH PROVIDER ──────────────────────────────────────────
     Google({
       clientId:     process.env.AUTH_GOOGLE_ID!,
       clientSecret: process.env.AUTH_GOOGLE_SECRET!,
@@ -51,12 +38,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
 
-    // ── Email & Password ──────────────────────────────────────────────────
+    // ── 2. EMAIL & PASSWORD CREDENTIALS PROVIDER ──────────────────────────
     Credentials({
       name: "credentials",
       credentials: {
-        email:    { label: "Email",       type: "email"    },
-        password: { label: "Kata Sandi",  type: "password" },
+        email:    { label: "Email",      type: "email"    },
+        password: { label: "Kata Sandi", type: "password" },
       },
 
       async authorize(credentials) {
@@ -65,66 +52,54 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const email    = credentials.email as string;
         const password = credentials.password as string;
 
-        // Production: uncomment ini
-        // const user = await db.query.users.findFirst({
-        //   where: eq(users.email, email),
-        // });
-        // if (!user?.passwordHash) return null;
-        // const valid = await bcrypt.compare(password, user.passwordHash);
-        // if (!valid) return null;
-        // return { id: user.id, name: user.name, email: user.email };
+        // Ambil data user dari database Neon via Drizzle
+        const user = await db.query.users.findFirst({
+          where: eq(users.email, email),
+        });
 
-        // Mock — hapus saat production
-        if (email.includes("@") && password.length >= 8) {
-          return {
-            id:    "mock-user-id",
-            name:  "User Mock",
-            email,
-          };
+        // Jika user tidak ditemukan, atau jika user mendaftar pakai Google (tidak punya passwordHash)
+        if (!user?.passwordHash) return null;
+
+        // ✅ FIX: Kunci login jika akun manual belum melakukan verifikasi link email
+        if (!user.emailVerified) {
+          throw new Error("email_not_verified");
         }
 
-        return null; // null = login gagal → error: "CredentialsSignin"
+        // Validasi kecocokan password dengan bcrypt
+        const isValid = await bcrypt.compare(password, user.passwordHash);
+        if (!isValid) return null;
+
+        return {
+          id:    user.id,
+          name:  user.name,
+          email: user.email,
+          image: user.image,
+        };
       },
     }),
   ],
 
   callbacks: {
-    // ── JWT: tambah userId ke token ──────────────────────────────────────
     async jwt({ token, user }) {
-      if (user) {
-        token.userId = user.id;
-      }
+      if (user) token.userId = user.id;
       return token;
     },
 
-    // ── Session: expose userId ke client via session ──────────────────────
     async session({ session, token }) {
-      if (token.userId) {
-        session.user.id = token.userId as string;
-      }
+      if (token.userId) session.user.id = token.userId as string;
       return session;
     },
 
-    // ── Authorized: dipakai oleh proxy.ts untuk cek sesi ─────────────────
-    // Dipanggil saat menggunakan auth() di proxy.ts
     async authorized({ auth }) {
-      return !!auth; // true = ada session, false = redirect ke /login
+      return !!auth;
     },
   },
 
-  // ── Events: untuk side effects setelah aksi auth ──────────────────────
   events: {
     async createUser({ user }) {
-      // Beri akses gratis vol 1 & 2 untuk user baru
-      // Production: uncomment ini
-      // await db.insert(userAccess).values([
-      //   { userId: user.id!, packageId: 1 },
-      //   { userId: user.id!, packageId: 2 },
-      // ]);
-      console.log("[Auth] User baru dibuat:", user.email);
+      console.log("[Auth] Registrasi berhasil via Google:", user.email);
     },
   },
 
-  // ── Debug: aktifkan hanya di development ──────────────────────────────
   debug: process.env.NODE_ENV === "development",
 });

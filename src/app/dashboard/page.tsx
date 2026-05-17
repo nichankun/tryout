@@ -1,4 +1,3 @@
-
 import Image from "next/image";
 import Link from "next/link";
 
@@ -8,7 +7,9 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { TryoutGrid } from "@/components/dashboard/tryout-grid";
 import { ExamTypeTabs } from "@/components/dashboard/exam-type-tabs";
-import { BookOpen, Clock, Target } from "lucide-react";
+import { BookOpen, Clock, Target, LogOut } from "lucide-react";
+// ✅ PERBAIKAN 1: Ambil signOut langsung dari konfigurasi auth utama
+import { signOut } from "@/auth"; 
 
 export interface TryoutVolume {
   id: number;
@@ -76,7 +77,7 @@ export default function DashboardPage() {
 
               <Separator orientation="vertical" className="h-8 hidden sm:block" />
 
-              {/* ✅ Pakai next/image + Avatar shadcn, bukan <img> biasa */}
+              {/* Pakai next/image + Avatar shadcn, bukan <img> biasa */}
               <Avatar className="h-9 w-9 border-2 border-slate-100 dark:border-slate-700">
                 <AvatarImage
                   src="https://api.dicebear.com/7.x/avataaars/svg?seed=Imam"
@@ -84,6 +85,25 @@ export default function DashboardPage() {
                 />
                 <AvatarFallback>IM</AvatarFallback>
               </Avatar>
+
+              {/* ✅ PERBAIKAN 2: Menggunakan Inline Server Action untuk logout aman via NextAuth */}
+              <form 
+                action={async () => {
+                  "use server";
+                  await signOut({ redirectTo: "/login" });
+                }}
+              >
+                <Button 
+                  type="submit"
+                  variant="ghost" 
+                  size="icon" 
+                  className="text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/50 rounded-full transition-colors ml-1"
+                  title="Keluar"
+                >
+                  <LogOut className="w-5 h-5" />
+                  <span className="sr-only">Logout</span>
+                </Button>
+              </form>
             </div>
           </div>
         </div>
@@ -107,7 +127,7 @@ export default function DashboardPage() {
             mulai simulasi CAT sekarang.
           </p>
 
-          {/* ✅ Tab SKD/SKB dipisah ke Client Component — Server Component tetap pure */}
+          {/* Tab SKD/SKB dipisah ke Client Component — Server Component tetap pure */}
           <ExamTypeTabs />
 
           {/* Stats */}
@@ -137,11 +157,11 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ✅ Grid & Search dipisah ke Client Component */}
+        {/* Grid & Search dipisah ke Client Component */}
         <TryoutGrid volumes={volumes} />
 
         <div className="mt-12 text-center">
-          {/* ✅ Button dari shadcn/ui */}
+          {/* Button dari shadcn/ui */}
           <Button variant="outline" size="lg" className="rounded-xl font-bold">
             Lihat Volume Lainnya
           </Button>

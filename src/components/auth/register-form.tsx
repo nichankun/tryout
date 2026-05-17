@@ -51,9 +51,9 @@ export function RegisterForm() {
         return;
       }
 
-      // Berhasil → langsung ke dashboard (sudah auto-login via Server Action)
-      router.push("/dashboard");
-      router.refresh();
+      // ✅ PERBAIKAN: Dialihkan ke halaman login dengan membawa parameter status
+      // agar tidak terjadi konflik routing dengan Middleware NextAuth
+      router.push("/login?status=verification_sent");
     } catch {
       setError("Koneksi bermasalah. Periksa internet kamu dan coba lagi.");
     } finally {

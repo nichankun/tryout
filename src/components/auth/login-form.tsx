@@ -1,18 +1,13 @@
 "use client";
 
 /**
- * components/auth/login-form.tsx — FIXED
- *
- * Perbaikan dari review:
- * [1] try/finally pada router.push() → isLoading tidak stuck permanen
- * [2] Error dari Server Action diwhitelist → tidak tampil pesan teknis
- * [3] <a href> diganti <Link> → client-side navigation + prefetch
- * [4] autoFocus diganti useRef + useEffect → lebih terkontrol
+ * components/auth/login-form.tsx — FIXED with Verification Status Check
  */
 
 import { useRef, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+// ✅ Tambahkan import useSearchParams
+import { useRouter, useSearchParams } from "next/navigation"; 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,24 +18,29 @@ interface LoginFormProps {
   callbackUrl: string;
 }
 
-// ✅ [FIX 2] Whitelist pesan error dari Server Action
-// Jangan render result.error mentah — bisa berisi pesan teknis dari server
+// ✅ Whitelist pesan error dari Server Action
 const SAFE_ERRORS: Record<string, string> = {
   invalid_credentials: "Email atau kata sandi salah. Coba lagi.",
   user_not_found: "Akun dengan email ini tidak ditemukan.",
   too_many_attempts: "Terlalu banyak percobaan. Tunggu beberapa menit.",
   account_disabled: "Akun kamu telah dinonaktifkan. Hubungi dukungan.",
+  // ✅ TAMBAHAN: Pesan khusus jika email belum diverifikasi
+  email_not_verified: "Email kamu belum diverifikasi. Silakan periksa kotak masuk atau folder spam email kamu untuk melakukan verifikasi.",
 };
 
 export function LoginForm({ callbackUrl }: LoginFormProps) {
   const router = useRouter();
-  const emailRef = useRef<HTMLInputElement>(null);
+  
+  // ✅ Ambil query parameter status dari URL
+  const searchParams = useSearchParams();
+  const status = searchParams.get("status");
 
+  const emailRef = useRef<HTMLInputElement>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ [FIX 4] Focus terkontrol via useRef — lebih aman dari autoFocus
+  // Focus terkontrol via useRef
   useEffect(() => {
     emailRef.current?.focus();
   }, []);
@@ -53,26 +53,33 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
       const result = await loginAction(formData);
 
       if (result?.error) {
-        // ✅ [FIX 2] Whitelist — fallback ke pesan generic jika kode tidak dikenal
         setError(SAFE_ERRORS[result.error] ?? "Terjadi kesalahan. Silakan coba lagi.");
         return;
       }
 
-      // ✅ [FIX 1] router.push di dalam try — jika gagal, finally tetap reset loading
       router.push(callbackUrl);
       router.refresh();
 
     } catch {
-      // Tangkap error jaringan atau error tak terduga dari Server Action
       setError("Koneksi bermasalah. Periksa internet kamu dan coba lagi.");
     } finally {
-      // ✅ [FIX 1] finally selalu jalan — isLoading tidak pernah stuck
       setIsLoading(false);
     }
   }
 
   return (
     <form action={handleSubmit} className="space-y-4">
+
+      {/* ✅ BANNER INFORMASI: Muncul jika di-redirect dari form register setelah sukses kirim token */}
+      {status === "verification_sent" && !error && (
+        <div
+          role="status"
+          className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-400 text-sm px-4 py-3 rounded-xl font-medium leading-relaxed"
+        >
+          <p className="font-bold mb-0.5">Registrasi Berhasil!</p>
+          <p className="text-xs opacity-90">Silakan periksa kotak masuk email kamu dan klik tautan verifikasi sebelum melakukan login.</p>
+        </div>
+      )}
 
       {/* Error inline */}
       {error && (
@@ -100,7 +107,6 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
           autoComplete="email"
           disabled={isLoading}
           className="h-11 rounded-xl"
-          // ✅ [FIX 4] autoFocus dihapus — diganti useRef + useEffect di atas
         />
       </div>
 
@@ -110,7 +116,6 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
           <Label htmlFor="password" className="text-sm font-medium">
             Kata Sandi
           </Label>
-          {/* ✅ [FIX 3] <a> diganti <Link> — client-side navigation, tidak full reload */}
           <Link
             href="/lupa-password"
             className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
