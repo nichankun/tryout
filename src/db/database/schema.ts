@@ -14,6 +14,13 @@ import {
 import { relations } from "drizzle-orm";
 import type { AdapterAccountType } from "next-auth/adapters";
 
+// ==========================================
+// KONSTANTA ENUM (Bisa diimpor ke file lain)
+// ==========================================
+export const USER_ROLES = ["USER", "ADMIN"] as const;
+export const ORDER_STATUSES = ["pending", "paid", "failed"] as const;
+export const QUESTION_CATEGORIES = ["TWK", "TIU", "TKP"] as const;
+
 // ── 1. USERS ──────────────────────────────────────────────────────────────
 export const users = pgTable("user", {
   id:            uuid("id").defaultRandom().primaryKey(),
@@ -22,8 +29,7 @@ export const users = pgTable("user", {
   emailVerified: timestamp("emailVerified", { mode: "date" }),
   image:         text("image"),
   passwordHash:  text("password_hash"),
-  // ✅ TAMBAHAN KOLOM ROLE UNTUK AKSES ADMIN
-  role:          text("role", { enum: ["USER", "ADMIN"] }).notNull().default("USER"),
+  role:          text("role", { enum: USER_ROLES }).notNull().default("USER"),
   createdAt:     timestamp("created_at").defaultNow(),
 });
 
@@ -71,7 +77,6 @@ export const verificationTokens = pgTable(
 );
 
 // ── 5. NEXTAUTH: passwordResetTokens ──────────────────────────────────────
-// ✅ TABEL BARU: Diperlukan untuk menyimpan token fitur Lupa Kata Sandi
 export const passwordResetTokens = pgTable(
   "password_reset_token",
   {
@@ -100,7 +105,7 @@ export const orders = pgTable("orders", {
   userId:        uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   packageId:     integer("package_id").notNull().references(() => tryoutPackages.id),
   amount:        integer("amount").notNull(),
-  status:        text("status", { enum: ["pending", "paid", "failed"] }).notNull().default("pending"),
+  status:        text("status", { enum: ORDER_STATUSES }).notNull().default("pending"),
   paymentMethod: text("payment_method"),
   snapToken:     text("snap_token"),
   transactionId: text("transaction_id"),
@@ -131,9 +136,9 @@ export const questions = pgTable(
   {
     id:         serial("id").primaryKey(),
     packageId:  integer("package_id").notNull().references(() => tryoutPackages.id),
-    kategori:   text("kategori", { enum: ["TWK", "TIU", "TKP"] }).notNull(),
+    kategori:   text("kategori", { enum: QUESTION_CATEGORIES }).notNull(),
     pertanyaan: text("pertanyaan").notNull(),
-    pilihan:    jsonb("pilihan").notNull(),
+    pilihan:    jsonb("pilihan").notNull(), // Disarankan nanti membuat type TS untuk struktur JSON ini
     pembahasan: text("pembahasan").notNull(),
   },
   (table) => ({
@@ -143,21 +148,23 @@ export const questions = pgTable(
 
 // ── 10. RIWAYAT UJIAN ──────────────────────────────────────────────────────
 export const tryoutHistories = pgTable("tryout_histories", {
-  id:            uuid("id").defaultRandom().primaryKey(),
-  userId:        uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  packageId:     integer("package_id").notNull().references(() => tryoutPackages.id),
-  skorTwk:       integer("skor_twk").notNull().default(0),
-  skorTiu:       integer("skor_tiu").notNull().default(0),
-  skorTkp:       integer("skor_tkp").notNull().default(0),
-  totalSkor:     integer("total_skor").notNull().default(0),
-  isLolos:       boolean("is_lolos").notNull().default(false),
-  jawabanSiswa:  jsonb("jawaban_siswa").notNull(),
-  startTime:     timestamp("start_time").defaultNow(),
-  endTime:       timestamp("end_time"),
+  id:           uuid("id").defaultRandom().primaryKey(),
+  userId:       uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  packageId:    integer("package_id").notNull().references(() => tryoutPackages.id),
+  skorTwk:      integer("skor_twk").notNull().default(0),
+  skorTiu:      integer("skor_tiu").notNull().default(0),
+  skorTkp:      integer("skor_tkp").notNull().default(0),
+  totalSkor:    integer("total_skor").notNull().default(0),
+  isLolos:      boolean("is_lolos").notNull().default(false),
+  jawabanSiswa: jsonb("jawaban_siswa").notNull(),
+  startTime:    timestamp("start_time").defaultNow(),
+  endTime:      timestamp("end_time"),
 });
 
+// ==========================================
+// RELASI (RELATIONS)
+// ==========================================
 
-// ── RELASI ────────────────────────────────────────────────────────────────
 export const usersRelations = relations(users, ({ many }) => ({
   accounts:  many(accounts),
   sessions:  many(sessions),
@@ -172,17 +179,22 @@ export const packagesRelations = relations(tryoutPackages, ({ many }) => ({
   orders:    many(orders),
 }));
 
+// ✅ Relasi balik untuk Questions (sebelumnya belum ada)
+export const questionsRelations = relations(questions, ({ one }) => ({
+  package: one(tryoutPackages, { fields: [questions.packageId], references: [tryoutPackages.id] }),
+}));
+
 export const ordersRelations = relations(orders, ({ one }) => ({
-  user:    one(users,           { fields: [orders.userId],    references: [users.id]            }),
-  package: one(tryoutPackages,  { fields: [orders.packageId], references: [tryoutPackages.id]   }),
+  user:    one(users,          { fields: [orders.userId],    references: [users.id] }),
+  package: one(tryoutPackages, { fields: [orders.packageId], references: [tryoutPackages.id] }),
 }));
 
 export const userAccessRelations = relations(userAccess, ({ one }) => ({
-  user:    one(users,          { fields: [userAccess.userId],    references: [users.id]          }),
+  user:    one(users,          { fields: [userAccess.userId],    references: [users.id] }),
   package: one(tryoutPackages, { fields: [userAccess.packageId], references: [tryoutPackages.id] }),
 }));
 
 export const historiesRelations = relations(tryoutHistories, ({ one }) => ({
-  user:    one(users,          { fields: [tryoutHistories.userId],    references: [users.id]          }),
+  user:    one(users,          { fields: [tryoutHistories.userId],    references: [users.id] }),
   package: one(tryoutPackages, { fields: [tryoutHistories.packageId], references: [tryoutPackages.id] }),
 }));

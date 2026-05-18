@@ -1,7 +1,5 @@
 /**
- * auth.ts — Konfigurasi Tunggal NextAuth v5 (Terpusat)
- * * Menggabungkan Google OAuth & Credentials dengan proteksi hashing bcrypt
- * serta validasi status verifikasi email.
+ * auth.ts — Konfigurasi Tunggal NextAuth v5 (Terpusat & Optimized)
  */
 
 import NextAuth from "next-auth";
@@ -13,21 +11,41 @@ import { users } from "@/db/database/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
+// ==========================================
+// KONSTANTA & KONFIGURASI
+// ==========================================
+const AUTH_ROUTES = {
+  signIn: "/login",
+  error: "/login",
+  newUser: "/dashboard",
+} as const;
+
+const AUTH_ERRORS = {
+  notVerified: "email_not_verified",
+} as const;
+
+const DEFAULT_ROLES = {
+  admin: "ADMIN",
+  user: "USER",
+} as const;
+
+// ==========================================
+// NEXTAUTH CONFIG
+// ==========================================
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: DrizzleAdapter(db),
   session: { strategy: "jwt" },
 
   pages: {
-    signIn:  "/login",
-    error:   "/login",
-    // ✅ FIX: Pengguna baru lewat Google akan dialihkan ke halaman login/onboarding terlebih dahulu
-    newUser: "/dashboard", 
+    signIn: AUTH_ROUTES.signIn,
+    error: AUTH_ROUTES.error,
+    newUser: AUTH_ROUTES.newUser, 
   },
 
   providers: [
-    // ── 1. GOOGLE OAUTH PROVIDER ──────────────────────────────────────────
+    // ── 1. GOOGLE OAUTH PROVIDER ──
     Google({
-      clientId:     process.env.AUTH_GOOGLE_ID!,
+      clientId: process.env.AUTH_GOOGLE_ID!,
       clientSecret: process.env.AUTH_GOOGLE_SECRET!,
       authorization: {
         params: {
@@ -38,43 +56,39 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
 
-    // ── 2. EMAIL & PASSWORD CREDENTIALS PROVIDER ──────────────────────────
+    // ── 2. EMAIL & PASSWORD CREDENTIALS PROVIDER ──
     Credentials({
       name: "credentials",
       credentials: {
-        email:    { label: "Email",      type: "email"    },
+        email: { label: "Email", type: "email" },
         password: { label: "Kata Sandi", type: "password" },
       },
 
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const email    = credentials.email as string;
+        const email = credentials.email as string;
         const password = credentials.password as string;
 
-        // Ambil data user dari database Neon via Drizzle
         const user = await db.query.users.findFirst({
           where: eq(users.email, email),
         });
 
-        // Jika user tidak ditemukan, atau jika user mendaftar pakai Google (tidak punya passwordHash)
         if (!user?.passwordHash) return null;
 
-        // ✅ FIX: Kunci login jika akun manual belum melakukan verifikasi link email
         if (!user.emailVerified) {
-          throw new Error("email_not_verified");
+          throw new Error(AUTH_ERRORS.notVerified);
         }
 
-        // Validasi kecocokan password dengan bcrypt
         const isValid = await bcrypt.compare(password, user.passwordHash);
         if (!isValid) return null;
 
         return {
-          id:    user.id,
-          name:  user.name,
+          id: user.id,
+          name: user.name,
           email: user.email,
           image: user.image,
-          role:  user.role,
+          role: user.role,
         };
       },
     }),
@@ -86,14 +100,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.userId = user.id;
       }
 
-      // Ambil data role segar langsung dari database Neon via Drizzle
       if (token.userId) {
         const dbUser = await db.query.users.findFirst({
           where: eq(users.id, token.userId as string),
         });
 
         if (dbUser) {
-          token.role = (dbUser as any).role || "USER";
+          // Fallback ke default 'USER' jika role tidak di-set di DB
+          token.role = (dbUser as any).role || DEFAULT_ROLES.user;
         }
       }
 
@@ -113,7 +127,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
   events: {
     async createUser({ user }) {
-      console.log("[Auth] Registrasi berhasil via Google:", user.email);
+      console.log(`[Auth] Registrasi berhasil via Google: ${user.email}`);
     },
   },
 

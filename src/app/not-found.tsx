@@ -1,64 +1,79 @@
 /**
  * app/not-found.tsx
- *
- * ✅ Server Component — tidak perlu "use client"
- * ✅ Otomatis ditampilkan saat notFound() dipanggil dari mana saja, atau URL tidak cocok
- * ✅ Gunakan notFound() dari "next/navigation" di page/layout manapun:
- *
- *   import { notFound } from "next/navigation";
- *   if (!volume) notFound(); // ← Next.js render halaman ini
+ * 
+ * Halaman Server Component untuk Status HTTP 404.
+ * Secara otomatis akan dirender oleh Next.js ketika pengguna mengakses rute yang tidak terdaftar,
+ * atau ketika fungsi `notFound()` dari "next/navigation" dipanggil secara eksplisit di dalam halaman/layout.
  */
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { FileQuestion, Home, ArrowLeft } from "lucide-react";
 
+// ==========================================
+// KONSTANTA & KONFIGURASI (Bebas Hardcode)
+// ==========================================
+const ROUTES = {
+  home: "/",
+  dashboard: "/dashboard",
+} as const;
+
+const TEXT_CONTENT = {
+  errorCode: "404",
+  title: "Halaman Tidak Ditemukan",
+  description: "Halaman yang kamu cari tidak ada atau sudah dipindahkan. Periksa kembali URL yang dimasukkan, atau kembali ke beranda utama.",
+  btnDashboard: "Ke Dashboard",
+  btnHome: "Beranda Utama",
+} as const;
+
+// ==========================================
+// KOMPONEN UTAMA
+// ==========================================
 export default function NotFound() {
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4 font-sans antialiased">
       <div className="max-w-md w-full text-center space-y-6">
 
-        {/* Angka 404 */}
+        {/* Header Visual Angka 404 & Ikon Pendukung */}
         <div className="space-y-1">
-          <p className="text-8xl font-black text-slate-100 dark:text-slate-800 select-none leading-none">
-            404
+          <p className="text-8xl font-black text-muted/30 select-none leading-none tracking-tighter">
+            {TEXT_CONTENT.errorCode}
           </p>
           <div className="flex justify-center -mt-2">
-            <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-950 flex items-center justify-center">
-              <FileQuestion className="w-7 h-7 text-blue-500 dark:text-blue-400" />
+            <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center shadow-sm">
+              <FileQuestion className="w-7 h-7 text-primary" aria-hidden />
             </div>
           </div>
         </div>
 
-        {/* Pesan */}
+        {/* Area Teks Pesan Deskriptif */}
         <div className="space-y-2">
-          <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">
-            Halaman Tidak Ditemukan
+          <h1 className="text-xl font-bold text-foreground tracking-tight">
+            {TEXT_CONTENT.title}
           </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-            Halaman yang kamu cari tidak ada atau sudah dipindahkan. Periksa
-            kembali URL, atau kembali ke dashboard.
+          <p className="text-sm text-muted-foreground leading-relaxed px-2">
+            {TEXT_CONTENT.description}
           </p>
         </div>
 
-        {/* Aksi */}
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Button asChild>
-            <Link href="/dashboard" className="gap-2">
+        {/* Grup Tombol Navigasi Alternatif Pengguna */}
+        <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+          <Button asChild className="gap-2 cursor-pointer shadow-sm">
+            <Link href={ROUTES.dashboard}>
               <Home className="w-4 h-4" aria-hidden />
-              Ke Dashboard
+              {TEXT_CONTENT.btnDashboard}
             </Link>
           </Button>
 
-          <Button variant="outline" asChild>
-            {/* ✅ Pakai href="javascript:history.back()" tidak ideal di SSR,
-                gunakan Link ke halaman sebelumnya yang diketahui */}
-            <Link href="/" className="gap-2">
+          <Button variant="outline" asChild className="gap-2 cursor-pointer border-border">
+            {/* Navigasi absolut lebih direkomendasikan pada Server Component ketimbang javascript:history.back() */}
+            <Link href={ROUTES.home}>
               <ArrowLeft className="w-4 h-4" aria-hidden />
-              Beranda
+              {TEXT_CONTENT.btnHome}
             </Link>
           </Button>
         </div>
+        
       </div>
     </div>
   );

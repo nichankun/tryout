@@ -2,87 +2,149 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2, ArrowLeft, AlertCircle, CheckCircle2 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { forgotPasswordAction } from "@/lib/actions/auth";
 
+// ==========================================
+// KONSTANTA & KONFIGURASI
+// ==========================================
+const ROUTES = {
+  login: "/login",
+} as const;
+
+const PAGE_CONTENT = {
+  title: "Lupa Kata Sandi?",
+  subtitleDefault: "Masukkan email kamu yang terdaftar untuk mendapatkan tautan atur ulang kata sandi.",
+  subtitleSuccess: "Kami telah mengirimkan instruksi pemulihan.",
+  emailLabel: "Alamat Email",
+  emailPlaceholder: "nama@email.com",
+  submitDefault: "Kirim Tautan Atur Ulang",
+  submitLoading: "Mengirim...",
+  backToLogin: "Kembali ke Halaman Masuk",
+} as const;
+
+const MESSAGES = {
+  successTitle: "Tautan berhasil dikirim!",
+  successDesc: "Silakan periksa kotak masuk atau folder spam email kamu dalam beberapa menit ke depan.",
+  errorFormat: "Terjadi kesalahan. Pastikan format email sudah benar.",
+  errorConnection: "Koneksi bermasalah. Silakan periksa internet kamu dan coba lagi.",
+} as const;
+
+// ==========================================
+// SCHEMA VALIDASI ZOD
+// ==========================================
+const forgotSchema = z.object({
+  email: z.string().email({ message: "Format email tidak valid." }),
+});
+
+type ForgotValues = z.infer<typeof forgotSchema>;
+
+// ==========================================
+// KOMPONEN UTAMA
+// ==========================================
 export default function LupaPasswordPage() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [globalError, setGlobalError] = useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
-  async function handleSubmit(formData: FormData) {
-    setIsLoading(true);
-    setError(null);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<ForgotValues>({
+    resolver: zodResolver(forgotSchema),
+    defaultValues: { email: "" },
+  });
+
+  async function onSubmit(values: ForgotValues) {
+    setGlobalError(null);
+
+    const formData = new FormData();
+    formData.append("email", values.email);
 
     try {
       const result = await forgotPasswordAction(formData);
       if (result?.error) {
-        setError("Terjadi kesalahan. Pastikan format email sudah benar.");
+        setGlobalError(MESSAGES.errorFormat);
         return;
       }
       setIsSubmitted(true);
     } catch {
-      setError("Koneksi bermasalah. Silakan periksa internet kamu dan coba lagi.");
-    } finally {
-      setIsLoading(false);
+      setGlobalError(MESSAGES.errorConnection);
     }
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-6">
-      <div className="w-full max-w-md bg-white dark:bg-slate-950 p-8 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 space-y-6">
+    <div className="min-h-screen bg-background flex items-center justify-center p-6">
+      <div className="w-full max-w-md bg-card p-8 rounded-2xl shadow-xl border border-border space-y-6">
         
         <div className="space-y-2 text-center">
-          <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">
-            Lupa Kata Sandi?
+          <h1 className="text-2xl font-bold text-card-foreground">
+            {PAGE_CONTENT.title}
           </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            {isSubmitted 
-              ? "Kami telah mengirimkan instruksi pemulihan." 
-              : "Masukkan email kamu yang terdaftar untuk mendapatkan tautan atur ulang kata sandi."}
+          <p className="text-sm text-muted-foreground">
+            {isSubmitted ? PAGE_CONTENT.subtitleSuccess : PAGE_CONTENT.subtitleDefault}
           </p>
         </div>
 
         {isSubmitted ? (
-          <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-400 text-sm p-4 rounded-xl text-center leading-relaxed font-medium">
-            Tautan berhasil dikirim! Silakan periksa kotak masuk atau folder spam email kamu dalam beberapa menit ke depan.
-          </div>
+          <Alert className="bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-400">
+            <CheckCircle2 className="h-4 w-4 stroke-emerald-600 dark:stroke-emerald-400" />
+            <AlertTitle>{MESSAGES.successTitle}</AlertTitle>
+            <AlertDescription className="text-xs opacity-90">
+              {MESSAGES.successDesc}
+            </AlertDescription>
+          </Alert>
         ) : (
-          <form action={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm px-4 py-3 rounded-xl">
-                {error}
-              </div>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            
+            {globalError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{globalError}</AlertDescription>
+              </Alert>
             )}
 
             <div className="space-y-1.5">
-              <Label htmlFor="email" className="text-sm font-medium">Alamat Email</Label>
+              <Label htmlFor="email" className={errors.email ? "text-destructive" : ""}>
+                {PAGE_CONTENT.emailLabel}
+              </Label>
               <Input
                 id="email"
-                name="email"
                 type="email"
-                placeholder="nama@email.com"
-                required
-                disabled={isLoading}
+                placeholder={PAGE_CONTENT.emailPlaceholder}
+                disabled={isSubmitting}
+                autoFocus
+                aria-invalid={!!errors.email}
                 className="h-11 rounded-xl"
+                {...register("email")}
               />
+              {errors.email && (
+                <p className="text-[0.8rem] font-medium text-destructive">
+                  {errors.email.message}
+                </p>
+              )}
             </div>
 
             <Button 
               type="submit" 
-              disabled={isLoading} 
-              className="w-full h-11 rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white"
+              disabled={isSubmitting} 
+              className="w-full h-11 rounded-xl font-bold"
             >
-              {isLoading ? (
+              {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Mengirim...
+                  {PAGE_CONTENT.submitLoading}
                 </>
               ) : (
-                "Kirim Tautan Atur Ulang"
+                PAGE_CONTENT.submitDefault
               )}
             </Button>
           </form>
@@ -90,10 +152,10 @@ export default function LupaPasswordPage() {
 
         <div className="text-center pt-2">
           <Link 
-            href="/login" 
-            className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 font-semibold transition-colors"
+            href={ROUTES.login} 
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary font-semibold transition-colors"
           >
-            <ArrowLeft className="w-4 h-4" /> Kembali ke Halaman Masuk
+            <ArrowLeft className="w-4 h-4" /> {PAGE_CONTENT.backToLogin}
           </Link>
         </div>
 

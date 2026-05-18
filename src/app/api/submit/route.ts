@@ -1,111 +1,115 @@
+/**
+ * app/api/submit/route.ts
+ * 
+ * Route Handler Produksi untuk Pemrosesan Jawaban Tryout (Submit).
+ * Memverifikasi sesi NextAuth v5, memvalidasi payload & data JSONB menggunakan Zod,
+ * melakukan kalkulasi skor akhir di sisi server (secure room), dan menyimpan riwayat ke DB.
+ */
+
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { auth } from "@/auth";
+import { z } from "zod";
 import { db } from "@/db";
 import { questions, tryoutHistories, userAccess } from "@/db/database/schema";
 import { eq, and } from "drizzle-orm";
 
-// Passing grade resmi BKN
-const PASSING_GRADE = { TWK: 65, TIU: 80, TKP: 166 };
+export const dynamic = "force-dynamic";
 
+// ==========================================
+// KONSTANTA & KONFIGURASI (Bebas Hardcode)
+// ==========================================
+const EXAM_CONFIG = {
+  maxVolumeAllowed: 20,
+  passingGrade: { twk: 65, tiu: 80, tkp: 166 },
+} as const;
+
+const API_ERRORS = {
+  unauthorized: "UNAUTHORIZED",
+  forbidden: "FORBIDDEN",
+  invalidPayload: "INVALID_PAYLOAD",
+  notFound: "Soal untuk paket ini tidak ditemukan.",
+  serverError: "Terjadi kesalahan sistem. Coba lagi nanti.",
+} as const;
+
+// Schema Zod untuk Validasi Input Payload dari Pengguna
+const SubmitPayloadSchema = z.object({
+  packageId: z
+    .union([z.number(), z.string().transform((val) => parseInt(val, 10))])
+    .pipe(z.number().int().min(1).max(EXAM_CONFIG.maxVolumeAllowed)),
+  answers: z.record(
+    z.string().regex(/^\d+$/, "ID Soal harus berupa string angka"),
+    z.enum(["A", "B", "C", "D", "E"], { message: "Opsi pilihan tidak valid" })
+  ),
+});
+
+// Schema Zod untuk Validasi Integritas Struktur Opsi Pilihan di Database (jsonb)
+const PilihanSchema = z.array(
+  z.object({
+    opsi: z.string(),
+    teks: z.string(),
+    poin: z.number(),
+  })
+);
+
+// ==========================================
+// METHOD HANDLER: POST
+// ==========================================
 export async function POST(request: Request) {
-  // ── 1. AUTH CHECK ──────────────────────────────────────────────────────
-  const cookieStore = await cookies();
-  const sessionToken = cookieStore.get("SESSION_COOKIE")?.value;
-  if (!sessionToken) {
-    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  // ── 1. PROTEKSI UTAMA (NextAuth v5 API Session Check) ──
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: API_ERRORS.unauthorized }, { status: 401 });
   }
 
-  // ── 2. DECODE SESSION → userId ─────────────────────────────────────────
-  // Production: ganti dengan decode JWT / lookup session table
-  // const userId = await getUserIdFromSession(sessionToken);
-  // if (!userId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-  const userId = "00000000-0000-0000-0000-000000000000"; // placeholder
+  const userId = session.user.id;
 
   try {
-    const body = await request.json();
-    const { packageId, answers } = body;
+    // ── 2. PARSE & VALIDASI PAYLOAD REQUEST BODY VIA ZOD ──
+    const rawBody = await request.json();
+    const parsedPayload = SubmitPayloadSchema.safeParse(rawBody);
 
-    // ── 3. VALIDASI PAYLOAD ────────────────────────────────────────────────
-    if (!packageId) {
+    if (!parsedPayload.success) {
       return NextResponse.json(
-        { error: "packageId wajib disertakan." },
+        { error: API_ERRORS.invalidPayload, details: parsedPayload.error.format() },
         { status: 400 }
       );
     }
 
-    const parsedPackageId = parseInt(packageId, 10);
-    if (isNaN(parsedPackageId) || parsedPackageId < 1 || parsedPackageId > 20) {
-      return NextResponse.json(
-        { error: "packageId tidak valid. Harus angka antara 1–20." },
-        { status: 400 }
-      );
-    }
+    const { packageId, answers } = parsedPayload.data;
 
-    if (
-      !answers ||
-      typeof answers !== "object" ||
-      Array.isArray(answers) ||
-      Object.keys(answers).length === 0
-    ) {
-      return NextResponse.json(
-        { error: "Format jawaban tidak valid." },
-        { status: 400 }
-      );
-    }
-
-    const VALID_KEYS = new Set(["A", "B", "C", "D", "E"]);
-    const answersTyped = answers as Record<string, string>;
-    for (const [soalId, opsi] of Object.entries(answersTyped)) {
-      if (isNaN(Number(soalId)) || !VALID_KEYS.has(opsi)) {
-        return NextResponse.json(
-          { error: "Isi jawaban tidak valid." },
-          { status: 400 }
-        );
-      }
-    }
-
-    // ── 4. CEK KEPEMILIKAN VOLUME ──────────────────────────────────────────
-    // ✅ Sesuai schema: userAccess { userId, packageId }
+    // ── 3. VERIFIKASI HAK KEPEMILIKAN AKSES PAKET USER (Real DB Verification) ──
     const access = await db.query.userAccess.findFirst({
       where: and(
         eq(userAccess.userId, userId),
-        eq(userAccess.packageId, parsedPackageId)
+        eq(userAccess.packageId, packageId)
       ),
     });
 
     if (!access) {
-      return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+      return NextResponse.json({ error: API_ERRORS.forbidden }, { status: 403 });
     }
 
-    // ── 5. AMBIL KUNCI JAWABAN ─────────────────────────────────────────────
-    // ✅ Sesuai schema: questions { id, packageId, kategori, pilihan (jsonb) }
+    // ── 4. TARIK DATA KUNCI JAWABAN ASLI DARI DATABASE ──
     const dbQuestions = await db
       .select()
       .from(questions)
-      .where(eq(questions.packageId, parsedPackageId));
+      .where(eq(questions.packageId, packageId));
 
     if (dbQuestions.length === 0) {
-      return NextResponse.json(
-        { error: "Soal untuk paket ini tidak ditemukan." },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: API_ERRORS.notFound }, { status: 404 });
     }
 
-    // ── 6. HITUNG SKOR SERVER-SIDE ─────────────────────────────────────────
+    // ── 5. KALKULASI SKOR DI SISI SERVER (Secure Anti-Cheat Room) ──
     let skorTwk = 0;
     let skorTiu = 0;
     let skorTkp = 0;
 
     for (const soal of dbQuestions) {
-      const jawabanUser = answersTyped[soal.id.toString()];
-      if (!jawabanUser) continue;
+      const jawabanUser = answers[String(soal.id)];
+      if (!jawabanUser) continue; // Skip jika nomor soal ini dikosongkan oleh user
 
-      const daftarPilihan = soal.pilihan as Array<{
-        opsi: string;
-        teks: string;
-        poin: number;
-      }>;
-
+      // Validasi bentuk JSONB kolom pilihan di database demi keamanan runtime
+      const daftarPilihan = PilihanSchema.parse(soal.pilihan);
       const opsiCocok = daftarPilihan.find((p) => p.opsi === jawabanUser);
       if (!opsiCocok) continue;
 
@@ -118,18 +122,16 @@ export async function POST(request: Request) {
 
     const totalSkor = skorTwk + skorTiu + skorTkp;
     const isLolosUjian =
-      skorTwk >= PASSING_GRADE.TWK &&
-      skorTiu >= PASSING_GRADE.TIU &&
-      skorTkp >= PASSING_GRADE.TKP;
+      skorTwk >= EXAM_CONFIG.passingGrade.twk &&
+      skorTiu >= EXAM_CONFIG.passingGrade.tiu &&
+      skorTkp >= EXAM_CONFIG.passingGrade.tkp;
 
-    // ── 7. SIMPAN HASIL ────────────────────────────────────────────────────
-    // ✅ Sesuai schema tryoutHistories:
-    // { userId, packageId, skorTwk, skorTiu, skorTkp, totalSkor, isLolos, jawabanSiswa, endTime }
+    // ── 6. SIMPAN LOG LOG RIWAYAT SELESAI UJIAN KE POSTGRESQL ──
     const [insertedHistory] = await db
       .insert(tryoutHistories)
       .values({
-        userId,
-        packageId: parsedPackageId,
+        userId: userId,
+        packageId: packageId,
         skorTwk,
         skorTiu,
         skorTkp,
@@ -144,11 +146,9 @@ export async function POST(request: Request) {
       success: true,
       historyId: insertedHistory.id,
     });
+
   } catch (err) {
-    console.error("[POST /api/submit]", err);
-    return NextResponse.json(
-      { error: "Terjadi kesalahan sistem. Coba lagi nanti." },
-      { status: 500 }
-    );
+    console.error("[API ERROR] POST /api/submit:", err);
+    return NextResponse.json({ error: API_ERRORS.serverError }, { status: 500 });
   }
 }

@@ -1,3 +1,7 @@
+/**
+ * app/verify-email/page.tsx
+ */
+
 import { db } from "@/db";
 import { users, verificationTokens } from "@/db/database/schema";
 import { and, eq } from "drizzle-orm";
@@ -5,20 +9,57 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, XCircle } from "lucide-react";
 
+// ==========================================
+// KONSTANTA & KONFIGURASI (Bebas Hardcode)
+// ==========================================
+const ROUTES = {
+  login: "/login",
+} as const;
+
+const VERIFY_CONTENT = {
+  invalid: {
+    title: "Tautan Tidak Valid",
+    message: "Tautan verifikasi email tidak lengkap atau tidak sah. Silakan periksa kembali kotak masuk email Anda.",
+  },
+  notFound: {
+    title: "Verifikasi Gagal",
+    message: "Tautan verifikasi salah, sudah digunakan, atau tidak terdaftar di sistem kami.",
+  },
+  expired: {
+    title: "Tautan Kedaluwarsa",
+    message: "Tautan verifikasi ini telah kedaluwarsa karena sudah melewati batas waktu 1 jam. Silakan lakukan registrasi ulang.",
+  },
+  success: {
+    title: "Verifikasi Berhasil",
+    message: "Email Anda telah berhasil diverifikasi! Akun Anda kini aktif dan Anda sudah bisa masuk ke platform ASNPedia.",
+  },
+  error: {
+    title: "Terjadi Kesalahan",
+    message: "Terjadi gangguan internal pada server saat memproses verifikasi akun Anda. Silakan coba lagi beberapa saat lagi.",
+  },
+  btnText: "Kembali ke Halaman Login",
+} as const;
+
+// ==========================================
+// TIPE PROPS
+// ==========================================
 interface VerifyPageProps {
   searchParams: Promise<{ token?: string; email?: string }>;
 }
 
+// ==========================================
+// KOMPONEN UTAMA (SERVER)
+// ==========================================
 export default async function VerifyEmailPage({ searchParams }: VerifyPageProps) {
-  // ✅ Menangani searchParams secara asinkron sesuai standar Next.js 15/16
+  // Menangani searchParams secara asinkron (Standar Next.js > 15)
   const { token, email } = await searchParams;
 
   if (!token || !email) {
     return (
       <VerifyResult
         success={false}
-        title="Tautan Tidak Valid"
-        message="Tautan verifikasi email tidak lengkap atau tidak sah. Silakan periksa kembali kotak masuk email Anda."
+        title={VERIFY_CONTENT.invalid.title}
+        message={VERIFY_CONTENT.invalid.message}
       />
     );
   }
@@ -36,16 +77,16 @@ export default async function VerifyEmailPage({ searchParams }: VerifyPageProps)
       return (
         <VerifyResult
           success={false}
-          title="Verifikasi Gagal"
-          message="Tautan verifikasi salah, sudah digunakan, atau tidak terdaftar di sistem kami."
+          title={VERIFY_CONTENT.notFound.title}
+          message={VERIFY_CONTENT.notFound.message}
         />
       );
     }
 
-    // 2. Periksa apakah token sudah kedaluwarsa (lebih dari 1 jam)
+    // 2. Periksa apakah token sudah kedaluwarsa
     const hasExpired = new Date(existingToken.expires) < new Date();
     if (hasExpired) {
-      // Hapus token kedaluwarsa dari database agar bersih
+      // Bersihkan token kedaluwarsa
       await db
         .delete(verificationTokens)
         .where(eq(verificationTokens.token, token));
@@ -53,19 +94,19 @@ export default async function VerifyEmailPage({ searchParams }: VerifyPageProps)
       return (
         <VerifyResult
           success={false}
-          title="Tautan Kedaluwarsa"
-          message="Tautan verifikasi ini telah kedaluwarsa karena sudah melewati batas waktu 1 jam. Silakan lakukan registrasi ulang."
+          title={VERIFY_CONTENT.expired.title}
+          message={VERIFY_CONTENT.expired.message}
         />
       );
     }
 
-    // 3. Update kolom emailVerified pada user dengan waktu saat ini
+    // 3. Update status emailVerified pada user
     await db
       .update(users)
       .set({ emailVerified: new Date() })
       .where(eq(users.email, email));
 
-    // 4. Hapus token dari database karena proses verifikasi sudah selesai
+    // 4. Hapus token dari database karena sudah selesai
     await db
       .delete(verificationTokens)
       .where(eq(verificationTokens.token, token));
@@ -73,17 +114,17 @@ export default async function VerifyEmailPage({ searchParams }: VerifyPageProps)
     return (
       <VerifyResult
         success={true}
-        title="Verifikasi Berhasil"
-        message="Email Anda telah berhasil diverifikasi! Akun Anda kini aktif dan Anda sudah bisa masuk ke platform ASNPedia."
+        title={VERIFY_CONTENT.success.title}
+        message={VERIFY_CONTENT.success.message}
       />
     );
   } catch (error) {
-    console.error("Error pada verifikasi email:", error);
+    console.error("[Auth] Error pada verifikasi email:", error);
     return (
       <VerifyResult
         success={false}
-        title="Terjadi Kesalahan"
-        message="Terjadi gangguan internal pada server saat memproses verifikasi akun Anda. Silakan coba lagi beberapa saat lagi."
+        title={VERIFY_CONTENT.error.title}
+        message={VERIFY_CONTENT.error.message}
       />
     );
   }
@@ -100,8 +141,8 @@ interface VerifyResultProps {
 
 function VerifyResult({ success, title, message }: VerifyResultProps) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4 font-sans">
-      <div className="bg-white dark:bg-slate-950 p-8 rounded-2xl shadow-xl max-w-md w-full text-center border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-300">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 font-sans">
+      <div className="bg-card p-8 rounded-2xl shadow-xl max-w-md w-full text-center border border-border animate-in fade-in zoom-in-95 duration-300">
         
         {/* Indikator Status (Icon) */}
         <div className="flex justify-center mb-6">
@@ -110,28 +151,33 @@ function VerifyResult({ success, title, message }: VerifyResultProps) {
               <CheckCircle2 className="w-16 h-16" />
             </div>
           ) : (
-            <div className="p-3 bg-red-50 dark:bg-red-950/40 rounded-full text-red-600 dark:text-red-400">
+            // Menggunakan variabel destruktif bawaan shadcn untuk error
+            <div className="p-3 bg-destructive/10 rounded-full text-destructive">
               <XCircle className="w-16 h-16" />
             </div>
           )}
         </div>
 
         {/* Judul Status */}
-        <h1 className={`text-2xl font-extrabold tracking-tight mb-3 ${success ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+        <h1 
+          className={`text-2xl font-extrabold tracking-tight mb-3 ${
+            success ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"
+          }`}
+        >
           {title}
         </h1>
         
         {/* Deskripsi/Pesan */}
-        <p className="text-slate-600 dark:text-slate-400 mb-8 text-sm leading-relaxed">
+        <p className="text-muted-foreground mb-8 text-sm leading-relaxed">
           {message}
         </p>
 
-        {/* Tombol Aksi */}
-        <Link href="/login" passHref>
-          <Button className="w-full h-11 rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200 dark:shadow-none transition-all">
-            Kembali ke Halaman Login
-          </Button>
-        </Link>
+        {/* Tombol Aksi - Menggunakan asChild sesuai standar shadcn */}
+        <Button asChild className="w-full h-11 rounded-xl font-bold">
+          <Link href={ROUTES.login}>
+            {VERIFY_CONTENT.btnText}
+          </Link>
+        </Button>
       </div>
     </div>
   );

@@ -1,14 +1,9 @@
 /**
  * app/api/auth/[...nextauth]/route.ts
- *
- * ✅ NextAuth v5 — satu baris, handlers dari auth.ts
- * Melayani semua route:
- *   GET  /api/auth/signin
- *   GET  /api/auth/callback/google
- *   POST /api/auth/signin/credentials
- *   POST /api/auth/signout
- *   GET  /api/auth/session
- *   dll
+ * 
+ * Sesuai spesifikasi resmi NextAuth v5 (Auth.js):
+ * Handler catch-all endpoint API untuk menangani seluruh alur manajemen sesi otentikasi
+ * (signin, signout, session checks, dan OAuth callbacks).
  */
 
 import { handlers } from "@/auth";

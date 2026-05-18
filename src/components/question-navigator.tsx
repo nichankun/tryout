@@ -1,17 +1,44 @@
 "use client";
 
+/**
+ * components/dashboard/question-navigator.tsx
+ * 
+ * Komponen Client untuk navigasi panel nomor soal CAT.
+ * Terbagi otomatis per sub-materi SKD menggunakan token warna semantik yang adaptif.
+ */
+
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
+// ==========================================
+// KONSTANTA & KONFIGURASI (Bebas Hardcode)
+// ==========================================
+const TEXT_CONTENT = {
+  headerTitle: "Navigasi Soal",
+  legendAnswered: "Terjawab",
+  legendEmpty: "Kosong",
+  legendDoubt: "Ragu-ragu",
+  legendCurrent: "Posisi Saat Ini",
+} as const;
+
+const EXAM_SECTIONS = [
+  { label: "TWK (1-30)",   start: 0,  end: 30  },
+  { label: "TIU (31-65)",  start: 30, end: 65  },
+  { label: "TKP (66-110)", start: 65, end: 110 },
+] as const;
+
 interface QuestionNavigatorProps {
   totalQuestions?: number;
   currentQuestionIndex: number;
-  answers: Record<number, string>; // Contoh data: { 0: 'A', 5: 'C' }
-  doubtQuestions: number[]; // Array index soal yg diragukan: [1, 10]
+  answers: Record<number, string>; // Format data index: { 0: 'A', 5: 'C' }
+  doubtQuestions: number[];        // Format data array index: [1, 10]
   onSelect: (index: number) => void;
 }
 
+// ==========================================
+// KOMPONEN UTAMA
+// ==========================================
 export function QuestionNavigator({
   currentQuestionIndex,
   answers,
@@ -19,10 +46,10 @@ export function QuestionNavigator({
   onSelect,
 }: QuestionNavigatorProps) {
   
-  // Fungsi pembuat grid per kategori materi
+  // Fungsi pembangun struktur grid per kelompok materi SKD
   const renderGrid = (start: number, end: number, label: string) => (
     <div className="mb-6 last:mb-0">
-      <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-3 flex items-center justify-between">
+      <h4 className="text-xs font-bold text-muted-foreground uppercase mb-3 flex items-center justify-between tracking-wider">
         <span>{label}</span>
       </h4>
       <div className="grid grid-cols-5 gap-2">
@@ -39,12 +66,12 @@ export function QuestionNavigator({
               type="button"
               onClick={() => onSelect(qIndex)}
               className={cn(
-                "w-10 h-10 p-0 text-xs font-semibold rounded-xl transition-all border-2",
-                isCurrent && "border-blue-600 ring-2 ring-blue-600/20",
-                isAnswered && !isDoubt && "bg-blue-600 text-white border-blue-600 hover:bg-blue-700 hover:text-white",
-                isDoubt && "bg-amber-500 text-white border-amber-500 hover:bg-amber-600 hover:text-white",
-                !isAnswered && !isDoubt && "text-slate-600 dark:text-slate-300 hover:border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20",
-                isCurrent && isAnswered && "ring-offset-2 ring-offset-white dark:ring-offset-slate-900"
+                "w-10 h-10 p-0 text-xs font-bold rounded-xl transition-all border-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                isCurrent && "border-primary ring-2 ring-primary/20",
+                isAnswered && !isDoubt && "bg-primary text-primary-foreground border-primary hover:bg-primary/90 hover:text-primary-foreground",
+                isDoubt && "bg-amber-500 dark:bg-amber-600 text-white border-amber-500 dark:border-amber-600 hover:bg-amber-600 dark:hover:bg-amber-700 hover:text-white",
+                !isAnswered && !isDoubt && "text-muted-foreground border-border bg-card hover:border-primary/50 hover:bg-muted/50",
+                isCurrent && isAnswered && "ring-offset-2 ring-offset-background"
               )}
             >
               {qIndex + 1}
@@ -56,33 +83,37 @@ export function QuestionNavigator({
   );
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-slate-900 rounded-2xl border-2 border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+    <div className="flex flex-col h-full bg-card rounded-2xl border-2 border-border shadow-sm overflow-hidden">
       
-      {/* Header Panel */}
-      <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
-        <h3 className="font-bold text-slate-800 dark:text-slate-100">Navigasi Soal</h3>
+      {/* Batas Header Panel Navigasi */}
+      <div className="p-4 border-b border-border bg-muted/40">
+        <h3 className="font-bold text-foreground tracking-tight">{TEXT_CONTENT.headerTitle}</h3>
       </div>
 
-      {/* Grid Soal (Scrollable) */}
+      {/* Konten Area Grid Soal (Dukungan Scrollable) */}
       <ScrollArea className="flex-1 p-4 h-100">
-        {renderGrid(0, 30, "TWK (1-30)")}
-        {renderGrid(30, 65, "TIU (31-65)")}
-        {renderGrid(65, 110, "TKP (66-110)")}
+        {EXAM_SECTIONS.map((section) => 
+          renderGrid(section.start, section.end, section.label)
+        )}
       </ScrollArea>
 
-      {/* Legenda Indikator Warna */}
-      <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 grid grid-cols-2 gap-y-3 text-xs font-medium text-slate-600 dark:text-slate-400">
+      {/* Legenda Blok Petunjuk Indikator Status Warna */}
+      <div className="p-4 border-t border-border bg-muted/20 grid grid-cols-2 gap-y-3 text-xs font-semibold text-muted-foreground">
         <div className="flex items-center gap-2.5">
-          <div className="w-3.5 h-3.5 rounded bg-blue-600 shadow-sm" /> Terjawab
+          <div className="w-3.5 h-3.5 rounded bg-primary shadow-sm" /> 
+          {TEXT_CONTENT.legendAnswered}
         </div>
         <div className="flex items-center gap-2.5">
-          <div className="w-3.5 h-3.5 rounded border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800" /> Kosong
+          <div className="w-3.5 h-3.5 rounded border-2 border-muted-foreground/30 bg-card" /> 
+          {TEXT_CONTENT.legendEmpty}
         </div>
         <div className="flex items-center gap-2.5">
-          <div className="w-3.5 h-3.5 rounded bg-amber-500 shadow-sm" /> Ragu-ragu
+          <div className="w-3.5 h-3.5 rounded bg-amber-500 dark:bg-amber-600 shadow-sm" /> 
+          {TEXT_CONTENT.legendDoubt}
         </div>
         <div className="flex items-center gap-2.5">
-          <div className="w-3.5 h-3.5 rounded ring-2 ring-blue-600 ring-offset-1 dark:ring-offset-slate-900 bg-white dark:bg-slate-800" /> Posisi Saat Ini
+          <div className="w-3.5 h-3.5 rounded ring-2 ring-primary ring-offset-1 ring-offset-background bg-card" /> 
+          {TEXT_CONTENT.legendCurrent}
         </div>
       </div>
       

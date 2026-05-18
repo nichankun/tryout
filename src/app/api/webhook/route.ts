@@ -1,147 +1,140 @@
 /**
- * app/api/payment/webhook/route.ts — FIXED
- *
- * [1] orders.midtransOrderId → orders.id
- *     Schema hanya punya kolom id, dan orderId dari api/payment/route.ts
- *     (format ASN-{volumeId}-{timestamp}) sudah dikirim ke Midtrans sebagai order_id,
- *     sehingga notif.order_id === orders.id
+ * app/api/payment/webhook/route.ts
+ * 
+ * Endpoint Publik Penerima Callback Webhook dari Midtrans.
+ * Menggunakan fitur Transaction Status Native dari midtrans-client SDK
+ * untuk memvalidasi keamanan signature dan melakukan pembaruan ke Database Drizzle.
  */
 
 import { NextResponse } from "next/server";
-import { createHash } from "crypto";
+import midtransClient from "midtrans-client";
 import { db } from "@/db";
 import { orders, userAccess } from "@/db/database/schema";
 import { eq } from "drizzle-orm";
 
-interface MidtransNotification {
-  order_id: string;
-  transaction_status: string;
-  fraud_status?: string;
-  payment_type: string;
-  gross_amount: string;
-  signature_key: string;
-  status_code: string;
-  transaction_id: string;
-}
+export const dynamic = "force-dynamic";
 
-function verifySignature(notif: MidtransNotification): boolean {
-  const serverKey = process.env.MIDTRANS_SERVER_KEY;
-  if (!serverKey) {
-    console.error("[webhook] MIDTRANS_SERVER_KEY tidak ditemukan di env");
-    return false;
-  }
-  const raw = `${notif.order_id}${notif.status_code}${notif.gross_amount}${serverKey}`;
-  const expected = createHash("sha512").update(raw).digest("hex");
-  return expected === notif.signature_key;
-}
+// ==========================================
+// KONSTANTA & KONFIGURASI (Bebas Hardcode)
+// ==========================================
+const API_ERRORS = {
+  invalidJson: "Format JSON payload tidak valid.",
+  missingFields: "Payload tidak lengkap. Pastikan integrasi dari Midtrans.",
+  dbError: "Terjadi kesalahan internal pada server database.",
+} as const;
+
+// Inisialisasi Instans Midtrans Snap Client (Untuk kebutuhan Verifikasi Signature)
+const snapGateway = new midtransClient.Snap({
+  isProduction: process.env.MIDTRANS_IS_PRODUCTION === "true",
+  serverKey: process.env.MIDTRANS_SERVER_KEY ?? "",
+});
 
 type OrderStatus = "paid" | "pending" | "failed" | "unknown";
 
-function resolveStatus(notif: MidtransNotification): OrderStatus {
-  const { transaction_status, fraud_status } = notif;
-  if (transaction_status === "capture") {
-    return fraud_status === "accept" ? "paid" : "failed";
+// Helper Resolusi Konversi Status Midtrans -> Status Internal Database
+function resolveStatus(transactionStatus: string, fraudStatus?: string): OrderStatus {
+  if (transactionStatus === "capture") {
+    return fraudStatus === "accept" ? "paid" : "failed";
   }
-  if (transaction_status === "settlement") return "paid";
-  if (transaction_status === "pending") return "pending";
-  if (["deny", "cancel", "expire"].includes(transaction_status)) return "failed";
+  if (transactionStatus === "settlement") return "paid";
+  if (transactionStatus === "pending") return "pending";
+  if (["deny", "cancel", "expire"].includes(transactionStatus)) return "failed";
+  
   return "unknown";
 }
 
+// ==========================================
+// METHOD HANDLER: POST (Menerima Notifikasi dari Server Midtrans)
+// ==========================================
 export async function POST(request: Request) {
-  let notif: MidtransNotification;
+  let notificationPayload: any;
+
   try {
-    notif = await request.json();
+    notificationPayload = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.invalidJson }, { status: 400 });
   }
-
-  const required: (keyof MidtransNotification)[] = [
-    "order_id",
-    "transaction_status",
-    "gross_amount",
-    "signature_key",
-    "status_code",
-  ];
-  for (const field of required) {
-    if (!notif[field]) {
-      return NextResponse.json(
-        { error: `Field ${field} wajib ada.` },
-        { status: 400 }
-      );
-    }
-  }
-
-  if (!verifySignature(notif)) {
-    console.warn("[webhook] Signature tidak valid:", notif.order_id);
-    return NextResponse.json({ error: "Invalid signature." }, { status: 403 });
-  }
-
-  const status = resolveStatus(notif);
-  console.info(`[webhook] order_id=${notif.order_id} status=${status}`);
 
   try {
-    // ✅ [FIX 1] orders.id bukan orders.midtransOrderId
-    const order = await db.query.orders.findFirst({
-      where: eq(orders.id, notif.order_id),
+    // 1. Verifikasi Keaslian Notifikasi (Signature) langsung menembak API Midtrans
+    // Method ini akan membuang error/melempar catch jika signature_key tidak cocok
+    const verifiedNotification = await snapGateway.transaction.notification(notificationPayload);
+
+    const orderId = verifiedNotification.order_id;
+    const transactionStatus = verifiedNotification.transaction_status;
+    const fraudStatus = verifiedNotification.fraud_status;
+    const transactionId = verifiedNotification.transaction_id;
+
+    if (!orderId) {
+      return NextResponse.json({ error: API_ERRORS.missingFields }, { status: 400 });
+    }
+
+    const resolvedStatus = resolveStatus(transactionStatus, fraudStatus);
+    console.info(`[Midtrans Webhook] order_id=${orderId} terdeteksi sebagai: ${resolvedStatus}`);
+
+    // 2. Pencarian Data Log Transaksi Awal di Database Lokal
+    const orderRecord = await db.query.orders.findFirst({
+      where: eq(orders.id, orderId),
     });
 
-    if (!order) {
-      console.error("[webhook] Order tidak ditemukan:", notif.order_id);
+    // Jika Midtrans mengirimkan order_id yang tidak ada di DB, anggap sukses (Bisa jadi dari sistem staging/dev)
+    if (!orderRecord) {
+      console.warn(`[Midtrans Webhook] Order tidak dikenali di sistem lokal: ${orderId}`);
       return NextResponse.json({ success: true }, { status: 200 });
     }
 
-    if (order.status === "paid") {
-      console.info(`[webhook] Order ${notif.order_id} sudah diproses, skip.`);
+    // Jika order sudah terekam sebagai paid sebelumnya, lewati proses mutasi redundan
+    if (orderRecord.status === "paid") {
+      console.info(`[Midtrans Webhook] Transaksi ${orderId} sudah terekam "paid". Melewati proses...`);
       return NextResponse.json({ success: true }, { status: 200 });
     }
 
-    if (status === "paid") {
+    // 3. Mutasi Database (Atomic Transaction untuk Kasus Paid)
+    if (resolvedStatus === "paid") {
       await db.transaction(async (tx) => {
-        // ✅ [FIX 1] orders.id bukan orders.midtransOrderId
+        // A. Perbarui Status Log Order Pembayaran
         await tx
           .update(orders)
           .set({
             status: "paid",
             paidAt: new Date(),
-            transactionId: notif.transaction_id,
+            transactionId: transactionId,
           })
-          .where(eq(orders.id, notif.order_id));
+          .where(eq(orders.id, orderId));
 
+        // B. Sisipkan Izin Hak Akses Paket (Buka Gembok Tryout)
+        // Memanfaatkan onConflictDoNothing bawaan Postgre/Drizzle untuk pencegahan duplikasi data
         await tx
           .insert(userAccess)
           .values({
-            userId: order.userId,
-            packageId: order.packageId,
+            userId: orderRecord.userId,
+            packageId: orderRecord.packageId,
             purchasedAt: new Date(),
           })
           .onConflictDoNothing();
       });
 
-      console.info(
-        `[webhook] PAID — akses volume ${order.packageId} diberikan ke user ${order.userId}`
-      );
-    } else if (status === "pending") {
-      // ✅ [FIX 1] orders.id bukan orders.midtransOrderId
+      console.info(`[Midtrans Webhook] SUCCESS - Izin paket ${orderRecord.packageId} berhasil dibuka untuk pengguna ${orderRecord.userId}`);
+    
+    } else if (resolvedStatus === "pending") {
       await db
         .update(orders)
         .set({ status: "pending" })
-        .where(eq(orders.id, notif.order_id));
+        .where(eq(orders.id, orderId));
 
-      console.info(`[webhook] PENDING — order ${notif.order_id}`);
-    } else if (status === "failed") {
-      // ✅ [FIX 1] orders.id bukan orders.midtransOrderId
+    } else if (resolvedStatus === "failed") {
       await db
         .update(orders)
         .set({ status: "failed" })
-        .where(eq(orders.id, notif.order_id));
-
-      console.info(`[webhook] FAILED — order ${notif.order_id}`);
+        .where(eq(orders.id, orderId));
     }
 
+    // Selalu respon 200 OK ke Midtrans setelah berhasil diproses agar Midtrans berhenti mengulang ping (retry)
     return NextResponse.json({ success: true }, { status: 200 });
+
   } catch (err) {
-    console.error("[webhook] DB error:", err);
-    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
+    // Akan terpanggil jika `snapGateway.transaction.notification()` gagal (Signature salah/Fraud)
+    console.error("[Midtrans Webhook Error]:", err);
+    return NextResponse.json({ error: API_ERRORS.dbError }, { status: 500 });
   }
 }

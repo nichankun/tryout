@@ -1,7 +1,14 @@
+/**
+ * app/riwayat/page.tsx
+ * 
+ * Async Server Component untuk menampilkan visualisasi riwayat pengerjaan tryout.
+ * Terhubung langsung ke PostgreSQL melalui Drizzle ORM dan diproteksi auth v5.
+ */
+
 import type { Metadata } from "next";
 import Link from "next/link";
-import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { auth } from "@/auth";
 import { db } from "@/db";
 import { tryoutHistories, tryoutPackages } from "@/db/database/schema";
 import { eq, desc } from "drizzle-orm";
@@ -17,26 +24,75 @@ import {
   BookOpen, Clock, ChevronRight, FileText,
 } from "lucide-react";
 
+// ==========================================
+// KONSTANTA & KONFIGURASI (Bebas Hardcode)
+// ==========================================
+const APP_CONFIG = {
+  name: "ASNPedia",
+  locale: "id-ID",
+} as const;
+
+const EXAM_THRESHOLDS = {
+  passingGrade: { twk: 65, tiu: 80, tkp: 166 },
+} as const;
+
+const ROUTES = {
+  loginRedirect: "/login?callbackUrl=/riwayat",
+  dashboard: "/dashboard",
+  detailHasil: (packageId: number) => `/tryout/${packageId}/hasil`,
+} as const;
+
+const TEXT_CONTENT = {
+  metaTitle: `Riwayat Tryout — ${APP_CONFIG.name}`,
+  metaDesc: "Lihat riwayat dan hasil semua tryout SKD yang pernah kamu kerjakan.",
+  title: "Riwayat Tryout",
+  subtitle: "Semua tryout SKD yang pernah kamu kerjakan",
+  btnActionMain: "Coba Volume Lain",
+  statTotalExams: "Total Ujian",
+  statPassed: "Lolos",
+  statAvgScore: "Rerata Skor",
+  statHighScore: "Skor Tertinggi",
+  emptyStateTitle: "Belum ada riwayat tryout",
+  emptyStateDesc: "Kerjakan tryout pertamamu dan hasilnya akan muncul di sini.",
+  emptyStateBtn: "Mulai Tryout",
+  tableHeaderSummary: (count: number) => `${count} Ujian Tercatat`,
+  thPackage: "Paket",
+  thTwk: "TWK",
+  thTiu: "TIU",
+  thTkp: "TKP",
+  thTotal: "Total",
+  thStatus: "Status",
+  thDate: "Tanggal",
+  thAction: "Aksi",
+  badgePassed: "Lolos",
+  badgeFailed: "Belum",
+  btnDetail: "Detail",
+  footerThresholds: "Passing grade BKN:",
+} as const;
+
 export const metadata: Metadata = {
-  title: "Riwayat Tryout — ASNPedia",
-  description: "Lihat riwayat dan hasil semua tryout SKD yang pernah kamu kerjakan.",
+  title: TEXT_CONTENT.metaTitle,
+  description: TEXT_CONTENT.metaDesc,
 };
 
-const PASSING_GRADE = { twk: 65, tiu: 80, tkp: 166 };
-
+// Helper format representasi waktu/tanggal lokal
 function formatTanggal(date: Date | null): string {
   if (!date) return "-";
-  return new Intl.DateTimeFormat("id-ID", {
+  return new Intl.DateTimeFormat(APP_CONFIG.locale, {
     day: "numeric", month: "long", year: "numeric",
     hour: "2-digit", minute: "2-digit",
   }).format(date);
 }
 
+// ==========================================
+// KOMPONEN UTAMA (SERVER COMPONENT)
+// ==========================================
 export default async function RiwayatPage() {
+  // 1. Validasi Keamanan Proteksi Sesi Pengguna
   const session = await auth();
-  if (!session?.user?.id) redirect("/login?callbackUrl=/riwayat");
+  if (!session?.user?.id) redirect(ROUTES.loginRedirect);
 
-  // ✅ Fetch dari DB — no mock
+  // 2. Tarik Data Komparatif Riwayat dari Database Relasional
   const histories = await db
     .select({
       id:           tryoutHistories.id,
@@ -64,133 +120,136 @@ export default async function RiwayatPage() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-10 px-4 md:px-8">
+    <div className="min-h-screen bg-background text-foreground py-10 px-4 md:px-8">
       <div className="max-w-5xl mx-auto space-y-8">
 
+        {/* ATAS: BARIS JUDUL DAN AKSI UTAMA */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <Clock className="w-5 h-5 text-blue-600" aria-hidden />
-              <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">
-                Riwayat Tryout
+              <Clock className="w-5 h-5 text-primary" aria-hidden />
+              <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                {TEXT_CONTENT.title}
               </h1>
             </div>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Semua tryout SKD yang pernah kamu kerjakan
+            <p className="text-sm text-muted-foreground">
+              {TEXT_CONTENT.subtitle}
             </p>
           </div>
           <Button asChild className="rounded-xl font-bold gap-2">
-            <Link href="/dashboard">
+            <Link href={ROUTES.dashboard}>
               <BookOpen className="w-4 h-4" aria-hidden />
-              Coba Volume Lain
+              {TEXT_CONTENT.btnActionMain}
             </Link>
           </Button>
         </div>
 
+        {/* TENGAH: GRID MATRIKS RINGKASAN METRIK PERFORMA */}
         {totalUjian > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { label: "Total Ujian",    value: totalUjian,    color: "text-blue-600 dark:text-blue-400",       bg: "bg-blue-50 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900" },
-              { label: "Lolos",          value: totalLolos,    color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-100 dark:border-emerald-900" },
-              { label: "Rerata Skor",    value: rerataSkor,    color: "text-purple-600 dark:text-purple-400",   bg: "bg-purple-50 dark:bg-purple-950/30 border-purple-100 dark:border-purple-900" },
-              { label: "Skor Tertinggi", value: skorTertinggi, color: "text-amber-600 dark:text-amber-400",     bg: "bg-amber-50 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900" },
+              { label: TEXT_CONTENT.statTotalExams, value: totalUjian,    color: "text-primary",     bg: "bg-primary/5 border-primary/10" },
+              { label: TEXT_CONTENT.statPassed,     value: totalLolos,    color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/5 border-emerald-500/10 dark:border-emerald-500/20" },
+              { label: TEXT_CONTENT.statAvgScore,   value: rerataSkor,    color: "text-purple-600 dark:text-purple-400",   bg: "bg-purple-500/5 border-purple-500/10 dark:border-purple-500/20" },
+              { label: TEXT_CONTENT.statHighScore,  value: skorTertinggi, color: "text-amber-600 dark:text-amber-400",     bg: "bg-amber-500/5 border-amber-500/10 dark:border-amber-500/20" },
             ].map((s) => (
               <Card key={s.label} className={`rounded-2xl border shadow-sm ${s.bg}`}>
                 <CardContent className="p-4 text-center">
-                  <p className={`text-3xl font-black ${s.color}`}>{s.value}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">{s.label}</p>
+                  <p className={`text-3xl font-black tracking-tight ${s.color}`}>{s.value}</p>
+                  <p className="text-xs text-muted-foreground mt-1 font-medium">{s.label}</p>
                 </CardContent>
               </Card>
             ))}
           </div>
         )}
 
+        {/* BAWAH: TABEL RIWAYAT ATAU FALLBACK KOSONG */}
         {totalUjian === 0 ? (
-          <Card className="rounded-2xl border-slate-200 dark:border-slate-800 shadow-sm">
+          <Card className="rounded-2xl border-border bg-card shadow-sm">
             <CardContent className="py-20 text-center space-y-3">
-              <FileText className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-600" aria-hidden />
-              <p className="font-semibold text-slate-600 dark:text-slate-300">
-                Belum ada riwayat tryout
+              <FileText className="w-10 h-10 mx-auto text-muted-foreground/40" aria-hidden />
+              <p className="font-semibold text-foreground/80">
+                {TEXT_CONTENT.emptyStateTitle}
               </p>
-              <p className="text-sm text-slate-400 dark:text-slate-500">
-                Kerjakan tryout pertamamu dan hasilnya akan muncul di sini.
+              <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                {TEXT_CONTENT.emptyStateDesc}
               </p>
               <Button asChild className="mt-2 rounded-xl font-bold">
-                <Link href="/dashboard">Mulai Tryout</Link>
+                <Link href={ROUTES.dashboard}>{TEXT_CONTENT.emptyStateBtn}</Link>
               </Button>
             </CardContent>
           </Card>
         ) : (
-          <Card className="rounded-2xl border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-            <CardHeader className="bg-slate-50 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 py-3 px-5">
+          <Card className="rounded-2xl border-border bg-card shadow-sm overflow-hidden">
+            <CardHeader className="bg-muted/30 border-b border-border py-3 px-5">
               <div className="flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-blue-600" aria-hidden />
-                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
-                  {totalUjian} Ujian Tercatat
+                <BarChart3 className="w-4 h-4 text-primary" aria-hidden />
+                <span className="text-sm font-bold text-foreground">
+                  {TEXT_CONTENT.tableHeaderSummary(totalUjian)}
                 </span>
               </div>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
-                <TableHeader className="bg-slate-50 dark:bg-slate-800/50">
-                  <TableRow>
-                    <TableHead className="font-bold pl-5">Paket</TableHead>
-                    <TableHead className="text-center font-bold">TWK</TableHead>
-                    <TableHead className="text-center font-bold">TIU</TableHead>
-                    <TableHead className="text-center font-bold">TKP</TableHead>
-                    <TableHead className="text-center font-bold">Total</TableHead>
-                    <TableHead className="text-center font-bold">Status</TableHead>
-                    <TableHead className="text-right font-bold pr-5">Tanggal</TableHead>
-                    <TableHead className="text-center font-bold">Aksi</TableHead>
+                <TableHeader className="bg-muted/50">
+                  <TableRow className="border-b border-border">
+                    <TableHead className="font-bold text-foreground pl-5">{TEXT_CONTENT.thPackage}</TableHead>
+                    <TableHead className="text-center font-bold text-foreground">{TEXT_CONTENT.thTwk}</TableHead>
+                    <TableHead className="text-center font-bold text-foreground">{TEXT_CONTENT.thTiu}</TableHead>
+                    <TableHead className="text-center font-bold text-foreground">{TEXT_CONTENT.thTkp}</TableHead>
+                    <TableHead className="text-center font-bold text-foreground">{TEXT_CONTENT.thTotal}</TableHead>
+                    <TableHead className="text-center font-bold text-foreground">{TEXT_CONTENT.thStatus}</TableHead>
+                    <TableHead className="text-right font-bold text-foreground pr-5">{TEXT_CONTENT.thDate}</TableHead>
+                    <TableHead className="text-center font-bold text-foreground">{TEXT_CONTENT.thAction}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {histories.map((item) => (
-                    <TableRow key={item.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                    <TableRow key={item.id} className="border-b border-border/60 hover:bg-muted/30 transition-colors">
                       <TableCell className="pl-5">
-                        <p className="text-slate-800 dark:text-slate-200 font-semibold text-sm">
+                        <p className="text-foreground font-semibold text-sm">
                           {item.packageTitle}
                         </p>
                       </TableCell>
                       <TableCell className="text-center">
-                        <span className={`text-sm font-bold ${item.skorTwk >= PASSING_GRADE.twk ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
+                        <span className={`text-sm font-bold ${item.skorTwk >= EXAM_THRESHOLDS.passingGrade.twk ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
                           {item.skorTwk}
                         </span>
                       </TableCell>
                       <TableCell className="text-center">
-                        <span className={`text-sm font-bold ${item.skorTiu >= PASSING_GRADE.tiu ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
+                        <span className={`text-sm font-bold ${item.skorTiu >= EXAM_THRESHOLDS.passingGrade.tiu ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
                           {item.skorTiu}
                         </span>
                       </TableCell>
                       <TableCell className="text-center">
-                        <span className={`text-sm font-bold ${item.skorTkp >= PASSING_GRADE.tkp ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
+                        <span className={`text-sm font-bold ${item.skorTkp >= EXAM_THRESHOLDS.passingGrade.tkp ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
                           {item.skorTkp}
                         </span>
                       </TableCell>
                       <TableCell className="text-center">
-                        <span className="text-base font-black text-slate-800 dark:text-slate-100">
+                        <span className="text-base font-black text-foreground">
                           {item.totalSkor}
                         </span>
                       </TableCell>
                       <TableCell className="text-center">
                         {item.isLolos ? (
-                          <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 gap-1 hover:bg-emerald-100">
-                            <CheckCircle2 className="w-3 h-3" aria-hidden />Lolos
+                          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 gap-1 hover:bg-emerald-500/10">
+                            <CheckCircle2 className="w-3 h-3" aria-hidden />{TEXT_CONTENT.badgePassed}
                           </Badge>
                         ) : (
-                          <Badge className="bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 gap-1 hover:bg-red-100">
-                            <XCircle className="w-3 h-3" aria-hidden />Belum
+                          <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20 gap-1 hover:bg-destructive/10">
+                            <XCircle className="w-3 h-3" aria-hidden />{TEXT_CONTENT.badgeFailed}
                           </Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-right pr-5 text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                      <TableCell className="text-right pr-5 text-xs text-muted-foreground whitespace-nowrap">
                         {formatTanggal(item.endTime)}
                       </TableCell>
                       <TableCell className="text-center">
                         <Button variant="ghost" size="sm" asChild
-                          className="rounded-lg gap-1 text-blue-600 dark:text-blue-400 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/30">
-                          <Link href={`/tryout/${item.packageId}/hasil`}>
-                            Detail
+                          className="rounded-lg gap-1 text-primary hover:text-primary hover:bg-primary/10 transition-colors">
+                          <Link href={ROUTES.detailHasil(item.packageId)}>
+                            {TEXT_CONTENT.btnDetail}
                             <ChevronRight className="w-3 h-3" aria-hidden />
                           </Link>
                         </Button>
@@ -203,13 +262,14 @@ export default async function RiwayatPage() {
           </Card>
         )}
 
-        <div className="flex flex-wrap gap-4 text-xs text-slate-400 dark:text-slate-500 justify-center">
-          <span>Passing grade BKN:</span>
-          <span>TWK ≥ {PASSING_GRADE.twk}</span>
+        {/* KAKI BANNER INFORMASI KISI AMBANG BATAS */}
+        <div className="flex flex-wrap gap-4 text-xs text-muted-foreground justify-center opacity-80">
+          <span>{TEXT_CONTENT.footerThresholds}</span>
+          <span>TWK ≥ {EXAM_THRESHOLDS.passingGrade.twk}</span>
           <span>·</span>
-          <span>TIU ≥ {PASSING_GRADE.tiu}</span>
+          <span>TIU ≥ {EXAM_THRESHOLDS.passingGrade.tiu}</span>
           <span>·</span>
-          <span>TKP ≥ {PASSING_GRADE.tkp}</span>
+          <span>TKP ≥ {EXAM_THRESHOLDS.passingGrade.tkp}</span>
         </div>
 
       </div>

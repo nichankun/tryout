@@ -2,47 +2,74 @@
 
 /**
  * app/global-error.tsx
- *
- * ✅ Menangkap error yang terjadi di app/layout.tsx (root layout)
- * ✅ Berbeda dari error.tsx — ini merender ULANG seluruh UI termasuk <html> dan <body>
- * ✅ Wajib ada di Next.js 16 untuk error handling yang lengkap
- *
- * ⚠️  Karena ini merender ulang root, ia TIDAK bisa pakai komponen dari layout
- *     (Navbar, dll tidak tersedia). Desain harus self-contained.
+ * 
+ * Error Boundary Tingkat Akar / Root (Next.js App Router).
+ * Wajib merender tag <html> dan <body> sendiri karena komponen ini aktif saat 
+ * terjadi crash kritis di dalam berkas app/layout.tsx utama.
  */
 
 import { Button } from "@/components/ui/button";
 import { RotateCcw } from "lucide-react";
 
+// ==========================================
+// KONSTANTA & KONFIGURASI (Bebas Hardcode)
+// ==========================================
+const APP_CONFIG = {
+  lang: "id",
+} as const;
+
+const TEXT_CONTENT = {
+  title: "ASNPedia Mengalami Gangguan",
+  description: "Terjadi kesalahan kritis pada sistem utama. Silakan coba muat ulang halaman.",
+  btnRetry: "Muat Ulang Halaman",
+  idPrefix: "ID:",
+} as const;
+
 interface GlobalErrorProps {
-  error: Error & { digest?: string };
-  reset: () => void;
+  error: Error & { digest?: string }; // ID enkripsi crash log dari Next.js runtime
+  reset: () => void;                 // Fungsi pemulihan state / remount root component
 }
 
+// ==========================================
+// KOMPONEN UTAMA
+// ==========================================
 export default function GlobalError({ error, reset }: GlobalErrorProps) {
   return (
-    // ✅ Wajib render <html> dan <body> sendiri di global-error
-    <html lang="id">
-      <body className="min-h-screen bg-slate-50 flex items-center justify-center px-4 font-sans">
+    <html lang={APP_CONFIG.lang}>
+      <body className="min-h-screen bg-background flex items-center justify-center px-4 font-sans antialiased text-foreground">
         <div className="max-w-sm w-full text-center space-y-5">
-          <div className="text-5xl font-black text-slate-200 select-none">!</div>
-          <div className="space-y-1">
-            <h1 className="text-lg font-bold text-slate-800">
-              ASNPedia mengalami gangguan
+          
+          {/* Indikator Visual Simbol Peringatan Kritis */}
+          <div className="text-6xl font-black text-muted/20 select-none tracking-tighter">
+            !
+          </div>
+
+          {/* Deskripsi Informasi Masalah */}
+          <div className="space-y-1.5">
+            <h1 className="text-lg font-bold text-foreground tracking-tight">
+              {TEXT_CONTENT.title}
             </h1>
-            <p className="text-sm text-slate-500">
-              Terjadi kesalahan kritis. Silakan muat ulang halaman.
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {TEXT_CONTENT.description}
             </p>
+            
+            {/* Penayangan Token Digest Kode Identifikasi Masalah */}
             {error.digest && (
-              <p className="text-xs text-slate-400 font-mono pt-1">
-                ID: {error.digest}
+              <p className="text-xs text-muted-foreground/60 font-mono pt-1 tracking-wider">
+                {TEXT_CONTENT.idPrefix} {error.digest}
               </p>
             )}
           </div>
-          <Button onClick={reset} className="gap-2 w-full">
+
+          {/* Tombol Eksekusi Aksi Pemulihan State */}
+          <Button 
+            onClick={reset} 
+            className="gap-2 w-full cursor-pointer font-semibold shadow-sm"
+          >
             <RotateCcw className="w-4 h-4" aria-hidden />
-            Muat Ulang
+            {TEXT_CONTENT.btnRetry}
           </Button>
+
         </div>
       </body>
     </html>

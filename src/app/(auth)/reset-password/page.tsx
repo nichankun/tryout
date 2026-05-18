@@ -2,51 +2,104 @@
 
 import { use, useState } from "react";
 import { useRouter } from "next/navigation";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { resetPasswordAction } from "@/lib/actions/auth";
 
+// ==========================================
+// KONSTANTA & KONFIGURASI
+// ==========================================
+const ROUTES = {
+  loginSuccess: "/login?status=password_reset_success",
+} as const;
+
+const PAGE_CONTENT = {
+  title: "Kata Sandi Baru",
+  subtitle: "Silakan buat kata sandi baru yang kuat untuk mengamankan akun kamu.",
+  invalidTitle: "Tautan Tidak Valid",
+  invalidDesc: "Tautan atur ulang kata sandi tidak lengkap atau sudah kedaluwarsa.",
+  passwordLabel: "Kata Sandi Baru",
+  passwordPlaceholder: "Minimal 8 karakter",
+  confirmLabel: "Konfirmasi Kata Sandi Baru",
+  confirmPlaceholder: "Ulangi kata sandi baru",
+  submitDefault: "Simpan Kata Sandi Baru",
+  submitLoading: "Memperbarui...",
+} as const;
+
+const MESSAGES = {
+  errors: {
+    token_expired: "Tautan telah kedaluwarsa. Silakan minta tautan baru.",
+    invalid_token: "Gagal mengubah kata sandi. Tautan tidak valid atau sudah kedaluwarsa.",
+    connection: "Terjadi gangguan koneksi. Silakan coba lagi.",
+    default: "Terjadi kesalahan yang tidak terduga.",
+  },
+} as const;
+
+// ==========================================
+// SCHEMA VALIDASI ZOD
+// ==========================================
+const resetSchema = z
+  .object({
+    password: z.string().min(8, { message: "Kata sandi minimal 8 karakter." }),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Kata sandi dan konfirmasi tidak cocok.",
+    path: ["confirmPassword"],
+  });
+
+type ResetValues = z.infer<typeof resetSchema>;
+
+// ==========================================
+// TIPE PROPS
+// ==========================================
 interface ResetProps {
   searchParams: Promise<{ token?: string; email?: string }>;
 }
 
+// ==========================================
+// KOMPONEN UTAMA
+// ==========================================
 export default function ResetPasswordPage({ searchParams }: ResetProps) {
   const router = useRouter();
-  
-  // Unwrap searchParams secara asinkron (Standar Next.js)
   const { token, email } = use(searchParams);
 
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [globalError, setGlobalError] = useState<string | null>(null);
 
-  // Proteksi awal jika token atau email tidak ada di URL
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<ResetValues>({
+    resolver: zodResolver(resetSchema),
+    defaultValues: { password: "", confirmPassword: "" },
+  });
+
+  // Proteksi Awal
   if (!token || !email) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4">
-        <div className="bg-white dark:bg-slate-950 p-8 rounded-2xl shadow-md text-center max-w-md w-full border border-red-100 dark:border-red-950/30">
-          <h1 className="text-xl font-bold text-red-600 dark:text-red-400 mb-2">Tautan Tidak Valid</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Tautan atur ulang kata sandi tidak lengkap atau sudah kedaluwarsa.</p>
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="bg-card p-8 rounded-2xl shadow-md text-center max-w-md w-full border border-destructive/20">
+          <h1 className="text-xl font-bold text-destructive mb-2">{PAGE_CONTENT.invalidTitle}</h1>
+          <p className="text-sm text-muted-foreground">{PAGE_CONTENT.invalidDesc}</p>
         </div>
       </div>
     );
   }
 
-  async function handleSubmit(formData: FormData) {
-    const password = formData.get("password") as string;
-    const confirm = formData.get("confirmPassword") as string;
+  async function onSubmit(values: ResetValues) {
+    setGlobalError(null);
 
-    if (password !== confirm) {
-      setError("Kata sandi baru dan konfirmasi kata sandi tidak cocok.");
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    // Sisipkan data token & email dari URL secara tersembunyi ke dalam formData
+    const formData = new FormData();
+    formData.append("password", values.password);
     formData.append("token", token!);
     formData.append("email", email!);
 
@@ -55,90 +108,102 @@ export default function ResetPasswordPage({ searchParams }: ResetProps) {
 
       if (result?.error) {
         if (result.error === "token_expired") {
-          setError("Tautan telah kedaluwarsa. Silakan minta tautan baru.");
+          setGlobalError(MESSAGES.errors.token_expired);
         } else {
-          setError("Gagal mengubah kata sandi. Tautan tidak valid atau sudah kedaluwarsa.");
+          setGlobalError(MESSAGES.errors.invalid_token);
         }
         return;
       }
 
-      // Berhasil -> arahkan ke login dengan membawa info sukses
-      router.push("/login?status=password_reset_success");
+      router.push(ROUTES.loginSuccess);
     } catch {
-      setError("Terjadi gangguan koneksi. Silakan coba lagi.");
-    } finally {
-      setIsLoading(false);
+      setGlobalError(MESSAGES.errors.connection);
     }
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-6">
-      <div className="w-full max-w-md bg-white dark:bg-slate-950 p-8 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 space-y-6">
+    <div className="min-h-screen bg-background flex items-center justify-center p-6">
+      <div className="w-full max-w-md bg-card p-8 rounded-2xl shadow-xl border border-border space-y-6">
         
         <div className="space-y-2 text-center">
-          <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Kata Sandi Baru</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Silakan buat kata sandi baru yang kuat untuk mengamankan akun kamu.</p>
+          <h1 className="text-2xl font-bold text-card-foreground">{PAGE_CONTENT.title}</h1>
+          <p className="text-sm text-muted-foreground">{PAGE_CONTENT.subtitle}</p>
         </div>
 
-        <form action={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm px-4 py-3 rounded-xl">
-              {error}
-            </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          
+          {globalError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{globalError}</AlertDescription>
+            </Alert>
           )}
 
-          {/* Password Baru */}
+          {/* PASSWORD BARU */}
           <div className="space-y-1.5">
-            <Label htmlFor="password" className="text-sm font-medium">Kata Sandi Baru</Label>
+            <Label htmlFor="password" className={errors.password ? "text-destructive" : ""}>
+              {PAGE_CONTENT.passwordLabel}
+            </Label>
             <div className="relative">
               <Input
                 id="password"
-                name="password"
                 type={showPassword ? "text" : "password"}
-                placeholder="Minimal 8 karakter"
-                required
-                disabled={isLoading}
+                placeholder={PAGE_CONTENT.passwordPlaceholder}
+                disabled={isSubmitting}
+                autoFocus
+                aria-invalid={!!errors.password}
                 className="h-11 rounded-xl pr-11"
-                minLength={8}
+                {...register("password")}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                disabled={isLoading}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                disabled={isSubmitting}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition disabled:opacity-50"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+            {errors.password && (
+              <p className="text-[0.8rem] font-medium text-destructive">
+                {errors.password.message}
+              </p>
+            )}
           </div>
 
-          {/* Konfirmasi Password */}
+          {/* KONFIRMASI PASSWORD BARU */}
           <div className="space-y-1.5">
-            <Label htmlFor="confirmPassword" className="text-sm font-medium">Konfirmasi Kata Sandi Baru</Label>
+            <Label htmlFor="confirmPassword" className={errors.confirmPassword ? "text-destructive" : ""}>
+              {PAGE_CONTENT.confirmLabel}
+            </Label>
             <Input
               id="confirmPassword"
-              name="confirmPassword"
               type="password"
-              placeholder="Ulangi kata sandi baru"
-              required
-              disabled={isLoading}
+              placeholder={PAGE_CONTENT.confirmPlaceholder}
+              disabled={isSubmitting}
+              aria-invalid={!!errors.confirmPassword}
               className="h-11 rounded-xl"
-              minLength={8}
+              {...register("confirmPassword")}
             />
+            {errors.confirmPassword && (
+              <p className="text-[0.8rem] font-medium text-destructive">
+                {errors.confirmPassword.message}
+              </p>
+            )}
           </div>
 
           <Button 
             type="submit" 
-            disabled={isLoading} 
-            className="w-full h-11 rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white"
+            disabled={isSubmitting} 
+            className="w-full h-11 rounded-xl font-bold"
           >
-            {isLoading ? (
+            {isSubmitting ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Memperbarui...
+                {PAGE_CONTENT.submitLoading}
               </>
             ) : (
-              "Simpan Kata Sandi Baru"
+              PAGE_CONTENT.submitDefault
             )}
           </Button>
         </form>

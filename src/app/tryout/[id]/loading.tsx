@@ -1,18 +1,31 @@
 /**
  * app/tryout/[id]/loading.tsx
- *
- * ✅ Skeleton untuk halaman pengerjaan soal
- * ✅ Tampil otomatis selagi page.tsx mengambil data soal dari server
+ * 
+ * Loading Skeleton Halaman Pengerjaan Ujian Simulasi CAT (Next.js Suspense Boundary).
+ * Ditampilkan secara otomatis sebagai fallback layout interaktif sewaktu komponen halaman utama
+ * (`page.tsx`) sedang melakukan streaming data bank soal dari database server.
  */
 
 import { Skeleton } from "@/components/ui/skeleton";
 
+// ==========================================
+// KONSTANTA & KONFIGURASI (Bebas Hardcode)
+// ==========================================
+const SKELETON_CONFIG = {
+  optionsCount: 5,       // Jumlah opsi pilihan ganda lembar jawaban (A-E)
+  statusGridCount: 3,    // Ringkasan indikator kategori status soal (Belum, Ragu, Sudah)
+  questionGridCount: 30, // Representasi placeholder jumlah kotak navigasi nomor soal
+} as const;
+
+// ==========================================
+// KOMPONEN UTAMA
+// ==========================================
 export default function TryoutLoading() {
   return (
-    <div className="bg-slate-50 dark:bg-slate-900 min-h-screen">
+    <div className="bg-background min-h-screen text-foreground antialiased">
 
-      {/* Header skeleton */}
-      <div className="bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 h-16 px-4 sticky top-0 z-50">
+      {/* 1. SKELETON PANEL HEADER (STICKY INTERFACE NAVBAR) */}
+      <div className="bg-card border-b border-border h-16 px-4 sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto h-full flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Skeleton className="h-8 w-10 rounded-lg" />
@@ -25,23 +38,23 @@ export default function TryoutLoading() {
         </div>
       </div>
 
-      {/* Main layout */}
+      {/* 2. MAIN GRID LAYOUT SYSTEM CONTAINER */}
       <div className="max-w-7xl mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-        {/* Panel soal skeleton */}
+        {/* ── PANEL SISI KIRI: KONTEN LEMBAR SOAL & JAWABAN ── */}
         <div className="lg:col-span-8 space-y-4">
-          {/* Progress bar */}
+          {/* Batang Indikator Kemajuan Sesi (Progress Bar) */}
           <Skeleton className="h-2 w-full rounded-full" />
 
-          {/* Card soal */}
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-            {/* Card header */}
-            <div className="bg-slate-50 dark:bg-slate-950 px-5 py-3 border-b border-slate-100 dark:border-slate-800 flex justify-between">
+          {/* Main Card Soal Container */}
+          <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
+            {/* Sub-Header Card Informasi Nomor & Kategori */}
+            <div className="bg-muted/40 px-5 py-3 border-b border-border flex justify-between items-center">
               <Skeleton className="h-5 w-32" />
               <Skeleton className="h-5 w-24 rounded-full" />
             </div>
 
-            {/* Teks soal */}
+            {/* Paragraf Narasi Teks Soal */}
             <div className="p-6 md:p-8 space-y-6">
               <div className="space-y-2">
                 <Skeleton className="h-5 w-full" />
@@ -49,16 +62,16 @@ export default function TryoutLoading() {
                 <Skeleton className="h-5 w-3/4" />
               </div>
 
-              {/* Pilihan jawaban */}
+              {/* Kelompok Shimmer Baris Opsi Pilihan Ganda */}
               <div className="space-y-3">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Skeleton key={i} className="h-14 w-full rounded-xl" />
+                {Array.from({ length: SKELETON_CONFIG.optionsCount }).map((_, i) => (
+                  <Skeleton key={`option-shimmer-${i}`} className="h-14 w-full rounded-xl" />
                 ))}
               </div>
             </div>
 
-            {/* Card footer */}
-            <div className="bg-slate-50 dark:bg-slate-950 px-5 py-3 border-t border-slate-100 dark:border-slate-800 flex justify-between">
+            {/* Sub-Footer Card Panel Tombol Navigasi Kontrol (Sebelumnya, Ragu, Selanjutnya) */}
+            <div className="bg-muted/40 px-5 py-3 border-t border-border flex justify-between items-center">
               <Skeleton className="h-9 w-28 rounded-lg" />
               <Skeleton className="h-9 w-28 rounded-lg" />
               <Skeleton className="h-9 w-28 rounded-lg" />
@@ -66,26 +79,32 @@ export default function TryoutLoading() {
           </div>
         </div>
 
-        {/* Panel navigasi skeleton */}
+        {/* ── PANEL SISI KANAN: NAVIGASI NOMOR MAP BOARD ── */}
         <div className="lg:col-span-4 space-y-4">
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 space-y-4">
+          <div className="bg-card rounded-xl border border-border p-4 space-y-4 shadow-sm">
             <Skeleton className="h-5 w-32" />
-            {/* Status grid */}
+            
+            {/* Papan Indikator Keterangan Status Mini */}
             <div className="grid grid-cols-3 gap-2">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-16 rounded-lg" />
+              {Array.from({ length: SKELETON_CONFIG.statusGridCount }).map((_, i) => (
+                <Skeleton key={`status-shimmer-${i}`} className="h-16 rounded-lg" />
               ))}
             </div>
-            {/* Nomor soal grid */}
+            
+            {/* Peta Kisi Kotak Nomor Pilihan Navigasi */}
             <div className="grid grid-cols-5 gap-1.5">
-              {Array.from({ length: 30 }).map((_, i) => (
-                <Skeleton key={i} className="h-9 rounded-lg" />
+              {Array.from({ length: SKELETON_CONFIG.questionGridCount }).map((_, i) => (
+                <Skeleton key={`num-shimmer-${i}`} className="h-9 rounded-lg" />
               ))}
             </div>
+            
             <Skeleton className="h-10 w-full rounded-xl" />
           </div>
+          
+          {/* Wadah Widget Informasi Ekstra Bawah */}
           <Skeleton className="h-28 w-full rounded-xl" />
         </div>
+
       </div>
     </div>
   );

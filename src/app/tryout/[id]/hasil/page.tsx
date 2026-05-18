@@ -1,9 +1,8 @@
 /**
  * app/tryout/[id]/hasil/page.tsx
- *
- * Mengubah halaman hasil menjadi Async Server Component dinamis.
- * Menarik data hasil tryout asli dari PostgreSQL (Drizzle ORM) berdasarkan
- * user yang sedang login (NextAuth session) dan packageId (params id).
+ * 
+ * Async Server Component dinamis untuk menampilkan hasil analisis tryout SKD.
+ * Menghubungkan PostgreSQL via Drizzle ORM dengan NextAuth v5 session.
  */
 
 import type { Metadata } from "next";
@@ -15,25 +14,56 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CheckCircle2, XCircle, AlertCircle, ArrowLeft, BarChart3, FileText } from "lucide-react";
 
-// ── IMPORT AUTH & DRIZZLE DATABASE ──
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { tryoutHistories } from "@/db/database/schema"; // Sesuaikan jika path schema Anda berbeda
+import { tryoutHistories } from "@/db/database/schema"; 
 import { and, eq, desc } from "drizzle-orm";
 
+// ==========================================
+// KONSTANTA & KONFIGURASI (Bebas Hardcode)
+// ==========================================
+const APP_CONFIG = {
+  name: "ASNPedia",
+  maxVolumeAllowed: 20,
+} as const;
+
+const EXAM_THRESHOLDS = {
+  passingGrade: { twk: 65, tiu: 80, tkp: 166 },
+  maxScore: { twk: 150, tiu: 175, tkp: 225 },
+} as const;
+
+const ROUTES = {
+  loginRedirect: (id: number) => `/login?callbackUrl=/tryout/${id}/hasil`,
+  pembahasan: (id: number) => `/tryout/${id}/pembahasan`,
+  dashboard: "/dashboard",
+} as const;
+
+const TEXT_CONTENT = {
+  metaTitle: (id: string) => `Hasil Tryout SKD Vol. ${id} — ${APP_CONFIG.name}`,
+  metaDesc: "Analisis nilai dan performa ujian SKD CPNS.",
+  examIdPrefix: "ID Ujian: #SKD-",
+  statusPassed: "SELAMAT! KAMU MEMENUHI PASSING GRADE",
+  statusFailed: "BELUM MEMENUHI PASSING GRADE",
+  descPassed: "Nilai kamu di seluruh kategori telah melewati ambang batas minimal yang ditentukan BKN.",
+  descFailed: "Masih ada kategori yang berada di bawah ambang batas minimal. Evaluasi dan terus latihan!",
+  totalScoreLabel: "Total Skor SKD",
+  analysisTitle: "Analisis Nilai Detail",
+  tableHeaderSubject: "Materi Uji",
+  tableHeaderYourScore: "Skor Kamu",
+  tableHeaderPassingGrade: "Passing Grade",
+  tableHeaderStatus: "Status",
+  actionPembahasan: "Lihat Pembahasan Soal",
+  actionDashboard: "Kembali ke Dashboard",
+  badgePassed: "Lolos",
+  badgeFailed: "Gagal",
+  thresholdLabel: "Ambang batas:",
+} as const;
+
+// ── INTERFACES ──
 interface HasilPageProps {
   params: Promise<{ id: string }>;
 }
 
-export async function generateMetadata({ params }: HasilPageProps): Promise<Metadata> {
-  const { id } = await params;
-  return {
-    title: `Hasil Tryout SKD Vol. ${id} — ASNPedia`,
-    description: "Analisis nilai dan performa ujian SKD CPNS.",
-  };
-}
-
-// ── Tipe data ──
 interface StatistikSubtest {
   singkatan: "TWK" | "TIU" | "TKP";
   kategori: string;
@@ -44,21 +74,34 @@ interface StatistikSubtest {
   keterangan: string;
 }
 
+// ==========================================
+// GENERATE METADATA DYNAMIC
+// ==========================================
+export async function generateMetadata({ params }: HasilPageProps): Promise<Metadata> {
+  const { id } = await params;
+  return {
+    title: TEXT_CONTENT.metaTitle(id),
+    description: TEXT_CONTENT.metaDesc,
+  };
+}
+
+// ==========================================
+// KOMPONEN UTAMA (SERVER COMPONENT)
+// ==========================================
 export default async function HasilTryoutPage({ params }: HasilPageProps) {
   const { id } = await params;
 
-  // Validasi id sebelum dipakai
+  // Validasi parameter ID Volume paket tryout
   const volumeId = parseInt(id, 10);
-  if (isNaN(volumeId) || volumeId < 1 || volumeId > 20) notFound();
+  if (isNaN(volumeId) || volumeId < 1 || volumeId > APP_CONFIG.maxVolumeAllowed) notFound();
 
-  // 1. PROTEKSI HALAMAN VIA SERVER-SIDE AUTH
+  // 1. Proteksi Halaman Sisi Server (Server-Side Auth)
   const session = await auth();
   if (!session?.user?.id) {
-    redirect(`/login?callbackUrl=/tryout/${volumeId}/hasil`);
+    redirect(ROUTES.loginRedirect(volumeId));
   }
 
-  // 2. TARIK DATA RIWAYAT TERBARU DARI DATABASE
-  // Diambil data percobaan terakhir milik user ini pada paket tryout terkait
+  // 2. Tarik Data Riwayat Ujian Terbaru dari Database PostgreSQL
   const riwayatList = await db
     .select()
     .from(tryoutHistories)
@@ -73,25 +116,20 @@ export default async function HasilTryoutPage({ params }: HasilPageProps) {
 
   const riwayatTerbaru = riwayatList[0];
 
-  // Jika user belum pernah submit/mengerjakan paket ini, lemparkan ke halaman 404
-  if (!riwayatTerbaru) {
-    notFound();
-  }
+  // Batasi akses jika pengguna belum pernah menyelesaikan submit ujian paket ini
+  if (!riwayatTerbaru) notFound();
 
-  // 3. RETRIEVE DATA NILAI RIIL DARI DATABASE
+  // 3. Mapping Data Komponen Nilai Riil
   const nilaiSiswa = { 
     twk: riwayatTerbaru.skorTwk, 
     tiu: riwayatTerbaru.skorTiu, 
     tkp: riwayatTerbaru.skorTkp 
   };
   
-  const passingGrade = { twk: 65, tiu: 80, tkp: 166 };
-  const skorMaksimal = { twk: 150, tiu: 175, tkp: 225 };
-
   const totalSkor = nilaiSiswa.twk + nilaiSiswa.tiu + nilaiSiswa.tkp;
-  const isLolosTWK = nilaiSiswa.twk >= passingGrade.twk;
-  const isLolosTIU = nilaiSiswa.tiu >= passingGrade.tiu;
-  const isLolosTKP = nilaiSiswa.tkp >= passingGrade.tkp;
+  const isLolosTWK = nilaiSiswa.twk >= EXAM_THRESHOLDS.passingGrade.twk;
+  const isLolosTIU = nilaiSiswa.tiu >= EXAM_THRESHOLDS.passingGrade.tiu;
+  const isLolosTKP = nilaiSiswa.tkp >= EXAM_THRESHOLDS.passingGrade.tkp;
   const isLolosSKD = isLolosTWK && isLolosTIU && isLolosTKP;
 
   const statistikDetail: StatistikSubtest[] = [
@@ -99,8 +137,8 @@ export default async function HasilTryoutPage({ params }: HasilPageProps) {
       singkatan: "TWK",
       kategori: "Tes Wawasan Kebangsaan",
       skor: nilaiSiswa.twk,
-      passingGrade: passingGrade.twk,
-      maksimal: skorMaksimal.twk,
+      passingGrade: EXAM_THRESHOLDS.passingGrade.twk,
+      maksimal: EXAM_THRESHOLDS.maxScore.twk,
       status: isLolosTWK,
       keterangan: "Nasionalisme, Integritas, Bela Negara, Pilar Negara, Bahasa Indonesia.",
     },
@@ -108,8 +146,8 @@ export default async function HasilTryoutPage({ params }: HasilPageProps) {
       singkatan: "TIU",
       kategori: "Tes Inteligensia Umum",
       skor: nilaiSiswa.tiu,
-      passingGrade: passingGrade.tiu,
-      maksimal: skorMaksimal.tiu,
+      passingGrade: EXAM_THRESHOLDS.passingGrade.tiu,
+      maksimal: EXAM_THRESHOLDS.maxScore.tiu,
       status: isLolosTIU,
       keterangan: "Kemampuan Verbal, Numerik, dan Figural.",
     },
@@ -117,86 +155,84 @@ export default async function HasilTryoutPage({ params }: HasilPageProps) {
       singkatan: "TKP",
       kategori: "Tes Karakteristik Pribadi",
       skor: nilaiSiswa.tkp,
-      passingGrade: passingGrade.tkp,
-      maksimal: skorMaksimal.tkp,
+      passingGrade: EXAM_THRESHOLDS.passingGrade.tkp,
+      maksimal: EXAM_THRESHOLDS.maxScore.tkp,
       status: isLolosTKP,
       keterangan: "Pelayanan Publik, Jejaring Kerja, Sosial Budaya, TI, Profesionalisme, Anti Radikalisme.",
     },
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-10 px-4 md:px-8">
+    <div className="min-h-screen bg-background text-foreground py-10 px-4 md:px-8">
       <div className="max-w-4xl mx-auto space-y-8">
 
-        {/* Navigasi atas */}
+        {/* HEADER BAR NAVIGASI */}
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="sm" asChild className="rounded-xl gap-2">
-            <Link href="/dashboard">
-              <ArrowLeft className="w-4 h-4" aria-hidden /> Kembali ke Dashboard
+          <Button variant="ghost" size="sm" asChild className="rounded-xl gap-2 text-muted-foreground hover:text-foreground">
+            <Link href={ROUTES.dashboard}>
+              <ArrowLeft className="w-4 h-4" aria-hidden /> {TEXT_CONTENT.actionDashboard}
             </Link>
           </Button>
-          <span className="text-xs font-semibold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-3 py-1.5 rounded-full">
-            ID Ujian: #SKD-{volumeId}
+          <span className="text-xs font-semibold bg-muted text-muted-foreground px-3 py-1.5 rounded-full border border-border">
+            {TEXT_CONTENT.examIdPrefix}{volumeId}
           </span>
         </div>
 
-        {/* Banner Status Kelulusan */}
+        {/* SPANDUK UTAMA BANNER KELULUSAN */}
         <Card className={`rounded-2xl border-2 shadow-sm overflow-hidden ${
           isLolosSKD
-            ? "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20"
-            : "border-red-200 bg-red-50/30 dark:bg-red-950/10"
+            ? "border-emerald-500 bg-emerald-500/5 dark:bg-emerald-500/10"
+            : "border-destructive/20 bg-destructive/5"
         }`}>
           <CardContent className="p-8 text-center space-y-4">
-            <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center">
+            <div className="mx-auto w-12 h-12 flex items-center justify-center">
               {isLolosSKD
-                ? <CheckCircle2 className="w-12 h-12 text-emerald-600 dark:text-emerald-400" aria-hidden />
-                : <XCircle className="w-12 h-12 text-red-600 dark:text-red-400" aria-hidden />
+                ? <CheckCircle2 className="w-12 h-12 text-emerald-600 dark:text-emerald-400" />
+                : <XCircle className="w-12 h-12 text-destructive" />
               }
             </div>
 
             <div className="space-y-1">
-              <h1 className="text-2xl font-black tracking-tight text-slate-800 dark:text-slate-100">
-                {isLolosSKD ? "SELAMAT! KAMU MEMENUHI PASSING GRADE" : "BELUM MEMENUHI PASSING GRADE"}
+              <h1 className="text-2xl font-black tracking-tight text-foreground">
+                {isLolosSKD ? TEXT_CONTENT.statusPassed : TEXT_CONTENT.statusFailed}
               </h1>
-              <p className="text-sm text-slate-500 dark:text-slate-400 max-w-lg mx-auto">
-                {isLolosSKD
-                  ? "Nilai kamu di seluruh kategori telah melewati ambang batas minimal yang ditentukan BKN."
-                  : "Masih ada kategori yang berada di bawah ambang batas minimal. Evaluasi dan terus latihan!"}
+              <p className="text-sm text-muted-foreground max-w-lg mx-auto leading-relaxed">
+                {isLolosSKD ? TEXT_CONTENT.descPassed : TEXT_CONTENT.descFailed}
               </p>
             </div>
 
-            <div className="inline-block bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 px-6 py-3 rounded-2xl shadow-sm">
-              <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">Total Skor SKD</p>
-              <p className="text-4xl font-black text-blue-600 dark:text-blue-400">{totalSkor}</p>
+            <div className="inline-block bg-card border border-border px-6 py-3 rounded-2xl shadow-sm">
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{TEXT_CONTENT.totalScoreLabel}</p>
+              <p className="text-4xl font-black text-primary">{totalSkor}</p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Ringkasan Per Kategori */}
+        {/* GRID RINGKASAN DATA SUBTEST */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {statistikDetail.map((item) => {
             const persentase = Math.round((item.skor / item.maksimal) * 100);
             return (
-              <Card key={item.singkatan} className="rounded-2xl border-slate-200 dark:border-slate-800 shadow-sm">
+              <Card key={item.singkatan} className="rounded-2xl border-border bg-card shadow-sm">
                 <CardHeader className="pb-3 flex flex-row items-start justify-between space-y-0">
                   <div className="space-y-0.5">
-                    <CardTitle className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                    <CardTitle className="text-sm font-bold text-foreground">
                       {item.singkatan}
                     </CardTitle>
-                    <CardDescription className="text-xs">Ambang batas: {item.passingGrade}</CardDescription>
+                    <CardDescription className="text-xs">{TEXT_CONTENT.thresholdLabel} {item.passingGrade}</CardDescription>
                   </div>
                   <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${
                     item.status
-                      ? "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50"
-                      : "text-red-600 bg-red-50 dark:bg-red-950/50"
+                      ? "text-emerald-600 bg-emerald-500/10 dark:text-emerald-400"
+                      : "text-destructive bg-destructive/10"
                   }`}>
-                    {item.status ? "Lolos" : "Gagal"}
+                    {item.status ? TEXT_CONTENT.badgePassed : TEXT_CONTENT.badgeFailed}
                   </span>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <div className="flex items-baseline justify-between">
-                    <span className="text-3xl font-black text-slate-800 dark:text-slate-100">{item.skor}</span>
-                    <span className="text-xs text-slate-400">/ {item.maksimal}</span>
+                    <span className="text-3xl font-black text-foreground">{item.skor}</span>
+                    <span className="text-xs text-muted-foreground">/ {item.maksimal}</span>
                   </div>
                   <Progress value={persentase} className="h-2 rounded-full" />
                 </CardContent>
@@ -205,48 +241,48 @@ export default async function HasilTryoutPage({ params }: HasilPageProps) {
           })}
         </div>
 
-        {/* Tabel Analisis Detail */}
-        <Card className="rounded-2xl border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-          <CardHeader className="border-b border-slate-100 dark:border-slate-800">
+        {/* TABEL ANALISIS DIAGNOSIS MATERI DETAIL */}
+        <Card className="rounded-2xl border-border bg-card shadow-sm overflow-hidden">
+          <CardHeader className="border-b border-border">
             <div className="flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-blue-600" aria-hidden />
-              <CardTitle className="text-lg font-bold text-slate-800 dark:text-slate-100">
-                Analisis Nilai Detail
+              <BarChart3 className="w-5 h-5 text-primary" aria-hidden />
+              <CardTitle className="text-lg font-bold text-foreground">
+                {TEXT_CONTENT.analysisTitle}
               </CardTitle>
             </div>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
-              <TableHeader className="bg-slate-50 dark:bg-slate-800/50">
-                <TableRow>
-                  <TableHead className="font-bold">Materi Uji</TableHead>
-                  <TableHead className="text-center font-bold">Skor Kamu</TableHead>
-                  <TableHead className="text-center font-bold">Passing Grade</TableHead>
-                  <TableHead className="text-center font-bold">Status</TableHead>
+              <TableHeader className="bg-muted/50">
+                <TableRow className="border-b border-border">
+                  <TableHead className="font-bold text-foreground">{TEXT_CONTENT.tableHeaderSubject}</TableHead>
+                  <TableHead className="text-center font-bold text-foreground">{TEXT_CONTENT.tableHeaderYourScore}</TableHead>
+                  <TableHead className="text-center font-bold text-foreground">{TEXT_CONTENT.tableHeaderPassingGrade}</TableHead>
+                  <TableHead className="text-center font-bold text-foreground">{TEXT_CONTENT.tableHeaderStatus}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {statistikDetail.map((item) => (
-                  <TableRow key={item.singkatan} className="hover:bg-transparent">
+                  <TableRow key={item.singkatan} className="border-b border-border/60 hover:bg-transparent">
                     <TableCell className="py-4 font-medium">
-                      <p className="text-slate-800 dark:text-slate-200 font-bold">
+                      <p className="text-foreground font-bold">
                         {item.kategori} ({item.singkatan})
                       </p>
-                      <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 max-w-md">
+                      <p className="text-xs text-muted-foreground mt-0.5 max-w-md leading-relaxed">
                         {item.keterangan}
                       </p>
                     </TableCell>
-                    <TableCell className="text-center text-base font-black text-slate-800 dark:text-slate-100">
+                    <TableCell className="text-center text-base font-black text-foreground">
                       {item.skor}
                     </TableCell>
-                    <TableCell className="text-center font-semibold text-slate-500">
+                    <TableCell className="text-center font-semibold text-muted-foreground">
                       {item.passingGrade}
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="inline-flex justify-center">
                         {item.status
-                          ? <CheckCircle2 className="w-5 h-5 text-emerald-500" aria-label="Lolos" />
-                          : <AlertCircle className="w-5 h-5 text-red-500" aria-label="Tidak lolos" />
+                          ? <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                          : <AlertCircle className="w-5 h-5 text-destructive" />
                         }
                       </div>
                     </TableCell>
@@ -257,15 +293,15 @@ export default async function HasilTryoutPage({ params }: HasilPageProps) {
           </CardContent>
         </Card>
 
-        {/* Tombol Aksi */}
+        {/* TOMBOL AKSI UTAMA FOOTER */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Button size="lg" className="rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white gap-2" asChild>
-            <Link href={`/tryout/${volumeId}/pembahasan`}>
-              <FileText className="w-5 h-5" aria-hidden /> Lihat Pembahasan Soal
+          <Button size="lg" className="rounded-xl font-bold gap-2" asChild>
+            <Link href={ROUTES.pembahasan(volumeId)}>
+              <FileText className="w-5 h-5" aria-hidden /> {TEXT_CONTENT.actionPembahasan}
             </Link>
           </Button>
           <Button size="lg" variant="outline" className="rounded-xl font-bold" asChild>
-            <Link href="/dashboard">Kembali ke Dashboard</Link>
+            <Link href={ROUTES.dashboard}>{TEXT_CONTENT.actionDashboard}</Link>
           </Button>
         </div>
 

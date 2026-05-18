@@ -1,70 +1,126 @@
 "use client";
 
 /**
- * components/auth/login-form.tsx — FIXED with Verification Status & Role Check
+ * components/auth/login-form.tsx
  */
 
-import { useRef, useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation"; 
+import { useRouter, useSearchParams } from "next/navigation";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+
+import { loginAction } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { loginAction } from "@/lib/actions/auth";
+import { Label } from "@/components/ui/label"; // Gunakan Label standar
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
+// ==========================================
+// KONSTANTA & KONFIGURASI (Bebas Hardcode)
+// ==========================================
+const ROUTES = {
+  admin: "/admin",
+  dashboard: "/dashboard",
+  forgotPassword: "/lupa-password",
+} as const;
+
+const API_ENDPOINTS = {
+  session: "/api/auth/session",
+} as const;
+
+const FORM_TEXT = {
+  emailLabel: "Email",
+  emailPlaceholder: "nama@email.com",
+  passwordLabel: "Kata Sandi",
+  passwordPlaceholder: "Minimal 8 karakter",
+  forgotPassword: "Lupa kata sandi?",
+  submitDefault: "Masuk",
+  submitLoading: "Memverifikasi...",
+} as const;
+
+const MESSAGES = {
+  success: {
+    verificationTitle: "Registrasi Berhasil!",
+    verificationDesc: "Silakan periksa kotak masuk email kamu dan klik tautan verifikasi sebelum melakukan login.",
+  },
+  errors: {
+    invalid_credentials: "Email atau kata sandi salah. Coba lagi.",
+    user_not_found: "Akun dengan email ini tidak ditemukan.",
+    too_many_attempts: "Terlalu banyak percobaan. Tunggu beberapa menit.",
+    account_disabled: "Akun kamu telah dinonaktifkan. Hubungi dukungan.",
+    email_not_verified: "Email kamu belum diverifikasi. Silakan periksa kotak masuk atau folder spam email kamu.",
+    connection: "Koneksi bermasalah. Periksa internet kamu dan coba lagi.",
+    default: "Terjadi kesalahan. Silakan coba lagi.",
+  },
+} as const;
+
+// ==========================================
+// SCHEMA VALIDASI ZOD
+// ==========================================
+const loginSchema = z.object({
+  email: z.string().email({ message: "Format email tidak valid." }),
+  password: z.string().min(1, { message: "Kata sandi tidak boleh kosong." }),
+});
+
+type LoginValues = z.infer<typeof loginSchema>;
+
+// ==========================================
+// TIPE PROPS
+// ==========================================
 interface LoginFormProps {
   callbackUrl: string;
 }
 
-// Whitelist pesan error dari Server Action
-const SAFE_ERRORS: Record<string, string> = {
-  invalid_credentials: "Email atau kata sandi salah. Coba lagi.",
-  user_not_found: "Akun dengan email ini tidak ditemukan.",
-  too_many_attempts: "Terlalu banyak percobaan. Tunggu beberapa menit.",
-  account_disabled: "Akun kamu telah dinonaktifkan. Hubungi dukungan.",
-  email_not_verified: "Email kamu belum diverifikasi. Silakan periksa kotak masuk atau folder spam email kamu untuk melakukan verifikasi.",
-};
-
+// ==========================================
+// KOMPONEN UTAMA
+// ==========================================
 export function LoginForm({ callbackUrl }: LoginFormProps) {
   const router = useRouter();
-  
-  // Ambil query parameter status dari URL
   const searchParams = useSearchParams();
   const status = searchParams.get("status");
 
-  const emailRef = useRef<HTMLInputElement>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [globalError, setGlobalError] = useState<string | null>(null);
 
-  // Focus terkontrol via useRef
-  useEffect(() => {
-    emailRef.current?.focus();
-  }, []);
+  // Inisialisasi React Hook Form murni
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
 
-  async function handleSubmit(formData: FormData) {
-    setIsLoading(true);
-    setError(null);
+  async function onSubmit(values: LoginValues) {
+    setGlobalError(null);
+
+    const formData = new FormData();
+    formData.append("email", values.email);
+    formData.append("password", values.password);
 
     try {
       const result = await loginAction(formData);
 
       if (result?.error) {
-        setError(SAFE_ERRORS[result.error] ?? "Terjadi kesalahan. Silakan coba lagi.");
+        setGlobalError(MESSAGES.errors[result.error as keyof typeof MESSAGES.errors] ?? MESSAGES.errors.default);
         return;
       }
 
       // ── DETEKSI ROLE SECARA DINAMIS ──
-      // Jika rute pengalihan bawaan mengarah ke /dashboard, periksa apakah dia ADMIN
-      if (callbackUrl === "/dashboard") {
+      if (callbackUrl === ROUTES.dashboard) {
         try {
-          const res = await fetch("/api/auth/session");
+          const res = await fetch(API_ENDPOINTS.session);
           const session = await res.json();
-          
-          // Jika role terdeteksi ADMIN, belokkan navigasi langsung ke rute /admin
+
           if (session?.user?.role === "ADMIN") {
-            router.push("/admin");
+            router.push(ROUTES.admin);
             router.refresh();
             return;
           }
@@ -73,112 +129,117 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
         }
       }
 
-      // Jika bukan admin atau ada callbackUrl khusus (misal /admin dicegat proxy), ikuti rute asal
       router.push(callbackUrl);
       router.refresh();
 
     } catch {
-      setError("Koneksi bermasalah. Periksa internet kamu dan coba lagi.");
-    } finally {
-      setIsLoading(false);
+      setGlobalError(MESSAGES.errors.connection);
     }
   }
 
   return (
-    <form action={handleSubmit} className="space-y-4">
-
-      {/* BANNER INFORMASI: Muncul jika di-redirect dari form register setelah sukses kirim token */}
-      {status === "verification_sent" && !error && (
-        <div
-          role="status"
-          className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-400 text-sm px-4 py-3 rounded-xl font-medium leading-relaxed"
-        >
-          <p className="font-bold mb-0.5">Registrasi Berhasil!</p>
-          <p className="text-xs opacity-90">Silakan periksa kotak masuk email kamu dan klik tautan verifikasi sebelum melakukan login.</p>
-        </div>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      
+      {/* BANNER INFORMASI VERIFIKASI */}
+      {status === "verification_sent" && !globalError && (
+        <Alert className="bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-400">
+          <CheckCircle2 className="h-4 w-4 stroke-emerald-600 dark:stroke-emerald-400" />
+          <AlertTitle>{MESSAGES.success.verificationTitle}</AlertTitle>
+          <AlertDescription className="text-xs opacity-90">
+            {MESSAGES.success.verificationDesc}
+          </AlertDescription>
+        </Alert>
       )}
 
-      {/* Error inline */}
-      {error && (
-        <div
-          role="alert"
-          aria-live="polite"
-          className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm px-4 py-3 rounded-xl"
-        >
-          {error}
-        </div>
+      {/* PESAN ERROR GLOBAL */}
+      {globalError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{globalError}</AlertDescription>
+        </Alert>
       )}
 
-      {/* Email */}
+      {/* INPUT EMAIL */}
       <div className="space-y-1.5">
-        <Label htmlFor="email" className="text-sm font-medium">
-          Email
+        <Label htmlFor="email" className={errors.email ? "text-destructive" : ""}>
+          {FORM_TEXT.emailLabel}
         </Label>
         <Input
-          ref={emailRef}
           id="email"
-          name="email"
           type="email"
-          placeholder="nama@email.com"
-          required
+          placeholder={FORM_TEXT.emailPlaceholder}
           autoComplete="email"
-          disabled={isLoading}
+          disabled={isSubmitting}
+          autoFocus
+          aria-invalid={!!errors.email}
           className="h-11 rounded-xl"
+          {...register("email")} // Mengikat input ke RHF
         />
+        {errors.email && (
+          <p className="text-[0.8rem] font-medium text-destructive">
+            {errors.email.message}
+          </p>
+        )}
       </div>
 
-      {/* Password */}
+      {/* INPUT KATA SANDI */}
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
-          <Label htmlFor="password" className="text-sm font-medium">
-            Kata Sandi
+          <Label htmlFor="password" className={errors.password ? "text-destructive" : ""}>
+            {FORM_TEXT.passwordLabel}
           </Label>
           <Link
-            href="/lupa-password"
-            className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+            href={ROUTES.forgotPassword}
+            className="text-xs text-primary hover:underline"
           >
-            Lupa kata sandi?
+            {FORM_TEXT.forgotPassword}
           </Link>
         </div>
         <div className="relative">
           <Input
             id="password"
-            name="password"
             type={showPassword ? "text" : "password"}
-            placeholder="Minimal 8 karakter"
-            required
+            placeholder={FORM_TEXT.passwordPlaceholder}
             autoComplete="current-password"
-            disabled={isLoading}
+            disabled={isSubmitting}
+            aria-invalid={!!errors.password}
             className="h-11 rounded-xl pr-11"
+            {...register("password")} // Mengikat input ke RHF
           />
           <button
             type="button"
             onClick={() => setShowPassword((v) => !v)}
-            disabled={isLoading}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition disabled:opacity-50"
+            disabled={isSubmitting}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition disabled:opacity-50"
             aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
           >
-            {showPassword
-              ? <EyeOff className="w-4 h-4" aria-hidden />
-              : <Eye className="w-4 h-4" aria-hidden />
-            }
+            {showPassword ? (
+              <EyeOff className="w-4 h-4" aria-hidden />
+            ) : (
+              <Eye className="w-4 h-4" aria-hidden />
+            )}
           </button>
         </div>
+        {errors.password && (
+          <p className="text-[0.8rem] font-medium text-destructive">
+            {errors.password.message}
+          </p>
+        )}
       </div>
 
-      {/* Submit */}
+      {/* TOMBOL SUBMIT */}
       <Button
         type="submit"
         className="w-full h-11 rounded-xl font-bold"
-        disabled={isLoading}
+        disabled={isSubmitting}
       >
-        {isLoading ? (
+        {isSubmitting ? (
           <>
             <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden />
-            Memverifikasi...
+            {FORM_TEXT.submitLoading}
           </>
         ) : (
-          "Masuk"
+          FORM_TEXT.submitDefault
         )}
       </Button>
     </form>

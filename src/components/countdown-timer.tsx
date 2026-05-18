@@ -1,14 +1,33 @@
 "use client";
 
+/**
+ * components/dashboard/countdown-timer.tsx
+ * 
+ * Komponen penghitung mundur ujian (Timer) yang adaptif.
+ * Menggunakan token warna semantik bawaan ekosistem untuk mendukung mode gelap/terang.
+ */
+
 import { useState, useEffect } from "react";
 import { Timer } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// ==========================================
+// KONSTANTA & KONFIGURASI (Bebas Hardcode)
+// ==========================================
+const TIMER_CONFIG = {
+  warningThresholdSeconds: 300, // Ambang batas kritis: 5 menit (300 detik)
+  padLength: 2,
+  padChar: "0",
+} as const;
+
 interface CountdownTimerProps {
-  initialSeconds: number; // Durasi ujian dalam detik (misal: 6000 untuk 100 menit)
-  onTimeUp?: () => void;  // Callback saat waktu habis
+  initialSeconds: number; // Durasi ujian dalam satuan detik
+  onTimeUp?: () => void;  // Callback eksekusi otomatis saat waktu habis
 }
 
+// ==========================================
+// KOMPONEN UTAMA
+// ==========================================
 export function CountdownTimer({ initialSeconds, onTimeUp }: CountdownTimerProps) {
   const [timeLeft, setTimeLeft] = useState(initialSeconds);
 
@@ -22,16 +41,16 @@ export function CountdownTimer({ initialSeconds, onTimeUp }: CountdownTimerProps
       setTimeLeft((prev) => prev - 1);
     }, 1000);
 
-    // Cleanup interval saat komponen di-unmount
+    // Pembersihan (cleanup) instans interval saat unmount komponen
     return () => clearInterval(timerId);
   }, [timeLeft, onTimeUp]);
 
-  // Format ke HH:MM:SS
+  // Transformasi kalkulasi representasi waktu (HH:MM:SS)
   const hours = Math.floor(timeLeft / 3600);
   const minutes = Math.floor((timeLeft % 3600) / 60);
   const seconds = timeLeft % 60;
 
-  const isWarning = timeLeft > 0 && timeLeft < 300; // Kurang dari 5 menit (300 detik)
+  const isWarning = timeLeft > 0 && timeLeft < TIMER_CONFIG.warningThresholdSeconds;
   const isTimeUp = timeLeft <= 0;
 
   return (
@@ -39,16 +58,28 @@ export function CountdownTimer({ initialSeconds, onTimeUp }: CountdownTimerProps
       className={cn(
         "flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono font-bold text-lg transition-colors border-2 shadow-sm",
         isTimeUp
-          ? "bg-red-600 text-white border-red-600"
+          ? "bg-destructive text-destructive-foreground border-destructive"
           : isWarning
-          ? "bg-red-50 text-red-600 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900 animate-pulse"
-          : "bg-white text-slate-800 border-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:border-slate-800"
+          ? "bg-destructive/10 text-destructive border-destructive/20 animate-pulse"
+          : "bg-card text-foreground border-border"
       )}
     >
-      <Timer className={cn("w-5 h-5", isTimeUp ? "text-white" : isWarning ? "text-red-600 dark:text-red-400" : "text-blue-600")} />
-      {hours.toString().padStart(2, '0')}:
-      {minutes.toString().padStart(2, '0')}:
-      {seconds.toString().padStart(2, '0')}
+      <Timer 
+        className={cn(
+          "w-5 h-5 transition-colors", 
+          isTimeUp 
+            ? "text-destructive-foreground" 
+            : isWarning 
+            ? "text-destructive" 
+            : "text-primary"
+        )} 
+        aria-hidden 
+      />
+      <span aria-live="polite" aria-atomic="true">
+        {hours.toString().padStart(TIMER_CONFIG.padLength, TIMER_CONFIG.padChar)}:
+        {minutes.toString().padStart(TIMER_CONFIG.padLength, TIMER_CONFIG.padChar)}:
+        {seconds.toString().padStart(TIMER_CONFIG.padLength, TIMER_CONFIG.padChar)}
+      </span>
     </div>
   );
 }
