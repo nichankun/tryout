@@ -11,7 +11,6 @@ import { DataTable } from "@/components/admin/data-table";
 export const dynamic = "force-dynamic";
 
 export default async function AdminOrdersPage() {
-  // Pengambilan data mutasi dari gabungan tabel relasional (JOIN)
   const allOrders = await db
     .select({
       id: orders.id,
