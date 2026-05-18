@@ -1,19 +1,25 @@
 /**
- * app/tryout/[id]/hasil/page.tsx — FIXED
+ * app/tryout/[id]/hasil/page.tsx
  *
- * [1] item.kategori.split(" ")[1] → field singkatan terpisah di data
- * [2] id divalidasi sebelum dipakai → notFound() jika tidak valid
- * [3] key={idx} → key={item.singkatan} — identifier stabil
+ * Mengubah halaman hasil menjadi Async Server Component dinamis.
+ * Menarik data hasil tryout asli dari PostgreSQL (Drizzle ORM) berdasarkan
+ * user yang sedang login (NextAuth session) dan packageId (params id).
  */
 
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CheckCircle2, XCircle, AlertCircle, ArrowLeft, BarChart3, FileText } from "lucide-react";
+
+// ── IMPORT AUTH & DRIZZLE DATABASE ──
+import { auth } from "@/auth";
+import { db } from "@/db";
+import { tryoutHistories } from "@/db/database/schema"; // Sesuaikan jika path schema Anda berbeda
+import { and, eq, desc } from "drizzle-orm";
 
 interface HasilPageProps {
   params: Promise<{ id: string }>;
@@ -29,7 +35,7 @@ export async function generateMetadata({ params }: HasilPageProps): Promise<Meta
 
 // ── Tipe data ──
 interface StatistikSubtest {
-  singkatan: "TWK" | "TIU" | "TKP"; // ✅ [FIX 1] field terpisah, tidak di-parse dari string
+  singkatan: "TWK" | "TIU" | "TKP";
   kategori: string;
   skor: number;
   passingGrade: number;
@@ -41,13 +47,44 @@ interface StatistikSubtest {
 export default async function HasilTryoutPage({ params }: HasilPageProps) {
   const { id } = await params;
 
-  // ✅ [FIX 2] Validasi id sebelum dipakai
+  // Validasi id sebelum dipakai
   const volumeId = parseInt(id, 10);
   if (isNaN(volumeId) || volumeId < 1 || volumeId > 20) notFound();
 
-  // MOCK DATA — di production: const hasil = await getHasilTryout(volumeId, userId);
-  // if (!hasil) notFound();
-  const nilaiSiswa = { twk: 105, tiu: 115, tkp: 176 };
+  // 1. PROTEKSI HALAMAN VIA SERVER-SIDE AUTH
+  const session = await auth();
+  if (!session?.user?.id) {
+    redirect(`/login?callbackUrl=/tryout/${volumeId}/hasil`);
+  }
+
+  // 2. TARIK DATA RIWAYAT TERBARU DARI DATABASE
+  // Diambil data percobaan terakhir milik user ini pada paket tryout terkait
+  const riwayatList = await db
+    .select()
+    .from(tryoutHistories)
+    .where(
+      and(
+        eq(tryoutHistories.userId, session.user.id),
+        eq(tryoutHistories.packageId, volumeId)
+      )
+    )
+    .orderBy(desc(tryoutHistories.endTime))
+    .limit(1);
+
+  const riwayatTerbaru = riwayatList[0];
+
+  // Jika user belum pernah submit/mengerjakan paket ini, lemparkan ke halaman 404
+  if (!riwayatTerbaru) {
+    notFound();
+  }
+
+  // 3. RETRIEVE DATA NILAI RIIL DARI DATABASE
+  const nilaiSiswa = { 
+    twk: riwayatTerbaru.skorTwk, 
+    tiu: riwayatTerbaru.skorTiu, 
+    tkp: riwayatTerbaru.skorTkp 
+  };
+  
   const passingGrade = { twk: 65, tiu: 80, tkp: 166 };
   const skorMaksimal = { twk: 150, tiu: 175, tkp: 225 };
 
@@ -57,7 +94,6 @@ export default async function HasilTryoutPage({ params }: HasilPageProps) {
   const isLolosTKP = nilaiSiswa.tkp >= passingGrade.tkp;
   const isLolosSKD = isLolosTWK && isLolosTIU && isLolosTKP;
 
-  // ✅ [FIX 1] singkatan sebagai field data — tidak di-parse dari string
   const statistikDetail: StatistikSubtest[] = [
     {
       singkatan: "TWK",
@@ -141,11 +177,9 @@ export default async function HasilTryoutPage({ params }: HasilPageProps) {
           {statistikDetail.map((item) => {
             const persentase = Math.round((item.skor / item.maksimal) * 100);
             return (
-              // ✅ [FIX 3] key={item.singkatan} — identifier stabil, bukan index
               <Card key={item.singkatan} className="rounded-2xl border-slate-200 dark:border-slate-800 shadow-sm">
                 <CardHeader className="pb-3 flex flex-row items-start justify-between space-y-0">
                   <div className="space-y-0.5">
-                    {/* ✅ [FIX 1] Langsung pakai item.singkatan */}
                     <CardTitle className="text-sm font-bold text-slate-700 dark:text-slate-300">
                       {item.singkatan}
                     </CardTitle>
@@ -192,7 +226,6 @@ export default async function HasilTryoutPage({ params }: HasilPageProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {/* ✅ [FIX 3] key={item.singkatan} di sini juga */}
                 {statistikDetail.map((item) => (
                   <TableRow key={item.singkatan} className="hover:bg-transparent">
                     <TableCell className="py-4 font-medium">

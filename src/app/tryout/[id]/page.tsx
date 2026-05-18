@@ -2,15 +2,16 @@
 
 /**
  * app/tryout/[id]/page.tsx
- * ✅ Fetch soal dari /api/soal?volumeId=[id]
- * ✅ Submit jawaban ke /api/submit lalu redirect ke halaman hasil
- * ✅ React Compiler aktif — hapus useCallback manual
- * ✅ params dibaca via useParams (Client Component)
- * ✅ Timer countdown + auto-submit saat habis
+ *
+ * Fix dari versi sebelumnya:
+ * [1] Avatar dari useSession (NextAuth) — tidak hardcode seed
+ * [2] useSession untuk cek auth di client — redirect jika belum login
+ * [3] handleSubmit di-wrap try/finally — isSubmitting tidak stuck
  */
 
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card";
@@ -22,35 +23,19 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  ChevronLeft,
-  ChevronRight,
-  CheckCircle2,
-  AlertCircle,
-  Clock,
-  LayoutGrid,
-  BookOpen,
-  Loader2,
+  ChevronLeft, ChevronRight, CheckCircle2, AlertCircle,
+  Clock, LayoutGrid, BookOpen, Loader2,
 } from "lucide-react";
 
 // ── TYPES ──────────────────────────────────────────────────────────────────
-
 type SubTest = "TWK" | "TIU" | "TKP";
 type AnswerStatus = "answered" | "flagged" | "unanswered";
 
@@ -66,9 +51,7 @@ interface UserAnswer {
   status: AnswerStatus;
 }
 
-// ── CONSTANTS ──────────────────────────────────────────────────────────────
-
-const DURATION_SECONDS = 100 * 60; // 100 menit
+const DURATION_SECONDS = 100 * 60;
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60).toString().padStart(2, "0");
@@ -77,26 +60,36 @@ function formatTime(seconds: number): string {
 }
 
 // ── KOMPONEN UTAMA ─────────────────────────────────────────────────────────
-
 export default function TryoutPage() {
-  const params = useParams();
-  const router = useRouter();
+  const params   = useParams();
+  const router   = useRouter();
   const volumeId = params.id as string;
 
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  // ✅ [FIX 1 & 2] Session dari NextAuth
+  const { data: session, status: sessionStatus } = useSession();
 
-  const [activeId, setActiveId] = useState<number>(1);
-  const [answers, setAnswers] = useState<Record<number, UserAnswer>>({});
-  const [timeLeft, setTimeLeft] = useState<number>(DURATION_SECONDS);
+  const [questions, setQuestions]   = useState<Question[]>([]);
+  const [isLoading, setIsLoading]   = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [activeId, setActiveId]     = useState<number>(1);
+  const [answers, setAnswers]       = useState<Record<number, UserAnswer>>({});
+  const [timeLeft, setTimeLeft]     = useState<number>(DURATION_SECONDS);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // ✅ [FIX 2] Redirect jika belum login
+  useEffect(() => {
+    if (sessionStatus === "unauthenticated") {
+      router.push(`/login?callbackUrl=/tryout/${volumeId}`);
+    }
+  }, [sessionStatus, router, volumeId]);
 
   // ── FETCH SOAL ────────────────────────────────────────────────────────────
   useEffect(() => {
+    if (sessionStatus !== "authenticated") return;
+
     async function fetchSoal() {
       try {
-        const res = await fetch(`/api/soal?volumeId=${volumeId}`);
+        const res  = await fetch(`/api/soal?volumeId=${volumeId}`);
         const data = await res.json();
 
         if (!res.ok) {
@@ -106,8 +99,6 @@ export default function TryoutPage() {
 
         setQuestions(data.data);
         setActiveId(data.data[0]?.id ?? 1);
-
-        // ✅ Inisialisasi semua jawaban dengan status unanswered
         setAnswers(
           Object.fromEntries(
             data.data.map((q: Question) => [
@@ -124,7 +115,7 @@ export default function TryoutPage() {
     }
 
     fetchSoal();
-  }, [volumeId]);
+  }, [volumeId, sessionStatus]);
 
   // ── TIMER ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -132,13 +123,14 @@ export default function TryoutPage() {
     const interval = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
-          handleSubmit(); // ✅ Auto-submit saat waktu habis
+          handleSubmit();
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
     return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, timeLeft]);
 
   // ── SUBMIT ────────────────────────────────────────────────────────────────
@@ -146,7 +138,6 @@ export default function TryoutPage() {
     if (isSubmitting) return;
     setIsSubmitting(true);
 
-    // Format jawaban: { "soalId": "opsi" }
     const answersFormatted = Object.fromEntries(
       Object.entries(answers)
         .filter(([, v]) => v.selectedKey !== null)
@@ -154,28 +145,23 @@ export default function TryoutPage() {
     );
 
     try {
-      const res = await fetch("/api/submit", {
+      const res  = await fetch("/api/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ packageId: volumeId, answers: answersFormatted }),
       });
-
       const data = await res.json();
 
-      if (!res.ok) {
-        setIsSubmitting(false);
-        return;
-      }
+      if (!res.ok) return;
 
-      // ✅ Redirect ke halaman hasil
       router.push(`/tryout/${volumeId}/hasil?historyId=${data.historyId}`);
     } catch {
+      // error diabaikan — isSubmitting di-reset via finally
+    } finally {
+      // ✅ [FIX 3] finally — isSubmitting tidak stuck jika error
       setIsSubmitting(false);
     }
   }
-
-  // ── HANDLERS ──────────────────────────────────────────────────────────────
-  // ✅ React Compiler aktif — tidak perlu useCallback manual
 
   function handleAnswer(key: string) {
     setAnswers((prev) => ({
@@ -195,28 +181,30 @@ export default function TryoutPage() {
   }
 
   // ── DERIVED STATE ─────────────────────────────────────────────────────────
+  const currentQuestion  = questions.find((q) => q.id === activeId);
+  const currentAnswer    = answers[activeId];
+  const answeredCount    = Object.values(answers).filter((a) => a.status === "answered").length;
+  const flaggedCount     = Object.values(answers).filter((a) => a.status === "flagged").length;
+  const unansweredCount  = questions.length - answeredCount - flaggedCount;
+  const progressPercent  = questions.length > 0 ? Math.round((answeredCount / questions.length) * 100) : 0;
+  const isWarning        = timeLeft < 10 * 60;
+  const currentIdx       = questions.findIndex((q) => q.id === activeId);
 
-  const currentQuestion = questions.find((q) => q.id === activeId);
-  const currentAnswer = answers[activeId];
-  const answeredCount = Object.values(answers).filter((a) => a.status === "answered").length;
-  const flaggedCount = Object.values(answers).filter((a) => a.status === "flagged").length;
-  const unansweredCount = questions.length - answeredCount - flaggedCount;
-  const progressPercent = questions.length > 0
-    ? Math.round((answeredCount / questions.length) * 100)
-    : 0;
-  const isWarning = timeLeft < 10 * 60;
+  // ✅ [FIX 1] Data user dari session
+  const userName     = session?.user?.name ?? "Peserta";
+  const userImage    = session?.user?.image ?? undefined;
+  const userInitials = userName.split(" ").slice(0, 2).map((n) => n[0]).join("").toUpperCase();
 
-  function getNavButtonVariant(id: number) {
-    if (id === activeId) return "active";
+  function getNavStyle(id: number) {
+    if (id === activeId)                return "bg-blue-600 text-white ring-2 ring-blue-200 dark:ring-blue-900";
     const s = answers[id]?.status;
-    if (s === "answered") return "answered";
-    if (s === "flagged") return "flagged";
-    return "outline";
+    if (s === "answered")               return "bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-700";
+    if (s === "flagged")                return "bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-900 dark:text-amber-300 dark:border-amber-700";
+    return "bg-white text-slate-500 border border-slate-200 hover:border-blue-300 hover:text-blue-600 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
   }
 
-  // ── LOADING STATE ─────────────────────────────────────────────────────────
-
-  if (isLoading) {
+  // ── LOADING / ERROR STATES ────────────────────────────────────────────────
+  if (sessionStatus === "loading" || isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-6 space-y-4 max-w-7xl mx-auto">
         <Skeleton className="h-16 w-full rounded-xl" />
@@ -249,7 +237,6 @@ export default function TryoutPage() {
   }
 
   // ── RENDER ────────────────────────────────────────────────────────────────
-
   return (
     <TooltipProvider>
       <div className="bg-slate-50 dark:bg-slate-900 font-sans antialiased text-slate-800 dark:text-slate-100 min-h-screen">
@@ -262,27 +249,25 @@ export default function TryoutPage() {
               <Separator orientation="vertical" className="h-8 hidden sm:block" />
               <div className="hidden sm:block">
                 <h1 className="text-sm font-bold leading-tight">Ujian Seleksi Kompetensi Dasar</h1>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  SKD CPNS 2026 · Vol. {volumeId}
-                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">SKD CPNS 2026 · Vol. {volumeId}</p>
               </div>
             </div>
 
             <div className="flex items-center gap-4">
-              <div
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border font-mono font-bold text-sm
-                  ${isWarning
-                    ? "bg-red-50 border-red-200 text-red-600 dark:bg-red-950 dark:border-red-800 dark:text-red-400"
-                    : "bg-slate-50 border-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
-                  }`}
+              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border font-mono font-bold text-sm
+                ${isWarning
+                  ? "bg-red-50 border-red-200 text-red-600 dark:bg-red-950 dark:border-red-800 dark:text-red-400"
+                  : "bg-slate-50 border-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+                }`}
               >
                 <Clock className="w-4 h-4" aria-hidden />
                 <span aria-live="polite" aria-atomic="true">{formatTime(timeLeft)}</span>
               </div>
 
+              {/* ✅ [FIX 1] Avatar dari session */}
               <Avatar className="h-9 w-9">
-                <AvatarImage src="https://api.dicebear.com/7.x/avataaars/svg?seed=user" alt="Foto profil" />
-                <AvatarFallback>U</AvatarFallback>
+                <AvatarImage src={userImage} alt={`Foto profil ${userName}`} />
+                <AvatarFallback className="text-xs font-bold">{userInitials}</AvatarFallback>
               </Avatar>
             </div>
           </div>
@@ -349,14 +334,10 @@ export default function TryoutPage() {
               <CardFooter className="bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 px-5 py-3 flex flex-wrap gap-3 justify-between">
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    const idx = questions.findIndex((q) => q.id === activeId);
-                    if (idx > 0) setActiveId(questions[idx - 1].id);
-                  }}
-                  disabled={questions.findIndex((q) => q.id === activeId) === 0}
+                  onClick={() => { if (currentIdx > 0) setActiveId(questions[currentIdx - 1].id); }}
+                  disabled={currentIdx === 0}
                 >
-                  <ChevronLeft className="w-4 h-4 mr-1" aria-hidden />
-                  Sebelumnya
+                  <ChevronLeft className="w-4 h-4 mr-1" aria-hidden />Sebelumnya
                 </Button>
 
                 <Tooltip>
@@ -373,20 +354,14 @@ export default function TryoutPage() {
                       {currentAnswer?.status === "flagged" ? "Batalkan Ragu" : "Ragu-Ragu"}
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Tandai soal ini untuk ditinjau kembali</p>
-                  </TooltipContent>
+                  <TooltipContent><p>Tandai soal ini untuk ditinjau kembali</p></TooltipContent>
                 </Tooltip>
 
                 <Button
-                  onClick={() => {
-                    const idx = questions.findIndex((q) => q.id === activeId);
-                    if (idx < questions.length - 1) setActiveId(questions[idx + 1].id);
-                  }}
-                  disabled={questions.findIndex((q) => q.id === activeId) === questions.length - 1}
+                  onClick={() => { if (currentIdx < questions.length - 1) setActiveId(questions[currentIdx + 1].id); }}
+                  disabled={currentIdx === questions.length - 1}
                 >
-                  Selanjutnya
-                  <ChevronRight className="w-4 h-4 ml-1" aria-hidden />
+                  Selanjutnya<ChevronRight className="w-4 h-4 ml-1" aria-hidden />
                 </Button>
               </CardFooter>
             </Card>
@@ -421,47 +396,27 @@ export default function TryoutPage() {
 
                 <ScrollArea className="h-80">
                   <div className="grid grid-cols-5 gap-1.5 pr-3">
-                    {questions.map((q) => {
-                      const v = getNavButtonVariant(q.id);
-                      return (
-                        <button
-                          key={q.id}
-                          onClick={() => setActiveId(q.id)}
-                          aria-label={`Soal ${q.id}`}
-                          aria-current={q.id === activeId ? "true" : undefined}
-                          className={`h-9 w-full rounded-lg text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500
-                            ${v === "active"
-                              ? "bg-blue-600 text-white ring-2 ring-blue-200 dark:ring-blue-900"
-                              : v === "answered"
-                              ? "bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-700"
-                              : v === "flagged"
-                              ? "bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-900 dark:text-amber-300 dark:border-amber-700"
-                              : "bg-white text-slate-500 border border-slate-200 hover:border-blue-300 hover:text-blue-600 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
-                            }`}
-                        >
-                          {q.id}
-                        </button>
-                      );
-                    })}
+                    {questions.map((q) => (
+                      <button
+                        key={q.id}
+                        onClick={() => setActiveId(q.id)}
+                        aria-label={`Soal ${q.id}`}
+                        aria-current={q.id === activeId ? "true" : undefined}
+                        className={`h-9 w-full rounded-lg text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${getNavStyle(q.id)}`}
+                      >
+                        {q.id}
+                      </button>
+                    ))}
                   </div>
                 </ScrollArea>
 
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-                      disabled={isSubmitting}
-                    >
+                    <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" disabled={isSubmitting}>
                       {isSubmitting ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden />
-                          Mengirim...
-                        </>
+                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden />Mengirim...</>
                       ) : (
-                        <>
-                          <CheckCircle2 className="w-4 h-4 mr-2" aria-hidden />
-                          Selesai Ujian
-                        </>
+                        <><CheckCircle2 className="w-4 h-4 mr-2" aria-hidden />Selesai Ujian</>
                       )}
                     </Button>
                   </AlertDialogTrigger>
@@ -476,10 +431,7 @@ export default function TryoutPage() {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Kembali ke Ujian</AlertDialogCancel>
-                      <AlertDialogAction
-                        className="bg-emerald-600 hover:bg-emerald-700"
-                        onClick={handleSubmit}
-                      >
+                      <AlertDialogAction className="bg-emerald-600 hover:bg-emerald-700" onClick={handleSubmit}>
                         Ya, Selesaikan
                       </AlertDialogAction>
                     </AlertDialogFooter>

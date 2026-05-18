@@ -22,6 +22,8 @@ export const users = pgTable("user", {
   emailVerified: timestamp("emailVerified", { mode: "date" }),
   image:         text("image"),
   passwordHash:  text("password_hash"),
+  // ✅ TAMBAHAN KOLOM ROLE UNTUK AKSES ADMIN
+  role:          text("role", { enum: ["USER", "ADMIN"] }).notNull().default("USER"),
   createdAt:     timestamp("created_at").defaultNow(),
 });
 

@@ -74,6 +74,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name:  user.name,
           email: user.email,
           image: user.image,
+          role:  user.role,
         };
       },
     }),
@@ -81,12 +82,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
   callbacks: {
     async jwt({ token, user }) {
-      if (user) token.userId = user.id;
+      if (user) {
+        token.userId = user.id;
+      }
+
+      // Ambil data role segar langsung dari database Neon via Drizzle
+      if (token.userId) {
+        const dbUser = await db.query.users.findFirst({
+          where: eq(users.id, token.userId as string),
+        });
+
+        if (dbUser) {
+          token.role = (dbUser as any).role || "USER";
+        }
+      }
+
       return token;
     },
 
     async session({ session, token }) {
       if (token.userId) session.user.id = token.userId as string;
+      if (token.role) session.user.role = token.role as "ADMIN" | "USER";
       return session;
     },
 

@@ -1,12 +1,11 @@
 "use client";
 
 /**
- * components/auth/login-form.tsx — FIXED with Verification Status Check
+ * components/auth/login-form.tsx — FIXED with Verification Status & Role Check
  */
 
 import { useRef, useEffect, useState } from "react";
 import Link from "next/link";
-// ✅ Tambahkan import useSearchParams
 import { useRouter, useSearchParams } from "next/navigation"; 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,20 +17,19 @@ interface LoginFormProps {
   callbackUrl: string;
 }
 
-// ✅ Whitelist pesan error dari Server Action
+// Whitelist pesan error dari Server Action
 const SAFE_ERRORS: Record<string, string> = {
   invalid_credentials: "Email atau kata sandi salah. Coba lagi.",
   user_not_found: "Akun dengan email ini tidak ditemukan.",
   too_many_attempts: "Terlalu banyak percobaan. Tunggu beberapa menit.",
   account_disabled: "Akun kamu telah dinonaktifkan. Hubungi dukungan.",
-  // ✅ TAMBAHAN: Pesan khusus jika email belum diverifikasi
   email_not_verified: "Email kamu belum diverifikasi. Silakan periksa kotak masuk atau folder spam email kamu untuk melakukan verifikasi.",
 };
 
 export function LoginForm({ callbackUrl }: LoginFormProps) {
   const router = useRouter();
   
-  // ✅ Ambil query parameter status dari URL
+  // Ambil query parameter status dari URL
   const searchParams = useSearchParams();
   const status = searchParams.get("status");
 
@@ -57,6 +55,25 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
         return;
       }
 
+      // ── DETEKSI ROLE SECARA DINAMIS ──
+      // Jika rute pengalihan bawaan mengarah ke /dashboard, periksa apakah dia ADMIN
+      if (callbackUrl === "/dashboard") {
+        try {
+          const res = await fetch("/api/auth/session");
+          const session = await res.json();
+          
+          // Jika role terdeteksi ADMIN, belokkan navigasi langsung ke rute /admin
+          if (session?.user?.role === "ADMIN") {
+            router.push("/admin");
+            router.refresh();
+            return;
+          }
+        } catch (e) {
+          console.error("Gagal memverifikasi role session:", e);
+        }
+      }
+
+      // Jika bukan admin atau ada callbackUrl khusus (misal /admin dicegat proxy), ikuti rute asal
       router.push(callbackUrl);
       router.refresh();
 
@@ -70,7 +87,7 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
   return (
     <form action={handleSubmit} className="space-y-4">
 
-      {/* ✅ BANNER INFORMASI: Muncul jika di-redirect dari form register setelah sukses kirim token */}
+      {/* BANNER INFORMASI: Muncul jika di-redirect dari form register setelah sukses kirim token */}
       {status === "verification_sent" && !error && (
         <div
           role="status"

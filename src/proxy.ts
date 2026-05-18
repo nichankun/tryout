@@ -3,26 +3,29 @@
  *
  * Menggunakan auth() dari NextAuth v5 untuk cek sesi,
  * menggantikan pengecekan cookie manual sebelumnya.
- *
- * ✅ Next.js 16 — file bernama proxy.ts, export function proxy
  */
 
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const PROTECTED_PREFIXES = ["/tryout", "/dashboard", "/checkout", "/riwayat"];
+// ✅ 1. Tambahkan "/admin" ke dalam daftar prefix yang dilindungi
+const PROTECTED_PREFIXES = ["/tryout", "/dashboard", "/checkout", "/riwayat", "/admin"];
 const AUTH_ONLY_ROUTES   = ["/login", "/register"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // ✅ NextAuth v5 — auth() bisa dipanggil di proxy
   const session = await auth();
   const isLoggedIn = !!session?.user;
 
-  // Sudah login → jangan tampilkan halaman auth
+  // ✅ 2. Arahkan pengguna ke tempat yang benar setelah login
   if (isLoggedIn && AUTH_ONLY_ROUTES.some((r) => pathname.startsWith(r))) {
+    // Jika yang login adalah Admin, arahkan ke /admin
+    if (session.user.role === "ADMIN") {
+      return NextResponse.redirect(new URL("/admin", request.url));
+    }
+    // Jika User biasa, arahkan ke /dashboard
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
@@ -36,16 +39,10 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Cek kepemilikan volume
+  // Cek kepemilikan volume (Logika Tryout)
   const tryoutMatch = pathname.match(/^\/tryout\/(\d+)/);
   if (tryoutMatch) {
     const volumeId = parseInt(tryoutMatch[1], 10);
-
-    // Production: cek dari DB via session.user.id
-    // const owned = await getUserOwnedVolumes(session.user.id);
-    // if (!owned.includes(volumeId)) {
-    //   return NextResponse.redirect(new URL(`/checkout/${volumeId}`, request.url));
-    // }
 
     // Fallback cookie untuk mock
     const purchased = request.cookies.get("asn_purchased")?.value ?? "";
