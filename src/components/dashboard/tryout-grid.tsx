@@ -2,17 +2,35 @@
 
 import { useState, useDeferredValue, useMemo, memo } from "react";
 import Link from "next/link";
+import { Clock, FileText, Search, RotateCcw, ArrowRight } from "lucide-react";
+
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
-import { Clock, FileText, Lock, Search, Zap, RotateCcw } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 // ==========================================
-// KONFIGURASI & TYPES
+// KONFIGURASI & DYNAMIC COLORS
 // ==========================================
 const INT_CONFIG = { locale: "id-ID", currency: "IDR" } as const;
 const ROUTES = { tryout: "/tryout", checkout: "/checkout" } as const;
+
+// Menggunakan variabel chart dari global.css Anda
+const ACCENT_COLORS = [
+  "border-t-chart-1",
+  "border-t-chart-2",
+  "border-t-chart-3",
+  "border-t-chart-4",
+  "border-t-chart-5",
+];
 
 export interface TryoutVolume {
   id: number;
@@ -23,8 +41,7 @@ export interface TryoutVolume {
   hargaAsli: number;
   isUnlocked: boolean;
   isAvailable: boolean;
-  // Data tambahan untuk evaluasi
-  lastHistory?: { totalSkor: number, isLolos: boolean } | null;
+  lastHistory?: { totalSkor: number; isLolos: boolean } | null;
   totalPengerjaan?: number;
 }
 
@@ -39,79 +56,75 @@ function formatRupiah(n: number): string {
 }
 
 // ==========================================
-// SUB-KOMPONEN: KARTU VOLUME (Dinamis)
+// SUB-KOMPONEN: KARTU VOLUME
 // ==========================================
 const VolumeCard = memo(function VolumeCard({ vol }: { vol: TryoutVolume }) {
   const paddedId = vol.id.toString().padStart(2, "0");
   const isFinished = (vol.totalPengerjaan ?? 0) > 0;
+  
+  // Mengambil warna border dinamis berdasarkan ID
+  const borderClass = ACCENT_COLORS[vol.id % ACCENT_COLORS.length];
 
   return (
-    <Card className={`overflow-hidden transition-all duration-300 group flex flex-col p-0 gap-0 border-2
-      ${isFinished ? 'border-emerald-500 shadow-emerald-500/10' : 'hover:shadow-xl'}`}>
-      
-      {/* Header dengan status dinamis */}
-      <CardHeader className={`h-32 flex items-center justify-center relative p-0 rounded-t-lg
-        ${isFinished ? 'bg-emerald-600' : vol.harga === 0 ? 'bg-violet-600' : 'bg-primary'}`}>
-        
-        <span className="text-white/20 font-black text-6xl absolute left-4 top-1 select-none leading-none">
-          {paddedId}
-        </span>
-        
-        {isFinished && (
-          <Badge className="absolute top-3 right-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm border-none text-white text-[10px]">
-            {vol.totalPengerjaan}x Pengerjaan
-          </Badge>
-        )}
+    <Card className={cn(
+      "flex flex-col justify-between border-t-4 transition-all hover:shadow-md",
+      borderClass
+    )}>
+      <CardHeader className="pb-4">
+        <div className="flex items-start justify-between gap-4">
+          <CardTitle className="text-lg leading-tight">{vol.title}</CardTitle>
+          <div className="flex flex-col items-end gap-2 shrink-0">
+             <Badge variant="outline" className="font-mono text-xs">
+               Vol. {paddedId}
+             </Badge>
+          </div>
+        </div>
+
+        <CardDescription className="flex items-center gap-3 pt-1.5">
+          <span className="flex items-center gap-1.5 text-xs">
+            <Clock className="h-3.5 w-3.5" /> {vol.durasiMenit}m
+          </span>
+          <span className="flex items-center gap-1.5 text-xs">
+            <FileText className="h-3.5 w-3.5" /> {vol.totalSoal} Soal
+          </span>
+        </CardDescription>
       </CardHeader>
 
-      <CardContent className="p-5 flex flex-col grow">
-        <h3 className="font-bold text-foreground text-base mb-2 leading-tight">{vol.title}</h3>
-        
-        {/* Preview Riwayat (Evaluasi) */}
+      <CardContent className="flex-1 pb-4">
         {isFinished && vol.lastHistory ? (
-          <div className="text-xs text-muted-foreground bg-emerald-50 p-2.5 rounded-lg border border-emerald-100 mb-4">
-            <p className="flex justify-between">
-              <span>Skor Terakhir:</span>
-              <strong className="text-emerald-700">{vol.lastHistory.totalSkor}</strong>
-            </p>
-            <p className="flex justify-between">
-              <span>Status:</span>
-              <strong className={vol.lastHistory.isLolos ? "text-emerald-600" : "text-red-600"}>
-                {vol.lastHistory.isLolos ? "Lolos" : "Belum Lolos"}
-              </strong>
-            </p>
-            {/* Tombol Lihat Semua Riwayat Volume */}
-      <div className="mt-3 pt-2 border-t border-emerald-200">
-              <Button variant="link" className="text-[10px] h-auto p-0 text-emerald-700 hover:text-emerald-900 font-semibold" asChild>
-                <Link href={`/dashboard/${vol.id}/riwayat?packageId=${vol.id}`}>
-                  Lihat riwayat
-                </Link>
-              </Button>
+          <div className="flex flex-col space-y-2 rounded-lg border bg-muted/30 p-3 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Skor Terakhir</span>
+              <span className="font-semibold text-foreground">{vol.lastHistory.totalSkor}</span>
             </div>
-    
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Status</span>
+              <span className={cn(
+                  "font-semibold",
+                  vol.lastHistory.isLolos ? "text-chart-2" : "text-destructive"
+                )}>
+                {vol.lastHistory.isLolos ? "Lolos" : "Belum Lolos"}
+              </span>
+            </div>
           </div>
-          
         ) : (
-          <div className="flex flex-wrap items-center gap-2 mb-4">
-            <Badge variant="outline" className="text-muted-foreground text-xs gap-1">
-              <Clock className="w-3 h-3" /> {vol.durasiMenit} Menit
-            </Badge>
-            <Badge variant="outline" className="text-muted-foreground text-xs gap-1">
-              <FileText className="w-3 h-3" /> {vol.totalSoal} Soal
-            </Badge>
+          <div className="text-sm text-muted-foreground min-h-16">
+            {vol.isUnlocked
+              ? "Paket siap dikerjakan. Uji kemampuanmu sekarang dengan latihan HOTS terkini."
+              : "Beli paket ini untuk membuka akses penuh simulasi CAT CPNS."}
           </div>
         )}
       </CardContent>
 
-      <CardFooter className="px-5 pb-5 pt-0 mt-auto">
-        <Button 
-          asChild 
-          className="w-full rounded-lg font-bold" 
+      <CardFooter className="pt-0">
+        <Button
+          asChild
+          className="w-full font-semibold"
           variant={isFinished ? "outline" : "default"}
         >
-          <Link href={`${ROUTES.tryout}/${vol.id}`}>
+          <Link href={vol.isUnlocked || isFinished ? `${ROUTES.tryout}/${vol.id}` : `${ROUTES.checkout}/${vol.id}`}>
             {isFinished ? (
-              <><RotateCcw className="w-4 h-4 mr-2" /> Kerjakan Ulang (Evaluasi)</>
+              <> <RotateCcw className="mr-2 h-4 w-4" /> Evaluasi Ulang </>
             ) : vol.isUnlocked ? (
               "Mulai Kerjakan"
             ) : (
@@ -140,18 +153,18 @@ export function TryoutGrid({ volumes }: { volumes: TryoutVolume[] }) {
 
   return (
     <div className="space-y-6">
-      <div className="relative w-full md:w-80">
+      <div className="relative w-full md:max-w-xs">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           type="search"
           placeholder="Cari volume..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="pl-9 rounded-xl"
+          className="pl-9"
         />
-        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {filtered.map((vol) => (
           <VolumeCard key={vol.id} vol={vol} />
         ))}

@@ -15,7 +15,6 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import {
   AlertDialog,
@@ -147,7 +146,6 @@ const ExamTimer = React.memo(({
   );
 });
 ExamTimer.displayName = "ExamTimer";
-
 
 // ==========================================
 // RUNTIME DESCRIPTOR ENGINE Component
@@ -364,37 +362,39 @@ export default function TryoutClient({
 
   return (
     <TooltipProvider>
-      <div className="bg-background font-sans antialiased text-foreground min-h-screen relative">
+      {/* PERBAIKAN: Menggunakan struktur flex yang sama dengan dashboard layout */}
+      <div className="relative flex min-h-screen flex-col bg-background font-sans text-foreground antialiased">
         
         {/* PAUSE OVERLAY (BLOKIR UI SAAT OFFLINE / KELUAR TAB) */}
         {isPaused && (
-          <div className="fixed inset-0 z-100 bg-background/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-300">
+          <div className="fixed inset-0 z-100 flex flex-col items-center justify-center bg-background/90 p-6 text-center backdrop-blur-md animate-in fade-in duration-300">
             {pauseReason === "offline" ? (
-              <WifiOff className="w-20 h-20 text-destructive mb-6 animate-pulse" />
+              <WifiOff className="mb-6 h-20 w-20 animate-pulse text-destructive" />
             ) : (
-              <AlertCircle className="w-20 h-20 text-amber-500 mb-6 animate-pulse" />
+              <AlertCircle className="mb-6 h-20 w-20 animate-pulse text-amber-500" />
             )}
-            <h2 className="text-3xl font-bold mb-3">Ujian Dijeda Otomatis</h2>
-            <p className="text-muted-foreground text-lg mb-8 max-w-lg">
+            <h2 className="mb-3 text-3xl font-bold">Ujian Dijeda Otomatis</h2>
+            <p className="mb-8 max-w-lg text-lg text-muted-foreground">
               {pauseReason === "offline"
                 ? "Koneksi internet Anda terputus. Waktu hitung mundur dihentikan sementara demi keadilan. Silakan periksa jaringan Anda."
                 : "Sistem mendeteksi Anda keluar/beralih dari halaman ujian. Waktu hitung mundur dibekukan. Harap tetap fokus pada ujian Anda."}
             </p>
             
-            <Button size="lg" onClick={() => setIsPaused(false)} className="font-bold text-sm px-8" disabled={!navigator.onLine}>
+            <Button size="lg" onClick={() => setIsPaused(false)} className="px-8 text-sm font-bold" disabled={!navigator.onLine}>
               {navigator.onLine ? "Saya Sudah Kembali Siap" : "Menunggu Koneksi..."}
             </Button>
           </div>
         )}
 
         {/* AREA HEADER BAR */}
-        <header className="bg-card border-b border-border sticky top-0 z-50 shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+        {/* PERBAIKAN: Menambahkan 'backdrop-blur supports-[backdrop-filter]:bg-background/60' dan 'container mx-auto px-4 md:px-6' */}
+        <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 shadow-sm backdrop-blur supports-backdrop-filter:bg-background/60">
+          <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4 md:px-6">
             <div className="flex items-center gap-3">
-              <div className="bg-primary text-primary-foreground px-3 py-1.5 rounded-lg font-bold text-sm">
+              <div className="rounded-lg bg-primary px-3 py-1.5 text-sm font-bold text-primary-foreground">
                 {TEXT_CONTENT.headerBadge}
               </div>
-              <Separator orientation="vertical" className="h-8 hidden sm:block" />
+              <Separator orientation="vertical" className="hidden h-8 sm:block" />
               <div className="hidden sm:block">
                 <h1 className="text-sm font-bold leading-tight">{TEXT_CONTENT.headerTitle}</h1>
                 <p className="text-xs text-muted-foreground">{TEXT_CONTENT.headerSubtitle} {volumeId} · {packageTitle}</p>
@@ -405,8 +405,8 @@ export default function TryoutClient({
               {/* TOMBOL RESTART DI HEADER */}
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="outline" size="sm" disabled={isPending} className="hidden sm:flex hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30">
-                    <RotateCcw className="w-4 h-4 mr-1.5" />
+                  <Button variant="outline" size="sm" disabled={isPending} className="hidden hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive sm:flex">
+                    <RotateCcw className="mr-1.5 h-4 w-4" />
                     Restart Ujian
                   </Button>
                 </AlertDialogTrigger>
@@ -435,188 +435,187 @@ export default function TryoutClient({
                 timeLeftRef={timeLeftRef} 
               />
 
-              <Avatar className="h-9 w-9 border border-border">
-                <AvatarImage src={userImage} alt={userName} />
-                <AvatarFallback className="text-xs font-bold">{userInitials}</AvatarFallback>
-              </Avatar>
             </div>
           </div>
         </header>
 
         {/* SEKSI UTAMA PLATFORM */}
-        <main className={`max-w-7xl mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 transition-opacity duration-300 ${isPaused ? "opacity-30 blur-sm pointer-events-none select-none" : "opacity-100"}`}>
-          {/* AREA KIRI: BARIS KONTEN PERTANYAAN */}
-          <div className="lg:col-span-8 space-y-4">
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>{TEXT_CONTENT.progressLabel}</span>
-                <span>{answeredCount} dari {questions.length} soal terjawab ({progressPercent}%)</span>
+        {/* PERBAIKAN: Menambahkan 'container mx-auto flex-1 px-4 py-6 md:px-6 md:py-8' agar grid berada di tengah dan ada jarak vertikal yang pas */}
+        <main className={`container mx-auto flex-1 px-4 py-6 md:px-6 md:py-8 transition-opacity duration-300 ${isPaused ? "pointer-events-none select-none opacity-30 blur-sm" : "opacity-100"}`}>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+            {/* AREA KIRI: BARIS KONTEN PERTANYAAN */}
+            <div className="space-y-4 lg:col-span-8">
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>{TEXT_CONTENT.progressLabel}</span>
+                  <span>{answeredCount} dari {questions.length} soal terjawab ({progressPercent}%)</span>
+                </div>
+                <Progress value={progressPercent} className="h-1.5" />
               </div>
-              <Progress value={progressPercent} className="h-1.5" />
+
+              <Card className="border-border bg-card shadow-sm">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-border bg-muted/30 px-5 py-3">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-bold text-primary">
+                      {TEXT_CONTENT.questionNumberLabel} {currentIdx + 1}
+                    </span>
+                  </div>
+                  <Badge variant="secondary" className="text-xs uppercase tracking-wide">
+                    {currentQuestion?.kategori}
+                  </Badge>
+                </CardHeader>
+
+                <CardContent className="space-y-6 p-6 md:p-8">
+                  <p className="whitespace-pre-line text-base leading-relaxed text-foreground select-none">
+                    {currentQuestion?.pertanyaan}
+                  </p>
+
+                  <RadioGroup
+                    value={currentAnswer?.selectedKey ?? ""}
+                    onValueChange={handleAnswer}
+                    className="space-y-2.5"
+                  >
+                    {currentQuestion?.pilihan.map((opt) => {
+                      const isSelected = currentAnswer?.selectedKey === opt.opsi;
+                      return (
+                        <Label
+                          key={opt.opsi}
+                          htmlFor={`opt-${opt.opsi}`}
+                          className={`flex cursor-pointer items-center gap-4 rounded-xl border p-4 transition-colors
+                            ${isSelected ? "border-primary bg-primary/5 dark:bg-primary/10" : "border-border hover:border-border/80 hover:bg-muted/50"}`}
+                        >
+                          <RadioGroupItem value={opt.opsi} id={`opt-${opt.opsi}`} />
+                          <span className={`text-sm ${isSelected ? "font-semibold text-primary" : "text-foreground"}`}>
+                            {opt.opsi}. {opt.teks}
+                          </span>
+                        </Label>
+                      );
+                    })}
+                  </RadioGroup>
+                </CardContent>
+
+                <CardFooter className="flex flex-wrap justify-between gap-3 border-t border-border bg-muted/20 px-5 py-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => { if (currentIdx > 0) setActiveId(questions[currentIdx - 1].id); }}
+                    disabled={currentIdx === 0}
+                  >
+                    <ChevronLeft className="mr-1 h-4 w-4" />{TEXT_CONTENT.actionPrev}
+                  </Button>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={currentAnswer?.status === "flagged" ? "default" : "outline"}
+                        className={currentAnswer?.status === "flagged"
+                          ? "border-amber-500 bg-amber-500 text-white hover:bg-amber-600"
+                          : "border-amber-500/30 text-amber-600 hover:bg-amber-500/10 dark:border-amber-500/40 dark:text-amber-400"
+                        }
+                        onClick={handleFlag}
+                      >
+                        <AlertCircle className="mr-1.5 h-4 w-4" />
+                        {currentAnswer?.status === "flagged" ? TEXT_CONTENT.actionUnflag : TEXT_CONTENT.actionFlag}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent><p>{TEXT_CONTENT.flagTooltip}</p></TooltipContent>
+                  </Tooltip>
+
+                  <Button
+                    onClick={() => { if (currentIdx < questions.length - 1) setActiveId(questions[currentIdx + 1].id); }}
+                    disabled={currentIdx === questions.length - 1}
+                  >
+                    {TEXT_CONTENT.actionNext}<ChevronRight className="ml-1 h-4 w-4" />
+                  </Button>
+                </CardFooter>
+              </Card>
             </div>
 
-            <Card className="shadow-sm bg-card border-border">
-              <CardHeader className="bg-muted/30 border-b border-border py-3 px-5 flex-row items-center justify-between space-y-0">
-                <div className="flex items-center gap-2">
-                  <BookOpen className="w-4 h-4 text-primary" />
-                  <span className="font-bold text-primary text-sm">
-                    {TEXT_CONTENT.questionNumberLabel} {currentIdx + 1}
-                  </span>
-                </div>
-                <Badge variant="secondary" className="text-xs uppercase tracking-wide">
-                  {currentQuestion?.kategori}
-                </Badge>
-              </CardHeader>
+            {/* AREA KANAN: PANEL NAVIGASI ANGKA NOMOR */}
+            <div className="space-y-4 lg:col-span-4">
+              <Card className="border-border bg-card shadow-sm">
+                <CardHeader className="flex flex-row items-center gap-2 space-y-0 border-b border-border px-5 py-3">
+                  <LayoutGrid className="h-4 w-4 text-primary" />
+                  <h2 className="text-sm font-bold text-foreground">{TEXT_CONTENT.sidebarTitle}</h2>
+                </CardHeader>
 
-              <CardContent className="p-6 md:p-8 space-y-6">
-                <p className="text-base leading-relaxed text-foreground select-none whitespace-pre-line">
-                  {currentQuestion?.pertanyaan}
-                </p>
-
-                <RadioGroup
-                  value={currentAnswer?.selectedKey ?? ""}
-                  onValueChange={handleAnswer}
-                  className="space-y-2.5"
-                >
-                  {currentQuestion?.pilihan.map((opt) => {
-                    const isSelected = currentAnswer?.selectedKey === opt.opsi;
-                    return (
-                      <Label
-                        key={opt.opsi}
-                        htmlFor={`opt-${opt.opsi}`}
-                        className={`flex items-center gap-4 p-4 rounded-xl border cursor-pointer transition-colors
-                          ${isSelected ? "border-primary bg-primary/5 dark:bg-primary/10" : "border-border hover:bg-muted/50 hover:border-border/80"}`}
-                      >
-                        <RadioGroupItem value={opt.opsi} id={`opt-${opt.opsi}`} />
-                        <span className={`text-sm ${isSelected ? "text-primary font-semibold" : "text-foreground"}`}>
-                          {opt.opsi}. {opt.teks}
-                        </span>
-                      </Label>
-                    );
-                  })}
-                </RadioGroup>
-              </CardContent>
-
-              <CardFooter className="bg-muted/20 border-t border-border px-5 py-3 flex flex-wrap gap-3 justify-between">
-                <Button
-                  variant="outline"
-                  onClick={() => { if (currentIdx > 0) setActiveId(questions[currentIdx - 1].id); }}
-                  disabled={currentIdx === 0}
-                >
-                  <ChevronLeft className="w-4 h-4 mr-1" />{TEXT_CONTENT.actionPrev}
-                </Button>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={currentAnswer?.status === "flagged" ? "default" : "outline"}
-                      className={currentAnswer?.status === "flagged"
-                        ? "bg-amber-500 hover:bg-amber-600 border-amber-500 text-white"
-                        : "border-amber-500/30 text-amber-600 hover:bg-amber-500/10 dark:border-amber-500/40 dark:text-amber-400"
-                      }
-                      onClick={handleFlag}
-                    >
-                      <AlertCircle className="w-4 h-4 mr-1.5" />
-                      {currentAnswer?.status === "flagged" ? TEXT_CONTENT.actionUnflag : TEXT_CONTENT.actionFlag}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent><p>{TEXT_CONTENT.flagTooltip}</p></TooltipContent>
-                </Tooltip>
-
-                <Button
-                  onClick={() => { if (currentIdx < questions.length - 1) setActiveId(questions[currentIdx + 1].id); }}
-                  disabled={currentIdx === questions.length - 1}
-                >
-                  {TEXT_CONTENT.actionNext}<ChevronRight className="w-4 h-4 ml-1" />
-                </Button>
-              </CardFooter>
-            </Card>
-          </div>
-
-          {/* AREA KANAN: PANEL NAVIGASI ANGKA NOMOR */}
-          <div className="lg:col-span-4 space-y-4">
-            <Card className="shadow-sm bg-card border-border">
-              <CardHeader className="py-3 px-5 border-b border-border flex-row items-center gap-2 space-y-0">
-                <LayoutGrid className="w-4 h-4 text-primary" />
-                <h2 className="font-bold text-sm text-foreground">{TEXT_CONTENT.sidebarTitle}</h2>
-              </CardHeader>
-
-              <CardContent className="p-4 space-y-4">
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div className="flex flex-col items-center gap-1 p-2 rounded-lg bg-primary/5 border border-primary/10">
-                    <CheckCircle2 className="w-4 h-4 text-primary" />
-                    <span className="font-semibold text-primary">{answeredCount}</span>
-                    <span className="text-muted-foreground">{TEXT_CONTENT.statusAnswered}</span>
+                <CardContent className="space-y-4 p-4">
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="flex flex-col items-center gap-1 rounded-lg border border-primary/10 bg-primary/5 p-2">
+                      <CheckCircle2 className="h-4 w-4 text-primary" />
+                      <span className="font-semibold text-primary">{answeredCount}</span>
+                      <span className="text-muted-foreground">{TEXT_CONTENT.statusAnswered}</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-1 rounded-lg border border-amber-500/10 bg-amber-500/5 p-2">
+                      <AlertCircle className="h-4 w-4 text-amber-500" />
+                      <span className="font-semibold text-amber-600 dark:text-amber-400">{flaggedCount}</span>
+                      <span className="text-muted-foreground">{TEXT_CONTENT.statusFlagged}</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-1 rounded-lg border border-border bg-muted p-2">
+                      <span className="h-4 w-4 rounded border-2 border-muted-foreground/30" />
+                      <span className="font-semibold text-foreground">{unansweredCount}</span>
+                      <span className="text-muted-foreground">{TEXT_CONTENT.statusUnanswered}</span>
+                    </div>
                   </div>
-                  <div className="flex flex-col items-center gap-1 p-2 rounded-lg bg-amber-500/5 border border-amber-500/10">
-                    <AlertCircle className="w-4 h-4 text-amber-500" />
-                    <span className="font-semibold text-amber-600 dark:text-amber-400">{flaggedCount}</span>
-                    <span className="text-muted-foreground">{TEXT_CONTENT.statusFlagged}</span>
-                  </div>
-                  <div className="flex flex-col items-center gap-1 p-2 rounded-lg bg-muted border border-border">
-                    <span className="w-4 h-4 rounded border-2 border-muted-foreground/30" />
-                    <span className="font-semibold text-foreground">{unansweredCount}</span>
-                    <span className="text-muted-foreground">{TEXT_CONTENT.statusUnanswered}</span>
-                  </div>
-                </div>
 
-                <ScrollArea className="h-80">
-                  <div className="grid grid-cols-5 gap-1.5 pr-3 pt-1">
-                    {questions.map((q, idx) => (
-                      <button
-                        key={q.id}
-                        onClick={() => setActiveId(q.id)}
-                        className={`h-9 w-full rounded-lg text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary font-mono ${getNavStyle(q.id)}`}
-                      >
-                        {(idx + 1).toString().padStart(2, "0")}
-                      </button>
-                    ))}
-                  </div>
-                </ScrollArea>
+                  <ScrollArea className="h-80">
+                    <div className="grid grid-cols-5 gap-1.5 pr-3 pt-1">
+                      {questions.map((q, idx) => (
+                        <button
+                          key={q.id}
+                          onClick={() => setActiveId(q.id)}
+                          className={`h-9 w-full rounded-lg font-mono text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${getNavStyle(q.id)}`}
+                        >
+                          {(idx + 1).toString().padStart(2, "0")}
+                        </button>
+                      ))}
+                    </div>
+                  </ScrollArea>
 
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold" disabled={isPending}>
-                      {isPending ? (
-                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{TEXT_CONTENT.btnSubmitting}</>
-                      ) : (
-                        <><CheckCircle2 className="w-4 h-4 mr-2" />{TEXT_CONTENT.btnSubmit}</>
-                      )}
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>{TEXT_CONTENT.alertTitle}</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Kamu baru menjawab <strong>{answeredCount} dari {questions.length} soal</strong>.
-                        {unansweredCount > 0 && ` Masih ada ${unansweredCount} soal yang belum dijawab.`}
-                        {" "}Tindakan ini bersifat final, seluruh jawaban akan dikunci dan dinilai permanen oleh server.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel disabled={isPending}>{TEXT_CONTENT.alertCancel}</AlertDialogCancel>
-                      <AlertDialogAction 
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white" 
-                        onClick={handleSubmitUjian}
-                        disabled={isPending}
-                      >
-                        {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : TEXT_CONTENT.alertConfirm}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </CardContent>
-            </Card>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button className="w-full bg-emerald-600 font-bold text-white hover:bg-emerald-700" disabled={isPending}>
+                        {isPending ? (
+                          <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{TEXT_CONTENT.btnSubmitting}</>
+                        ) : (
+                          <><CheckCircle2 className="mr-2 h-4 w-4" />{TEXT_CONTENT.btnSubmit}</>
+                        )}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>{TEXT_CONTENT.alertTitle}</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Kamu baru menjawab <strong>{answeredCount} dari {questions.length} soal</strong>.
+                          {unansweredCount > 0 && ` Masih ada ${unansweredCount} soal yang belum dijawab.`}
+                          {" "}Tindakan ini bersifat final, seluruh jawaban akan dikunci dan dinilai permanen oleh server.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isPending}>{TEXT_CONTENT.alertCancel}</AlertDialogCancel>
+                        <AlertDialogAction 
+                          className="bg-emerald-600 text-white hover:bg-emerald-700" 
+                          onClick={handleSubmitUjian}
+                          disabled={isPending}
+                        >
+                          {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : TEXT_CONTENT.alertConfirm}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </CardContent>
+              </Card>
 
-            {/* BOX TIPS TRICK BANNER */}
-            <Card className="bg-primary text-primary-foreground shadow-sm border-0">
-              <CardContent className="p-5">
-                <p className="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-2">{TEXT_CONTENT.tipsTitle}</p>
-                <p className="text-sm leading-relaxed italic opacity-90">
-                  {TEXT_CONTENT.tipsDesc}
-                </p>
-              </CardContent>
-            </Card>
+              {/* BOX TIPS TRICK BANNER */}
+              <Card className="border-0 bg-primary text-primary-foreground shadow-sm">
+                <CardContent className="p-5">
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest opacity-60">{TEXT_CONTENT.tipsTitle}</p>
+                  <p className="text-sm italic leading-relaxed opacity-90">
+                    {TEXT_CONTENT.tipsDesc}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </main>
       </div>

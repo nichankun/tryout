@@ -28,9 +28,9 @@ export function ExamTypeTabs() {
   const [active, setActive] = useState<ExamType>("SKD");
 
   return (
-    // Menggunakan variabel opasitas `primary-foreground` agar otomatis menyatu di dalam Hero Banner
+    // Menggunakan bg-muted agar memiliki kontras yang baik untuk wadah tabs
     <div
-      className="inline-flex bg-primary-foreground/10 p-1 rounded-full border border-primary-foreground/20"
+      className="inline-flex items-center justify-center rounded-full bg-muted p-1 text-muted-foreground"
       role="tablist"
       aria-label={LABELS.ariaLabel}
     >
@@ -46,15 +46,16 @@ export function ExamTypeTabs() {
             aria-disabled={isDisabled}
             disabled={isDisabled}
             onClick={() => setActive(tab.key)}
-            className={`px-6 py-2 rounded-full text-sm font-bold transition-all duration-200 flex items-center gap-2
-              ${isActive
-                ? "bg-primary-foreground text-primary shadow-sm"
-                : "text-primary-foreground/80 hover:text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+            className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-6 py-2 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 gap-2
+              ${
+                isActive
+                  ? "bg-background text-foreground shadow-sm"
+                  : "hover:text-foreground"
               }`}
           >
             {tab.label}
             {isDisabled && (
-              <span className="text-[10px] bg-primary-foreground/20 text-primary-foreground px-1.5 py-0.5 rounded-full font-semibold tracking-wide">
+              <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold text-secondary-foreground">
                 {LABELS.badgeIncoming}
               </span>
             )}
