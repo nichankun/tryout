@@ -2,8 +2,7 @@
 
 /**
  * components/dashboard/countdown-timer.tsx
- * 
- * Komponen penghitung mundur ujian (Timer) yang adaptif.
+ * * Komponen penghitung mundur ujian (Timer) yang adaptif.
  * Menggunakan token warna semantik bawaan ekosistem untuk mendukung mode gelap/terang.
  */
 
@@ -23,27 +22,56 @@ const TIMER_CONFIG = {
 interface CountdownTimerProps {
   initialSeconds: number; // Durasi ujian dalam satuan detik
   onTimeUp?: () => void;  // Callback eksekusi otomatis saat waktu habis
+  isPaused?: boolean;     // Prop baru untuk Auto-Pause
+  timeLeftRef?: React.MutableRefObject<number>; // Prop baru untuk Sinkronisasi LocalStorage
 }
 
 // ==========================================
 // KOMPONEN UTAMA
 // ==========================================
-export function CountdownTimer({ initialSeconds, onTimeUp }: CountdownTimerProps) {
+export function CountdownTimer({ initialSeconds, onTimeUp, isPaused = false, timeLeftRef }: CountdownTimerProps) {
   const [timeLeft, setTimeLeft] = useState(initialSeconds);
 
   useEffect(() => {
-    if (timeLeft <= 0) {
-      if (onTimeUp) onTimeUp();
+    // Sinkronkan ref ke parent setiap kali re-render agar tersimpan di LocalStorage
+    if (timeLeftRef) {
+      timeLeftRef.current = timeLeft;
+    }
+
+    // Jika sedang dijeda (pindah tab/offline), interval tidak dijalankan sama sekali
+    if (isPaused) {
       return;
     }
 
+    if (timeLeft <= 0) {
+      if (onTimeUp) {
+        onTimeUp();
+      }
+      return;
+    }
+
+    // Kalkulasi target waktu absolut agar timer stabil dan tidak drift/melambat
+    const targetTime = Date.now() + (timeLeft * 1000);
+
     const timerId = setInterval(() => {
-      setTimeLeft((prev) => prev - 1);
+      const newTimeLeft = Math.max(0, Math.floor((targetTime - Date.now()) / 1000));
+      setTimeLeft(newTimeLeft);
+      
+      if (timeLeftRef) {
+        timeLeftRef.current = newTimeLeft;
+      }
+
+      if (newTimeLeft <= 0) {
+        clearInterval(timerId);
+        if (onTimeUp) {
+          onTimeUp();
+        }
+      }
     }, 1000);
 
     // Pembersihan (cleanup) instans interval saat unmount komponen
     return () => clearInterval(timerId);
-  }, [timeLeft, onTimeUp]);
+  }, [isPaused, onTimeUp, timeLeftRef]); // Dependensi `timeLeft` sengaja dihilangkan agar kalkulasi targetTime stabil per-resume
 
   // Transformasi kalkulasi representasi waktu (HH:MM:SS)
   const hours = Math.floor(timeLeft / 3600);

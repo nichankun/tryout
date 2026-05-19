@@ -3,12 +3,11 @@
 /**
  * app/tryout/[id]/tryout-client.tsx
  * * Client Component Simulator CAT Premium (100% Strict Type Safe & Ultra Optimized).
- * Arsitektur diperbarui untuk mencegah re-render global setiap detik akibat timer.
- * Menggunakan useTransition untuk eksekusi Server Action yang non-blocking.
+ * Dilengkapi dengan fitur Auto-Pause (Anti Tab-Switch / Offline) dan Restart.
  */
 
 import * as React from "react";
-import { useTransition, useCallback, useMemo, useEffect, useState } from "react";
+import { useTransition, useCallback, useMemo, useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card";
@@ -30,8 +29,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronLeft, ChevronRight, CheckCircle2, AlertCircle, Clock, LayoutGrid, BookOpen, Loader2 } from "lucide-react";
-import { submitTryoutAction } from "@/lib/actions/tryout";
+import { ChevronLeft, ChevronRight, CheckCircle2, AlertCircle, Clock, LayoutGrid, BookOpen, Loader2, RotateCcw, WifiOff } from "lucide-react";
+import { submitTryoutAction } from "../../../lib/actions/tryout";
 
 // ==========================================
 // KONSTANTA & CONFIGURATION DICTIONARY
@@ -89,24 +88,50 @@ interface TryoutClientProps {
 }
 
 // ==========================================
-// OPTIMASI: ISOLATED TIMER COMPONENT
-// Mencegah re-render seluruh halaman setiap detik. Hanya komponen kecil ini yang re-render.
+// OPTIMASI: ISOLATED TIMER COMPONENT (Auto-Pause Ready)
 // ==========================================
-const ExamTimer = React.memo(({ endTime, onExpire }: { endTime: number; onExpire: () => void }) => {
-  const [timeLeft, setTimeLeft] = useState(() => Math.max(0, Math.floor((endTime - Date.now()) / 1000)));
+const ExamTimer = React.memo(({ 
+  initialTimeLeft, 
+  isPaused, 
+  onExpire,
+  timeLeftRef 
+}: { 
+  initialTimeLeft: number;
+  isPaused: boolean;
+  onExpire: () => void;
+  timeLeftRef: React.MutableRefObject<number>;
+}) => {
+  const [timeLeft, setTimeLeft] = useState(initialTimeLeft);
 
   useEffect(() => {
+    // Sinkronkan ref setiap kali UI timer re-render, agar parent bisa menyimpannya ke LocalStorage
+    timeLeftRef.current = timeLeft;
+
+    // Jika sedang di-pause, interval dimatikan total.
+    if (isPaused) return;
+
     if (timeLeft <= 0) {
       onExpire();
       return;
     }
+
+    // Kalkulasi target (memastikan timer tidak lambat/drift dari setInterval)
+    // Ketika di-resume, targetTime di-generate ulang dari sisa waktu (timeLeft) yang beku.
+    const targetTime = Date.now() + (timeLeft * 1000);
+
     const interval = setInterval(() => {
-      const newTimeLeft = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
+      const newTimeLeft = Math.max(0, Math.floor((targetTime - Date.now()) / 1000));
       setTimeLeft(newTimeLeft);
-      if (newTimeLeft <= 0) onExpire();
+      timeLeftRef.current = newTimeLeft;
+
+      if (newTimeLeft <= 0) {
+        clearInterval(interval);
+        onExpire();
+      }
     }, 1000);
+
     return () => clearInterval(interval);
-  }, [endTime, timeLeft, onExpire]);
+  }, [isPaused, onExpire, timeLeftRef]); // Effect hanya berulang ketika status pause diubah
 
   const isWarning = timeLeft < TIMER_CONFIG.warningThresholdSeconds;
   const m = Math.floor(timeLeft / 60).toString().padStart(2, "0");
@@ -114,7 +139,7 @@ const ExamTimer = React.memo(({ endTime, onExpire }: { endTime: number; onExpire
 
   return (
     <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border font-mono font-bold text-sm transition-colors
-      ${isWarning ? "bg-destructive/10 border-destructive/20 text-destructive" : "bg-muted border-border text-muted-foreground"}`}
+      ${isWarning ? "bg-destructive/10 border-destructive/20 text-destructive animate-pulse" : "bg-muted border-border text-muted-foreground"}`}
     >
       <Clock className="w-4 h-4" />
       <span>{m}:{s}</span>
@@ -122,6 +147,7 @@ const ExamTimer = React.memo(({ endTime, onExpire }: { endTime: number; onExpire
   );
 });
 ExamTimer.displayName = "ExamTimer";
+
 
 // ==========================================
 // RUNTIME DESCRIPTOR ENGINE Component
@@ -135,8 +161,16 @@ export default function TryoutClient({
 }: TryoutClientProps) {
   const [activeId, setActiveId] = useState<number>(questions[0]?.id ?? 1);
   const [answers, setAnswers] = useState<Record<number, UserAnswer>>({});
-  const [endTime, setEndTime] = useState<number | null>(null);
   
+  // State manajemen timer
+  const [initialTime, setInitialTime] = useState<number | null>(null);
+  const [timerKey, setTimerKey] = useState<number>(0); // Untuk me-remount timer saat Restart
+  const timeLeftRef = useRef<number>(TIMER_CONFIG.durationSeconds); // Referensi non-render untuk LocalStorage
+
+  // Auto-pause states
+  const [isPaused, setIsPaused] = useState(false);
+  const [pauseReason, setPauseReason] = useState<"offline" | "hidden" | null>(null);
+
   // React 18+ Transition untuk mencegah UI freeze saat memanggil Server Action
   const [isPending, startTransition] = useTransition();
 
@@ -151,14 +185,16 @@ export default function TryoutClient({
         const parsed = JSON.parse(savedSession);
         setAnswers(parsed.answers || {});
         
-        // Cek apakah waktu sudah kedaluwarsa dari backup
-        if (parsed.endTime && parsed.endTime > Date.now()) {
-          setEndTime(parsed.endTime);
+        // Membaca sisa waktu terakhir
+        if (typeof parsed.timeLeft === "number" && parsed.timeLeft > 0) {
+          setInitialTime(parsed.timeLeft);
+          timeLeftRef.current = parsed.timeLeft;
         } else {
-          setEndTime(Date.now() + TIMER_CONFIG.durationSeconds * 1000);
+          setInitialTime(TIMER_CONFIG.durationSeconds);
         }
       } catch {
-        console.error("Gagal memuat restasi backup log sesi ujian.");
+        console.error("Gagal memuat restorasi backup log sesi ujian.");
+        setInitialTime(TIMER_CONFIG.durationSeconds);
       }
     } else {
       // Inisialisasi awal
@@ -167,19 +203,71 @@ export default function TryoutClient({
           questions.map((q) => [q.id, { selectedKey: null, status: "unanswered" as AnswerStatus }])
         )
       );
-      setEndTime(Date.now() + TIMER_CONFIG.durationSeconds * 1000);
+      setInitialTime(TIMER_CONFIG.durationSeconds);
     }
   }, [STORAGE_KEY, questions]);
 
-  // OPTIMASI: Hanya simpan ke LocalStorage jika `answers` berubah, bukan setiap detik!
-  useEffect(() => {
-    if (Object.keys(answers).length === 0 || !endTime) return;
-    const sessionPayload = { answers, endTime };
+  // Fungsi simpan state persisten (hanya dipanggil saat jawaban berubah / di-pause)
+  const saveSessionState = useCallback(() => {
+    if (Object.keys(answers).length === 0 || initialTime === null) return;
+    const sessionPayload = { answers, timeLeft: timeLeftRef.current };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionPayload));
-  }, [answers, endTime, STORAGE_KEY]);
+  }, [answers, initialTime, STORAGE_KEY]);
+
+  useEffect(() => {
+    saveSessionState();
+  }, [answers, isPaused, saveSessionState]);
 
 
-  // ── 2. USER INTERACTION METHODS (Gunakan useCallback agar referensi stabil) ──
+  // ── 2. SENSOR AUTO-PAUSE (OFFLINE & TAB VISIBILITY) ──
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.hidden) {
+        setIsPaused(true);
+        setPauseReason("hidden");
+      } else {
+        // Jika tab aktif kembali, periksa koneksi terlebih dulu
+        if (navigator.onLine) {
+          setIsPaused(false);
+          setPauseReason(null);
+        } else {
+          setPauseReason("offline"); // Override ke mode offline jika internet mati
+        }
+      }
+    };
+
+    const handleOffline = () => {
+      setIsPaused(true);
+      setPauseReason("offline");
+    };
+
+    const handleOnline = () => {
+      if (!document.hidden) {
+        setIsPaused(false);
+        setPauseReason(null);
+      } else {
+        setPauseReason("hidden");
+      }
+    };
+
+    if (typeof window !== "undefined") {
+      if (!navigator.onLine) handleOffline();
+      if (document.hidden) handleVisibility();
+
+      document.addEventListener("visibilitychange", handleVisibility);
+      window.addEventListener("offline", handleOffline);
+      window.addEventListener("online", handleOnline);
+
+      return () => {
+        document.removeEventListener("visibilitychange", handleVisibility);
+        window.removeEventListener("offline", handleOffline);
+        window.removeEventListener("online", handleOnline);
+      };
+    }
+  }, []);
+
+
+  // ── 3. USER INTERACTION METHODS ──
   const handleAnswer = useCallback((key: string) => {
     setAnswers((prev) => ({
       ...prev,
@@ -208,25 +296,42 @@ export default function TryoutClient({
   const handleSubmitUjian = useCallback(() => {
     if (isPending) return;
     
-    // Gunakan transisi agar animasi "Mengirim..." muncul tanpa memblokir browser
     startTransition(async () => {
       try {
         localStorage.removeItem(STORAGE_KEY);
         await submitTryoutAction({ volumeId, answers });
       } catch (error) {
         console.error("Gagal memproses pengiriman data lembar ujian:", error);
-        alert("Terjadi masalah jaringan sewaktu menyerahkan lembar ujian Anda.");
       }
     });
   }, [isPending, volumeId, answers, STORAGE_KEY]);
 
   const handleAutoSubmit = useCallback(() => {
-    alert("Waktu pengerjaan simulasi telah habis! Sistem otomatis mengunci lembar jawaban Anda.");
+    // Diganti dengan pengiriman otomatis
     handleSubmitUjian();
   }, [handleSubmitUjian]);
 
+  const handleRestart = useCallback(() => {
+    if (isPending) return;
+    
+    // Reset seluruh state
+    const emptyAnswers = Object.fromEntries(
+      questions.map((q) => [q.id, { selectedKey: null, status: "unanswered" as AnswerStatus }])
+    );
+    
+    setAnswers(emptyAnswers);
+    setActiveId(questions[0]?.id ?? 1);
+    
+    // Reset Timer & Storage
+    setInitialTime(TIMER_CONFIG.durationSeconds);
+    timeLeftRef.current = TIMER_CONFIG.durationSeconds;
+    setTimerKey(prev => prev + 1); // Me-remount komponen Timer
+    localStorage.removeItem(STORAGE_KEY);
+    setIsPaused(false);
+  }, [isPending, questions, STORAGE_KEY]);
 
-  // ── 3. DERIVED METRICS (Gunakan useMemo untuk kalkulasi berat) ──
+
+  // ── 4. DERIVED METRICS ──
   const { currentQuestion, currentIdx } = useMemo(() => {
     const idx = questions.findIndex((q) => q.id === activeId);
     return { currentQuestion: questions[idx] || questions[0], currentIdx: idx !== -1 ? idx : 0 };
@@ -246,7 +351,6 @@ export default function TryoutClient({
 
   const currentAnswer = answers[activeId];
 
-  // Helper function untuk style navigasi grid
   const getNavStyle = useCallback((qId: number) => {
     if (qId === activeId) return "bg-primary text-primary-foreground ring-2 ring-primary/20";
     const s = answers[qId]?.status;
@@ -255,12 +359,33 @@ export default function TryoutClient({
     return "bg-card text-muted-foreground border border-border hover:border-primary/50 hover:text-primary";
   }, [activeId, answers]);
 
-  // Hindari render blank state sebelum endTime terhitung
-  if (!endTime) return null;
+  // Hindari render sebelum inisialisasi selesai (hidrasi timer aman)
+  if (initialTime === null) return null;
 
   return (
     <TooltipProvider>
-      <div className="bg-background font-sans antialiased text-foreground min-h-screen">
+      <div className="bg-background font-sans antialiased text-foreground min-h-screen relative">
+        
+        {/* PAUSE OVERLAY (BLOKIR UI SAAT OFFLINE / KELUAR TAB) */}
+        {isPaused && (
+          <div className="fixed inset-0 z-100 bg-background/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-300">
+            {pauseReason === "offline" ? (
+              <WifiOff className="w-20 h-20 text-destructive mb-6 animate-pulse" />
+            ) : (
+              <AlertCircle className="w-20 h-20 text-amber-500 mb-6 animate-pulse" />
+            )}
+            <h2 className="text-3xl font-bold mb-3">Ujian Dijeda Otomatis</h2>
+            <p className="text-muted-foreground text-lg mb-8 max-w-lg">
+              {pauseReason === "offline"
+                ? "Koneksi internet Anda terputus. Waktu hitung mundur dihentikan sementara demi keadilan. Silakan periksa jaringan Anda."
+                : "Sistem mendeteksi Anda keluar/beralih dari halaman ujian. Waktu hitung mundur dibekukan. Harap tetap fokus pada ujian Anda."}
+            </p>
+            
+            <Button size="lg" onClick={() => setIsPaused(false)} className="font-bold text-sm px-8" disabled={!navigator.onLine}>
+              {navigator.onLine ? "Saya Sudah Kembali Siap" : "Menunggu Koneksi..."}
+            </Button>
+          </div>
+        )}
 
         {/* AREA HEADER BAR */}
         <header className="bg-card border-b border-border sticky top-0 z-50 shadow-sm">
@@ -277,8 +402,38 @@ export default function TryoutClient({
             </div>
 
             <div className="flex items-center gap-4">
-              {/* Komponen Timer Di-Isolasi */}
-              <ExamTimer endTime={endTime} onExpire={handleAutoSubmit} />
+              {/* TOMBOL RESTART DI HEADER */}
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm" disabled={isPending} className="hidden sm:flex hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30">
+                    <RotateCcw className="w-4 h-4 mr-1.5" />
+                    Restart Ujian
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Anda yakin ingin mengulang ujian?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Semua jawaban yang sudah Anda isi akan <strong>dihapus</strong> secara permanen dan waktu hitung mundur akan dikembalikan dari awal.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isPending}>Batal</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleRestart} disabled={isPending} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      Ya, Ulangi Ujian
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              {/* Komponen Timer Di-Isolasi, menggunakan Key agar bisa diremount */}
+              <ExamTimer 
+                key={timerKey} 
+                initialTimeLeft={initialTime} 
+                isPaused={isPaused} 
+                onExpire={handleAutoSubmit} 
+                timeLeftRef={timeLeftRef} 
+              />
 
               <Avatar className="h-9 w-9 border border-border">
                 <AvatarImage src={userImage} alt={userName} />
@@ -289,8 +444,7 @@ export default function TryoutClient({
         </header>
 
         {/* SEKSI UTAMA PLATFORM */}
-        <main className="max-w-7xl mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-
+        <main className={`max-w-7xl mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 transition-opacity duration-300 ${isPaused ? "opacity-30 blur-sm pointer-events-none select-none" : "opacity-100"}`}>
           {/* AREA KIRI: BARIS KONTEN PERTANYAAN */}
           <div className="lg:col-span-8 space-y-4">
             <div className="space-y-1">
