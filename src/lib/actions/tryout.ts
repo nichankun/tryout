@@ -23,7 +23,7 @@ const EXAM_CONFIG = {
 
 const ACTION_ROUTES = {
   login: "/login",
-  hasilRedirection: (volId: number, historyId: string) => `/tryout/${volId}/hasil?historyId=${historyId}`,
+  hasilRedirection: (volId: number, historyId: string) => `/dashboard/${volId}/hasil?historyId=${historyId}`,
 } as const;
 
 const ERROR_MESSAGES = {
