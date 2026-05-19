@@ -1,8 +1,8 @@
 /**
  * app/tryout/[id]/hasil/page.tsx
- * 
- * Async Server Component dinamis untuk menampilkan hasil analisis tryout SKD.
+ * * Async Server Component dinamis untuk menampilkan hasil analisis tryout SKD.
  * Menghubungkan PostgreSQL via Drizzle ORM dengan NextAuth v5 session.
+ * Sudah dioptimalkan dengan deteksi searchParams historyId untuk akurasi data.
  */
 
 import type { Metadata } from "next";
@@ -17,10 +17,10 @@ import { CheckCircle2, XCircle, AlertCircle, ArrowLeft, BarChart3, FileText } fr
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { tryoutHistories } from "@/db/database/schema"; 
-import { and, eq, desc } from "drizzle-orm";
+import { and, eq, desc, SQL } from "drizzle-orm";
 
 // ==========================================
-// KONSTANTA & KONFIGURASI (Bebas Hardcode)
+// KONSTANTA & KONFIGURASI
 // ==========================================
 const APP_CONFIG = {
   name: "ASNPedia",
@@ -62,6 +62,7 @@ const TEXT_CONTENT = {
 // ── INTERFACES ──
 interface HasilPageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ historyId?: string }>; // ✅ Menangkap query ?historyId=... dari URL
 }
 
 interface StatistikSubtest {
@@ -88,8 +89,9 @@ export async function generateMetadata({ params }: HasilPageProps): Promise<Meta
 // ==========================================
 // KOMPONEN UTAMA (SERVER COMPONENT)
 // ==========================================
-export default async function HasilTryoutPage({ params }: HasilPageProps) {
+export default async function HasilTryoutPage({ params, searchParams }: HasilPageProps) {
   const { id } = await params;
+  const { historyId } = await searchParams; // ✅ Resolve searchParams di server
 
   // Validasi parameter ID Volume paket tryout
   const volumeId = parseInt(id, 10);
@@ -101,22 +103,28 @@ export default async function HasilTryoutPage({ params }: HasilPageProps) {
     redirect(ROUTES.loginRedirect(volumeId));
   }
 
-  // 2. Tarik Data Riwayat Ujian Terbaru dari Database PostgreSQL
+  // 2. Merakit Kueri Kondisional Berbasis Drizzle
+  const queryConditions: SQL[] = [
+    eq(tryoutHistories.userId, session.user.id),
+    eq(tryoutHistories.packageId, volumeId)
+  ];
+
+  // Jika di URL ada historyId yang spesifik, kunci pencarian ke ID tersebut
+  if (historyId) {
+    queryConditions.push(eq(tryoutHistories.id, historyId));
+  }
+
+  // Tarik Data Riwayat Ujian dari Database PostgreSQL
   const riwayatList = await db
     .select()
     .from(tryoutHistories)
-    .where(
-      and(
-        eq(tryoutHistories.userId, session.user.id),
-        eq(tryoutHistories.packageId, volumeId)
-      )
-    )
+    .where(and(...queryConditions))
     .orderBy(desc(tryoutHistories.endTime))
     .limit(1);
 
   const riwayatTerbaru = riwayatList[0];
 
-  // Batasi akses jika pengguna belum pernah menyelesaikan submit ujian paket ini
+  // Batasi akses jika data riwayat pengerjaan tidak ditemukan
   if (!riwayatTerbaru) notFound();
 
   // 3. Mapping Data Komponen Nilai Riil
@@ -174,7 +182,7 @@ export default async function HasilTryoutPage({ params }: HasilPageProps) {
             </Link>
           </Button>
           <span className="text-xs font-semibold bg-muted text-muted-foreground px-3 py-1.5 rounded-full border border-border">
-            {TEXT_CONTENT.examIdPrefix}{volumeId}
+            {TEXT_CONTENT.examIdPrefix}{riwayatTerbaru.id.slice(0, 8).toUpperCase()}
           </span>
         </div>
 
@@ -201,7 +209,7 @@ export default async function HasilTryoutPage({ params }: HasilPageProps) {
               </p>
             </div>
 
-            <div className="inline-block bg-card border border-border px-6 py-3 rounded-2xl shadow-sm">
+            <div className="bg-card border border-border inline-block px-6 py-3 rounded-2xl shadow-sm">
               <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{TEXT_CONTENT.totalScoreLabel}</p>
               <p className="text-4xl font-black text-primary">{totalSkor}</p>
             </div>

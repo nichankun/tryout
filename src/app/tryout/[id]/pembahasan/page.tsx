@@ -1,5 +1,8 @@
 /**
  * app/tryout/[id]/pembahasan/page.tsx
+ * * Async Server Component dinamis untuk menampilkan pembahasan tryout SKD.
+ * Menghubungkan PostgreSQL via Drizzle ORM dengan NextAuth v5 session.
+ * Sudah dioptimalkan dengan penayangan bobot distribusi poin per butir opsi jawaban.
  */
 
 import type { Metadata } from "next";
@@ -8,19 +11,19 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { questions, tryoutHistories } from "@/db/database/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc, SQL } from "drizzle-orm";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ArrowLeft, CheckCircle2, XCircle, BookOpen, ChevronRight } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, BookOpen, ChevronRight, AlertCircle } from "lucide-react";
 
 // ==========================================
-// KONSTANTA & KONFIGURASI (Bebas Hardcode)
+// KONSTANTA & KONFIGURASI
 // ==========================================
 const APP_CONFIG = {
   name: "ASNPedia",
@@ -66,12 +69,10 @@ const SUBTEST_CONFIG: Record<SubTest, { label: string; badgeClass: string }> = {
   },
 };
 
-// Schema Zod untuk validasi pilihan dari DB
 const PilihanSchema = z.array(z.object({ opsi: z.string(), teks: z.string(), poin: z.number() }));
 
-// Tipe Antarmuka Props Halaman
 interface PembahasanPageProps {
-  params:      Promise<{ id: string }>;
+  params: Promise<{ id: string }>;
   searchParams: Promise<{ historyId?: string }>;
 }
 
@@ -90,10 +91,10 @@ export async function generateMetadata({ params }: PembahasanPageProps): Promise
 // KOMPONEN UTAMA (SERVER COMPONENT)
 // ==========================================
 export default async function PembahasanPage({ params, searchParams }: PembahasanPageProps) {
-  const { id }        = await params;
+  const { id } = await params;
   const { historyId } = await searchParams;
 
-  // ── 1. Validasi Otentikasi Sesi ──
+  // ── 1. Validasi Otentikasi Sesi Sisi Server ──
   const session = await auth();
   if (!session?.user?.id) redirect(ROUTES.login(id));
 
@@ -101,53 +102,57 @@ export default async function PembahasanPage({ params, searchParams }: Pembahasa
   const volumeId = parseInt(id, 10);
   if (isNaN(volumeId) || volumeId < 1) notFound();
 
-  // ── 3. Ambil Data Riwayat Ujian Pengguna ──
-  const history = historyId
-    ? await db.query.tryoutHistories.findFirst({
-        where: and(
-          eq(tryoutHistories.id, historyId),
-          eq(tryoutHistories.userId, session.user.id)
-        ),
-      })
-    : await db.query.tryoutHistories.findFirst({
-        where: and(
-          eq(tryoutHistories.userId, session.user.id),
-          eq(tryoutHistories.packageId, volumeId)
-        ),
-      });
+  // ── 3. Merakit Kueri Riwayat Kondisional Berbasis Select Standar Drizzle ──
+  const queryConditions: SQL[] = [
+    eq(tryoutHistories.userId, session.user.id),
+    eq(tryoutHistories.packageId, volumeId)
+  ];
 
+  if (historyId) {
+    queryConditions.push(eq(tryoutHistories.id, historyId));
+  }
+
+  const riwayatList = await db
+    .select()
+    .from(tryoutHistories)
+    .where(and(...queryConditions))
+    .orderBy(desc(tryoutHistories.endTime))
+    .limit(1);
+
+  const history = riwayatList[0];
   if (!history) notFound();
 
-  const jawabanSiswa = history.jawabanSiswa as Record<string, string>;
+  const jawabanSiswa = (history.jawabanSiswa as Record<string, string>) || {};
 
-  // ── 4. Ambil Daftar Bank Soal Berdasarkan Volume Paket ──
+  // ── 4. Ambil Daftar Bank Soal Berdasarkan Volume Paket Ujian ──
   const soalList = await db
     .select()
     .from(questions)
-    .where(eq(questions.packageId, volumeId));
+    .where(eq(questions.packageId, volumeId))
+    .orderBy(questions.id);
 
   if (soalList.length === 0) notFound();
 
-  // ── 5. Penggabungan Data Soal dengan Jawaban Pengguna ──
+  // ── 5. Sinkronisasi Gabungan Data Soal dengan Hasil Lembar Jawaban Siswa ──
   const enrichedSoal = soalList.map((soal, i) => {
     const daftarPilihan = PilihanSchema.parse(soal.pilihan);
-    const jawabanBenar  = daftarPilihan.reduce((a, b) => a.poin >= b.poin ? a : b).opsi;
-    const jawabanUser   = jawabanSiswa[String(soal.id)] ?? null;
+    const jawabanBenar = daftarPilihan.reduce((a, b) => (a.poin >= b.poin ? a : b)).opsi;
+    const jawabanUser = jawabanSiswa[String(soal.id)] ?? null;
 
     return {
-      id:          soal.id,
-      nomor:       i + 1,
-      subTest:     soal.kategori as SubTest,
-      pertanyaan:  soal.pertanyaan,
-      pembahasan:  soal.pembahasan,
-      pilihan:     daftarPilihan.map((p) => ({ opsi: p.opsi, teks: p.teks })),
+      id: soal.id,
+      nomor: i + 1,
+      subTest: soal.kategori as SubTest,
+      pertanyaan: soal.pertanyaan,
+      pembahasan: soal.pembahasan,
+      pilihan: daftarPilihan.map((p) => ({ opsi: p.opsi, teks: p.teks, poin: p.poin })), // ✅ Menyertakan poin ke frontend
       jawabanBenar,
       jawabanUser,
     };
   });
 
-  const totalBenar  = enrichedSoal.filter((s) => s.jawabanUser === s.jawabanBenar).length;
-  const totalSalah  = enrichedSoal.filter((s) => s.jawabanUser !== null && s.jawabanUser !== s.jawabanBenar).length;
+  const totalBenar = enrichedSoal.filter((s) => s.jawabanUser === s.jawabanBenar).length;
+  const totalSalah = enrichedSoal.filter((s) => s.jawabanUser !== null && s.jawabanUser !== s.jawabanBenar).length;
   const totalKosong = enrichedSoal.filter((s) => s.jawabanUser === null).length;
   const subtests: SubTest[] = ["TWK", "TIU", "TKP"];
 
@@ -159,19 +164,19 @@ export default async function PembahasanPage({ params, searchParams }: Pembahasa
         <div className="flex items-center justify-between">
           <Button variant="ghost" size="sm" asChild className="gap-2 rounded-xl text-muted-foreground hover:text-foreground">
             <Link href={ROUTES.backToResults(id, historyId)}>
-              <ArrowLeft className="w-4 h-4" aria-hidden />
+              <ArrowLeft className="w-4 h-4" />
               {TEXT_CONTENT.btnBack}
             </Link>
           </Button>
           <span className="text-xs font-semibold bg-muted text-muted-foreground px-3 py-1.5 rounded-full border border-border">
-            Vol. {volumeId} · {enrichedSoal.length} {TEXT_CONTENT.unitQuestions}
+            Vol. {volumeId} · {enrichedSoal.length} {TEXT_CONTENT.unitQuestions} Soal
           </span>
         </div>
 
         {/* JUDUL HALAMAN */}
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-primary" aria-hidden />
+            <BookOpen className="w-5 h-5 text-primary" />
             <h1 className="text-2xl font-bold tracking-tight text-foreground">{TEXT_CONTENT.pageTitle}</h1>
           </div>
           <p className="text-sm text-muted-foreground">
@@ -182,8 +187,8 @@ export default async function PembahasanPage({ params, searchParams }: Pembahasa
         {/* METRIK KARTU STATISTIK SKOR */}
         <div className="grid grid-cols-3 gap-4">
           {[
-            { label: TEXT_CONTENT.labelCorrect, value: totalBenar,  color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/5 border-emerald-500/10 dark:border-emerald-500/20" },
-            { label: TEXT_CONTENT.labelIncorrect, value: totalSalah,  color: "text-destructive",  bg: "bg-destructive/5 border-destructive/10 dark:border-destructive/20" },
+            { label: TEXT_CONTENT.labelCorrect, value: totalBenar, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/5 border-emerald-500/10 dark:border-emerald-500/20" },
+            { label: TEXT_CONTENT.labelIncorrect, value: totalSalah, color: "text-destructive", bg: "bg-destructive/5 border-destructive/10 dark:border-destructive/20" },
             { label: TEXT_CONTENT.labelEmpty, value: totalKosong, color: "text-muted-foreground", bg: "bg-muted/40 border-border" },
           ].map((s) => (
             <Card key={s.label} className={`rounded-2xl border shadow-sm ${s.bg}`}>
@@ -205,9 +210,9 @@ export default async function PembahasanPage({ params, searchParams }: Pembahasa
               <CardHeader className="bg-muted/30 border-b border-border py-3 px-5">
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className={SUBTEST_CONFIG[sub].badgeClass}>{sub}</Badge>
-                  <span className="text-sm font-bold text-foreground">
+                  <CardTitle className="text-sm font-bold text-foreground">
                     {SUBTEST_CONFIG[sub].label}
-                  </span>
+                  </CardTitle>
                   <span className="text-xs text-muted-foreground ml-auto">{soalSub.length} {TEXT_CONTENT.unitQuestions}</span>
                 </div>
               </CardHeader>
@@ -215,7 +220,7 @@ export default async function PembahasanPage({ params, searchParams }: Pembahasa
               <CardContent className="p-0">
                 <Accordion type="multiple" className="divide-y divide-border">
                   {soalSub.map((soal) => {
-                    const isBenar  = soal.jawabanUser === soal.jawabanBenar;
+                    const isBenar = soal.jawabanUser === soal.jawabanBenar;
                     const isKosong = soal.jawabanUser === null;
 
                     return (
@@ -223,31 +228,31 @@ export default async function PembahasanPage({ params, searchParams }: Pembahasa
                         <AccordionTrigger className="px-5 py-3 hover:no-underline hover:bg-muted/40 data-[state=open]:bg-muted/30 transition-colors">
                           <div className="flex items-center gap-3 text-left w-full">
                             {isKosong ? (
-                              <span className="w-5 h-5 rounded-full border-2 border-muted-foreground/30 shrink-0" aria-label="Tidak dijawab" />
+                              <span className="w-5 h-5 rounded-full border-2 border-muted-foreground/30 shrink-0" />
                             ) : isBenar ? (
-                              <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" aria-label="Benar" />
+                              <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
                             ) : (
-                              <XCircle className="w-5 h-5 text-destructive shrink-0" aria-label="Salah" />
+                              <XCircle className="w-5 h-5 text-destructive shrink-0" />
                             )}
                             <span className="text-sm font-medium text-foreground">
-                              Soal {soal.nomor}
+                              Soal Nomor {soal.nomor}
                             </span>
                           </div>
                         </AccordionTrigger>
 
                         <AccordionContent className="px-5 pb-5 pt-2 space-y-4">
-                          <p className="text-sm text-foreground leading-relaxed">
+                          <p className="text-sm text-foreground leading-relaxed whitespace-pre-line select-none">
                             {soal.pertanyaan}
                           </p>
 
                           {/* DAFTAR PILIHAN JAWABAN */}
                           <div className="space-y-2">
                             {soal.pilihan.map((p) => {
-                              const isCorrect    = p.opsi === soal.jawabanBenar;
+                              const isCorrect = p.opsi === soal.jawabanBenar;
                               const isUserChoice = p.opsi === soal.jawabanUser;
                               return (
                                 <div key={p.opsi}
-                                  className={`flex items-start gap-3 px-4 py-2.5 rounded-xl text-sm border transition-colors
+                                  className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm border transition-colors
                                     ${isCorrect
                                       ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-medium"
                                       : isUserChoice && !isCorrect
@@ -257,8 +262,20 @@ export default async function PembahasanPage({ params, searchParams }: Pembahasa
                                 >
                                   <span className="font-bold shrink-0">{p.opsi}.</span>
                                   <span className="flex-1">{p.teks}</span>
-                                  {isCorrect && <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" aria-hidden />}
-                                  {isUserChoice && !isCorrect && <XCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" aria-hidden />}
+                                  
+                                  {/* ✅ EKSTRA INDIKATOR: Menampilkan bobot nilai tiap opsi (Sangat berguna untuk materi TKP) */}
+                                  <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md ${
+                                    p.poin === 5 
+                                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" 
+                                      : p.poin > 0 
+                                      ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" 
+                                      : "bg-muted text-muted-foreground"
+                                  }`}>
+                                    +{p.poin} Poin
+                                  </span>
+
+                                  {isCorrect && <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />}
+                                  {isUserChoice && !isCorrect && <XCircle className="w-4 h-4 text-destructive shrink-0" />}
                                 </div>
                               );
                             })}
@@ -285,7 +302,7 @@ export default async function PembahasanPage({ params, searchParams }: Pembahasa
                               <p className="text-xs font-bold text-primary uppercase tracking-wider mb-1.5">
                                 {TEXT_CONTENT.explanationHeader}
                               </p>
-                              <p className="text-sm text-foreground/90 leading-relaxed">
+                              <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-line">
                                 {soal.pembahasan}
                               </p>
                             </div>
@@ -304,7 +321,7 @@ export default async function PembahasanPage({ params, searchParams }: Pembahasa
         <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
           <Button size="lg" className="rounded-xl font-bold gap-2" asChild>
             <Link href={ROUTES.dashboard}>
-              {TEXT_CONTENT.btnNextVol}<ChevronRight className="w-4 h-4" aria-hidden />
+              {TEXT_CONTENT.btnNextVol}<ChevronRight className="w-4 h-4" />
             </Link>
           </Button>
           <Button size="lg" variant="outline" className="rounded-xl font-bold" asChild>

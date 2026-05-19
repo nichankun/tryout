@@ -1,8 +1,8 @@
 /**
  * app/checkout/[id]/page.tsx
- * 
- * Async Server Component untuk memproses halaman peninjauan belanja (Checkout).
- * Terintegrasi penuh dengan Drizzle ORM, skema userAccess, dan sesi NextAuth v5.
+ * * Async Server Component untuk memproses halaman peninjauan belanja (Checkout).
+ * Terintegrasi penuh dengan Drizzle ORM (Core Query), skema userAccess, dan sesi NextAuth v5.
+ * Sudah dioptimalkan menggunakan arsitektur penulisan kueri Drizzle yang seragam dan type-safe.
  */
 
 import type { Metadata } from "next";
@@ -16,9 +16,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle2, ChevronLeft } from "lucide-react";
 import { CheckoutForm } from "@/components/checkout/checkout-form";
-
+import { Separator } from "@/components/ui/separator"
 // ==========================================
-// KONSTANTA & KONFIGURASI (Bebas Hardcode)
+// KONSTANTA & KONFIGURASI
 // ==========================================
 const APP_CONFIG = {
   name: "ASNPedia",
@@ -56,27 +56,28 @@ const TEXT_CONTENT = {
   footerDisclaimer: "Pembayaran aman & terenkripsi. Akses tryout terbuka otomatis setelah pembayaran berhasil.",
 } as const;
 
-// ── INTERFACES ──
 interface CheckoutPageProps {
   params: Promise<{ id: string }>;
 }
 
-// Helper format representasi rupiah secara global
 function formatMataUang(amount: number): string {
   return `Rp ${amount.toLocaleString(APP_CONFIG.locale)}`;
 }
 
 // ==========================================
-// GENERATE METADATA DYNAMIC
+// GENERATE METADATA DYNAMIC (Strict Core Query)
 // ==========================================
 export async function generateMetadata({ params }: CheckoutPageProps): Promise<Metadata> {
   const { id } = await params;
   const volumeId = parseInt(id, 10);
   if (isNaN(volumeId)) return { title: TEXT_CONTENT.metaTitleDefault };
 
-  const pkg = await db.query.tryoutPackages.findFirst({
-    where: eq(tryoutPackages.id, volumeId),
-  });
+  // ✅ Seragamkan menggunakan select core kueri
+  const [pkg] = await db
+    .select({ title: tryoutPackages.title })
+    .from(tryoutPackages)
+    .where(eq(tryoutPackages.id, volumeId))
+    .limit(1);
 
   return {
     title: pkg
@@ -100,21 +101,33 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
   if (!session?.user?.id) redirect(ROUTES.loginRedirect(volumeId));
 
   // ── 3. Ambil Data Informasi Paket Aktif Langsung Dari DB ──
-  const pkg = await db.query.tryoutPackages.findFirst({
-    where: and(
-      eq(tryoutPackages.id, volumeId),
-      eq(tryoutPackages.isActive, true)
-    ),
-  });
+  // ✅ Dioptimalkan menggunakan select core syntax
+  const [pkg] = await db
+    .select()
+    .from(tryoutPackages)
+    .where(
+      and(
+        eq(tryoutPackages.id, volumeId),
+        eq(tryoutPackages.isActive, true)
+      )
+    )
+    .limit(1);
+
   if (!pkg) notFound();
 
   // ── 4. Validasi Status Kepemilikan (Pencegahan Pembelian Ganda) ──
-  const owned = await db.query.userAccess.findFirst({
-    where: and(
-      eq(userAccess.userId, session.user.id),
-      eq(userAccess.packageId, volumeId)
-    ),
-  });
+  // ✅ Dioptimalkan menggunakan select core syntax
+  const [owned] = await db
+    .select()
+    .from(userAccess)
+    .where(
+      and(
+        eq(userAccess.userId, session.user.id),
+        eq(userAccess.packageId, volumeId)
+      )
+    )
+    .limit(1);
+
   if (owned) redirect(ROUTES.tryoutDashboard(volumeId));
 
   const totalPembayaran = pkg.price + APP_CONFIG.adminFee;
@@ -127,7 +140,7 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild className="rounded-full text-muted-foreground hover:text-foreground">
             <Link href={ROUTES.dashboard} aria-label="Kembali ke dashboard">
-              <ChevronLeft className="w-5 h-5" aria-hidden />
+              <ChevronLeft className="w-5 h-5" />
             </Link>
           </Button>
           <div>
@@ -170,7 +183,7 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
                   <ul className="space-y-2">
                     {BENEFITS_LIST.map((benefit) => (
                       <li key={benefit} className="flex items-start gap-3 text-sm text-muted-foreground">
-                        <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" aria-hidden />
+                        <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
                         <span className="leading-relaxed">{benefit}</span>
                       </li>
                     ))}
@@ -183,7 +196,7 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
             <CheckoutForm volumeId={volumeId} total={totalPembayaran} />
           </div>
 
-          {/* SISI KANAN: RINGKASAN REKAPITULASI BIAYA BELANJA */}
+          {/* SISI KAIAN: RINGKASAN REKAPITULASI BIAYA BELANJA */}
           <div className="md:col-span-2">
             <Card className="rounded-2xl border-border bg-card shadow-sm sticky top-8">
               <CardContent className="p-6 space-y-4">
@@ -199,7 +212,7 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
                     <span>{TEXT_CONTENT.labelAdminFee}</span>
                     <span>{formatMataUang(APP_CONFIG.adminFee)}</span>
                   </div>
-                  <hr className="border-border" />
+                  <Separator />
                   <div className="flex justify-between font-bold text-base text-foreground">
                     <span>{TEXT_CONTENT.labelTotalPrice}</span>
                     <span className="text-primary font-black">

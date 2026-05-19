@@ -1,5 +1,8 @@
 /**
  * app/dashboard/page.tsx
+ * * Server Component Utama Dashboard Siswa.
+ * Mengamankan sesi, menghitung manifes kepemilikan paket, dan menyusun grid volume tryout.
+ * Sudah dioptimalkan dengan penambahan pengurutan sekuensial pada daftar paket.
  */
 
 import type { Metadata } from "next";
@@ -8,7 +11,7 @@ import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
 import { db } from "@/db";
 import { userAccess, tryoutPackages } from "@/db/database/schema";
-import { eq } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm"; // ✅ Mengimpor 'asc' untuk pengurutan sekuensial
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -19,7 +22,7 @@ import { BookOpen, Clock, Target, LogOut } from "lucide-react";
 import type { TryoutVolume } from "@/components/dashboard/tryout-grid";
 
 // ==========================================
-// KONSTANTA & KONFIGURASI (Bebas Hardcode)
+// KONSTANTA & KONFIGURASI
 // ==========================================
 const APP_CONFIG = {
   name: "ASNPedia",
@@ -73,22 +76,23 @@ export default async function DashboardPage() {
 
   const unlockedIds = new Set(accessList.map((a) => a.packageId));
 
-  // ── 3. Ambil Semua Paket yang Aktif dari Database ──
+  // ── 3. Ambil Semua Paket yang Aktif Berurutan Berdasarkan ID ──
   const packages = await db
     .select()
     .from(tryoutPackages)
-    .where(eq(tryoutPackages.isActive, true));
+    .where(eq(tryoutPackages.isActive, true))
+    .orderBy(asc(tryoutPackages.id)); // ✅ FIX: Kunci susunan letak grid agar konsisten sekuensial
 
   // ── 4. Transformasi Data Paket Menjadi Volume Grid ──
   const volumes: TryoutVolume[] = packages.map((pkg) => ({
-    id:           pkg.id,
-    title:        pkg.title,
-    totalSoal:    APP_CONFIG.pricing.defaultTotalSoal,
-    durasiMenit:  APP_CONFIG.pricing.defaultDurasi,
-    harga:        pkg.price,
-    hargaAsli:    Math.round(pkg.price * APP_CONFIG.pricing.discountMultiplier),
-    isUnlocked:   unlockedIds.has(pkg.id),
-    isAvailable:  true,
+    id:          pkg.id,
+    title:       pkg.title,
+    totalSoal:   APP_CONFIG.pricing.defaultTotalSoal,
+    durasiMenit: APP_CONFIG.pricing.defaultDurasi,
+    harga:       pkg.price,
+    hargaAsli:   Math.round(pkg.price * APP_CONFIG.pricing.discountMultiplier),
+    isUnlocked:  unlockedIds.has(pkg.id),
+    isAvailable: true,
   }));
 
   // ── 5. Pengolahan Data Profil Ringkas User ──
@@ -141,12 +145,12 @@ export default async function DashboardPage() {
                 </AvatarFallback>
               </Avatar>
 
-              {/* Menu Navigasi Riwayat */}
+              {/* Menu Navigasi Riwayat Belajar */}
               <Button variant="ghost" size="sm" asChild className="hidden sm:flex rounded-lg text-muted-foreground">
                 <Link href={ROUTES.history}>Riwayat</Link>
               </Button>
 
-              {/* Tombol Logout Instan via Server Action */}
+              {/* Tombol Logout Instan via Inline Server Action */}
               <form
                 action={async () => {
                   "use server";
@@ -188,7 +192,7 @@ export default async function DashboardPage() {
 
           <ExamTypeTabs />
 
-          {/* Bagian Statistik Real-time */}
+          {/* Bagian Statistik Ringkas */}
           <div className="flex flex-wrap justify-center gap-6 mt-10">
             {STATS_DATA.map(({ icon: Icon, label, value }) => (
               <div key={label} className="flex items-center gap-2 text-primary-foreground/90">

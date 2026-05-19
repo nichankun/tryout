@@ -1,8 +1,8 @@
 /**
  * app/riwayat/page.tsx
- * 
- * Async Server Component untuk menampilkan visualisasi riwayat pengerjaan tryout.
+ * * Async Server Component untuk menampilkan visualisasi riwayat pengerjaan tryout.
  * Terhubung langsung ke PostgreSQL melalui Drizzle ORM dan diproteksi auth v5.
+ * Sudah dioptimalkan dengan penguncian parameter historyId pada tombol detail aksi.
  */
 
 import type { Metadata } from "next";
@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 
 // ==========================================
-// KONSTANTA & KONFIGURASI (Bebas Hardcode)
+// KONSTANTA & KONFIGURASI
 // ==========================================
 const APP_CONFIG = {
   name: "ASNPedia",
@@ -39,7 +39,8 @@ const EXAM_THRESHOLDS = {
 const ROUTES = {
   loginRedirect: "/login?callbackUrl=/riwayat",
   dashboard: "/dashboard",
-  detailHasil: (packageId: number) => `/tryout/${packageId}/hasil`,
+  // ✅ FIX: Teruskan rute lengkap beserta search parameter historyId uniknya
+  detailHasil: (packageId: number, historyId: string) => `/tryout/${packageId}/hasil?historyId=${historyId}`,
 } as const;
 
 const TEXT_CONTENT = {
@@ -75,7 +76,6 @@ export const metadata: Metadata = {
   description: TEXT_CONTENT.metaDesc,
 };
 
-// Helper format representasi waktu/tanggal lokal
 function formatTanggal(date: Date | null): string {
   if (!date) return "-";
   return new Intl.DateTimeFormat(APP_CONFIG.locale, {
@@ -121,7 +121,7 @@ export default async function RiwayatPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground py-10 px-4 md:px-8">
-      <div className="max-w-5xl mx-auto space-y-8">
+      <div className="max-w-4xl mx-auto space-y-8">
 
         {/* ATAS: BARIS JUDUL DAN AKSI UTAMA */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -148,10 +148,10 @@ export default async function RiwayatPage() {
         {totalUjian > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { label: TEXT_CONTENT.statTotalExams, value: totalUjian,    color: "text-primary",     bg: "bg-primary/5 border-primary/10" },
+              { label: TEXT_CONTENT.statTotalExams, value: totalUjian,    color: "text-primary",      bg: "bg-primary/5 border-primary/10" },
               { label: TEXT_CONTENT.statPassed,     value: totalLolos,    color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/5 border-emerald-500/10 dark:border-emerald-500/20" },
               { label: TEXT_CONTENT.statAvgScore,   value: rerataSkor,    color: "text-purple-600 dark:text-purple-400",   bg: "bg-purple-500/5 border-purple-500/10 dark:border-purple-500/20" },
-              { label: TEXT_CONTENT.statHighScore,  value: skorTertinggi, color: "text-amber-600 dark:text-amber-400",     bg: "bg-amber-500/5 border-amber-500/10 dark:border-amber-500/20" },
+              { label: TEXT_CONTENT.statHighScore,  value: skorTertinggi, color: "text-amber-600 dark:text-amber-400",      bg: "bg-amber-500/5 border-amber-500/10 dark:border-amber-500/20" },
             ].map((s) => (
               <Card key={s.label} className={`rounded-2xl border shadow-sm ${s.bg}`}>
                 <CardContent className="p-4 text-center">
@@ -234,11 +234,11 @@ export default async function RiwayatPage() {
                       <TableCell className="text-center">
                         {item.isLolos ? (
                           <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 gap-1 hover:bg-emerald-500/10">
-                            <CheckCircle2 className="w-3 h-3" aria-hidden />{TEXT_CONTENT.badgePassed}
+                            <CheckCircle2 className="w-3 h-3" />{TEXT_CONTENT.badgePassed}
                           </Badge>
                         ) : (
                           <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20 gap-1 hover:bg-destructive/10">
-                            <XCircle className="w-3 h-3" aria-hidden />{TEXT_CONTENT.badgeFailed}
+                            <XCircle className="w-3 h-3" />{TEXT_CONTENT.badgeFailed}
                           </Badge>
                         )}
                       </TableCell>
@@ -248,9 +248,10 @@ export default async function RiwayatPage() {
                       <TableCell className="text-center">
                         <Button variant="ghost" size="sm" asChild
                           className="rounded-lg gap-1 text-primary hover:text-primary hover:bg-primary/10 transition-colors">
-                          <Link href={ROUTES.detailHasil(item.packageId)}>
+                          {/* ✅ SEKARANG SYNC: Mengirim parameter volumeId dan historyId string secara akurat */}
+                          <Link href={ROUTES.detailHasil(item.packageId, item.id)}>
                             {TEXT_CONTENT.btnDetail}
-                            <ChevronRight className="w-3 h-3" aria-hidden />
+                            <ChevronRight className="w-3 h-3" />
                           </Link>
                         </Button>
                       </TableCell>
