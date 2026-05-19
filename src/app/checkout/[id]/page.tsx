@@ -1,6 +1,7 @@
 /**
  * app/checkout/[id]/page.tsx
- * * Async Server Component untuk memproses halaman peninjauan belanja (Checkout).
+ *
+ * Async Server Component untuk memproses halaman peninjauan belanja (Checkout).
  * Terintegrasi penuh dengan Drizzle ORM (Core Query), skema userAccess, dan sesi NextAuth v5.
  * Sudah dioptimalkan menggunakan arsitektur penulisan kueri Drizzle yang seragam dan type-safe.
  */
@@ -16,7 +17,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle2, ChevronLeft } from "lucide-react";
 import { CheckoutForm } from "@/components/checkout/checkout-form";
-import { Separator } from "@/components/ui/separator"
+import { Separator } from "@/components/ui/separator";
+
 // ==========================================
 // KONSTANTA & KONFIGURASI
 // ==========================================
@@ -53,7 +55,8 @@ const TEXT_CONTENT = {
   labelItemPrice: "Harga Paket",
   labelAdminFee: "Biaya Layanan",
   labelTotalPrice: "Total Pembayaran",
-  footerDisclaimer: "Pembayaran aman & terenkripsi. Akses tryout terbuka otomatis setelah pembayaran berhasil.",
+  footerDisclaimer:
+    "Pembayaran aman & terenkripsi. Akses tryout terbuka otomatis setelah pembayaran berhasil.",
 } as const;
 
 interface CheckoutPageProps {
@@ -67,17 +70,19 @@ function formatMataUang(amount: number): string {
 // ==========================================
 // GENERATE METADATA DYNAMIC (Strict Core Query)
 // ==========================================
-export async function generateMetadata({ params }: CheckoutPageProps): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: CheckoutPageProps): Promise<Metadata> {
   const { id } = await params;
   const volumeId = parseInt(id, 10);
   if (isNaN(volumeId)) return { title: TEXT_CONTENT.metaTitleDefault };
 
-  // ✅ Seragamkan menggunakan select core kueri
   const [pkg] = await db
     .select({ title: tryoutPackages.title })
     .from(tryoutPackages)
     .where(eq(tryoutPackages.id, volumeId))
     .limit(1);
+
 
   return {
     title: pkg
@@ -101,7 +106,6 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
   if (!session?.user?.id) redirect(ROUTES.loginRedirect(volumeId));
 
   // ── 3. Ambil Data Informasi Paket Aktif Langsung Dari DB ──
-  // ✅ Dioptimalkan menggunakan select core syntax
   const [pkg] = await db
     .select()
     .from(tryoutPackages)
@@ -114,9 +118,25 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
     .limit(1);
 
   if (!pkg) notFound();
+console.log("[CHECKOUT DEBUG] pkg:", pkg);
+console.log("[CHECKOUT DEBUG] pkg.price:", pkg?.price, typeof pkg?.price);
+  // ── 3b. ✅ REDIRECT OTOMATIS JIKA PAKET GRATIS ──
+  // Insert akses langsung tanpa perlu pembayaran, lalu redirect ke ruang ujian.
+ if (pkg.price === 0) {
+  try {
+    await db
+      .insert(userAccess)
+      .values({ userId: session.user.id, packageId: volumeId })
+      .onConflictDoNothing();
+  } catch (err) {
+    console.error("[INSERT ERROR]", err);
+  }
+
+  console.log("[REDIRECT] Menuju:", ROUTES.tryoutDashboard(volumeId));
+  redirect(ROUTES.tryoutDashboard(volumeId));
+}
 
   // ── 4. Validasi Status Kepemilikan (Pencegahan Pembelian Ganda) ──
-  // ✅ Dioptimalkan menggunakan select core syntax
   const [owned] = await db
     .select()
     .from(userAccess)
@@ -130,6 +150,7 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
 
   if (owned) redirect(ROUTES.tryoutDashboard(volumeId));
 
+  // ── 5. Hitung total pembayaran (hanya untuk paket berbayar) ──
   const totalPembayaran = pkg.price + APP_CONFIG.adminFee;
 
   return (
@@ -138,7 +159,12 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
 
         {/* BAR UTAMA NAVIGASI ATAS */}
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild className="rounded-full text-muted-foreground hover:text-foreground">
+          <Button
+            variant="ghost"
+            size="icon"
+            asChild
+            className="rounded-full text-muted-foreground hover:text-foreground"
+          >
             <Link href={ROUTES.dashboard} aria-label="Kembali ke dashboard">
               <ChevronLeft className="w-5 h-5" />
             </Link>
@@ -165,9 +191,7 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
                     {TEXT_CONTENT.sectionDetail}
                   </h2>
                   <div className="bg-primary/5 p-4 rounded-xl border border-primary/10">
-                    <p className="font-semibold text-primary">
-                      {pkg.title}
-                    </p>
+                    <p className="font-semibold text-primary">{pkg.title}</p>
                     {pkg.description && (
                       <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
                         {pkg.description}
@@ -182,7 +206,10 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
                   </h3>
                   <ul className="space-y-2">
                     {BENEFITS_LIST.map((benefit) => (
-                      <li key={benefit} className="flex items-start gap-3 text-sm text-muted-foreground">
+                      <li
+                        key={benefit}
+                        className="flex items-start gap-3 text-sm text-muted-foreground"
+                      >
                         <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
                         <span className="leading-relaxed">{benefit}</span>
                       </li>
@@ -196,7 +223,7 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
             <CheckoutForm volumeId={volumeId} total={totalPembayaran} />
           </div>
 
-          {/* SISI KAIAN: RINGKASAN REKAPITULASI BIAYA BELANJA */}
+          {/* SISI KANAN: RINGKASAN REKAPITULASI BIAYA BELANJA */}
           <div className="md:col-span-2">
             <Card className="rounded-2xl border-border bg-card shadow-sm sticky top-8">
               <CardContent className="p-6 space-y-4">

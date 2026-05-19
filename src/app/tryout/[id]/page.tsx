@@ -1,12 +1,12 @@
 /**
  * app/tryout/[id]/page.tsx
  * * Server Component Utama Ruang Ujian CAT.
- * Mengamankan sesi dan menyuplai data soal berdasarkan Volume ID.
+ * Mengamankan sesi, memvalidasi kepemilikan akses, dan menyuplai data soal berdasarkan Volume ID.
  */
 
 import { db } from "@/db";
-import { questions, tryoutPackages } from "@/db/database/schema";
-import { eq, asc } from "drizzle-orm";
+import { questions, tryoutPackages, userAccess } from "@/db/database/schema";
+import { eq, asc, and } from "drizzle-orm";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import TryoutClient from "./tryout-client";
@@ -18,31 +18,45 @@ interface TryoutPageProps {
 export const dynamic = "force-dynamic";
 
 export default async function TryoutPage({ params }: TryoutPageProps) {
-  // 1. Amankan Sesi Login Siswa di Sisi Server
-  const session = await auth();
-  if (!session?.user) {
-    redirect(`/login?callbackUrl=/tryout/${(await params).id}`);
-  }
-
+  // ── 1. Amankan Sesi Login Siswa di Sisi Server ──
   const resolvedParams = await params;
-  const volumeId = parseInt(resolvedParams.id, 10);
+  const session = await auth();
 
-  if (isNaN(volumeId)) {
-    notFound();
+  if (!session?.user?.id) {
+    redirect(`/login?callbackUrl=/tryout/${resolvedParams.id}`);
   }
 
-  // 2. Ambil Informasi Manifes Paket Tryout
+  const volumeId = parseInt(resolvedParams.id, 10);
+  if (isNaN(volumeId)) notFound();
+
+  // ── 2. Validasi Kepemilikan Akses Volume ──
+  // Middleware tidak lagi mengecek ini, jadi wajib divalidasi di page level.
+  const [access] = await db
+    .select()
+    .from(userAccess)
+    .where(
+      and(
+        eq(userAccess.userId, session.user.id),
+        eq(userAccess.packageId, volumeId)
+      )
+    )
+    .limit(1);
+
+  if (!access) {
+    // Belum punya akses → arahkan ke checkout
+    redirect(`/checkout/${volumeId}`);
+  }
+
+  // ── 3. Ambil Informasi Manifes Paket Tryout ──
   const [packageData] = await db
     .select()
     .from(tryoutPackages)
     .where(eq(tryoutPackages.id, volumeId))
     .limit(1);
 
-  if (!packageData) {
-    notFound();
-  }
+  if (!packageData) notFound();
 
-  // 3. Tarik Bank Soal yang Terikat pada Volume Ini (Anti-Cheat Room)
+  // ── 4. Tarik Bank Soal yang Terikat pada Volume Ini ──
   const rawQuestions = await db
     .select({
       id: questions.id,
@@ -54,18 +68,19 @@ export default async function TryoutPage({ params }: TryoutPageProps) {
     .where(eq(questions.packageId, volumeId))
     .orderBy(asc(questions.id));
 
-  if (rawQuestions.length === 0) {
-    notFound();
-  }
+  if (rawQuestions.length === 0) notFound();
 
-  // Pemetaan tipe struktur data array JSONB untuk pilihan opsi ganda
+  // ── 5. Pemetaan Tipe Struktur Data JSONB Pilihan Opsi Ganda ──
   type PilihanStruktur = { opsi: string; teks: string; poin: number }[];
 
   const formattedQuestions = rawQuestions.map((q) => ({
     id: q.id,
     kategori: q.kategori as "TWK" | "TIU" | "TKP",
     pertanyaan: q.pertanyaan,
-    pilihan: (q.pilihan as PilihanStruktur).map((p) => ({ opsi: p.opsi, teks: p.teks })),
+    pilihan: (q.pilihan as PilihanStruktur).map((p) => ({
+      opsi: p.opsi,
+      teks: p.teks,
+    })),
   }));
 
   return (

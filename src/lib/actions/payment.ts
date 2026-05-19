@@ -2,7 +2,7 @@
 
 /**
  * lib/actions/payment.ts
- * 
+ *
  * Server Action Produksi untuk Pemrosesan Gerbang Transaksi Pembayaran.
  * Memvalidasi sesi NextAuth v5, melakukan kueri harga paket riil ke database,
  * dan mendaftarkan Snap Token pembayaran secara langsung lewat Midtrans SDK.
@@ -27,6 +27,7 @@ const ACTION_ERRORS = {
   invalidVolume: "invalid_volume",
   alreadyOwned: "already_owned",
   paymentFailed: "payment_failed",
+  freePackage: "free_package", // ✅ Tambahan: error khusus paket gratis
 } as const;
 
 const PAYMENT_CHANNELS = {
@@ -43,7 +44,7 @@ interface CreatePaymentInput {
   paymentMethod: PaymentMethod;
 }
 
-type ActionResponse = 
+type ActionResponse =
   | { success: true; snapToken: string; orderId: string }
   | { success: false; error: string };
 
@@ -70,7 +71,11 @@ export async function createPaymentAction(
 
   // ── 2. VALIDASI INTEGRITAS FORMAT INPUT ──
   const parsedVolumeId = parseInt(volumeId, 10);
-  if (isNaN(parsedVolumeId) || parsedVolumeId < 1 || parsedVolumeId > APP_CONFIG.maxVolumeAllowed) {
+  if (
+    isNaN(parsedVolumeId) ||
+    parsedVolumeId < 1 ||
+    parsedVolumeId > APP_CONFIG.maxVolumeAllowed
+  ) {
     return { success: false, error: ACTION_ERRORS.invalidVolume };
   }
 
@@ -89,6 +94,12 @@ export async function createPaymentAction(
 
     if (!pkg) {
       return { success: false, error: ACTION_ERRORS.invalidVolume };
+    }
+
+    // ── 3b. GUARD: Paket gratis tidak boleh diproses lewat payment gateway ──
+    // ✅ Defense in depth — seharusnya sudah ditangani di checkout page
+    if (pkg.price === 0) {
+      return { success: false, error: ACTION_ERRORS.freePackage };
     }
 
     // ── 4. CEK STATUS KEPEMILIKAN (Pencegahan Pembelian Ganda) ──
@@ -134,7 +145,7 @@ export async function createPaymentAction(
       enabled_payments: PAYMENT_CHANNELS[paymentMethod],
     });
 
-    // ── 6. SISIPKAN MANIFEST LOG LOG ORDER PENDING KE DATABASE LOKAL ──
+    // ── 6. SISIPKAN MANIFEST LOG ORDER PENDING KE DATABASE LOKAL ──
     await db.insert(orders).values({
       id: orderId,
       userId: userId,
@@ -146,7 +157,6 @@ export async function createPaymentAction(
 
     // Mengembalikan data lengkap payload untuk dieksekusi oleh window.snap.pay() di sisi client
     return { success: true, snapToken, orderId };
-
   } catch (err) {
     console.error("[Server Action Error] createPaymentAction:", err);
     return { success: false, error: ACTION_ERRORS.paymentFailed };

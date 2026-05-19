@@ -1,10 +1,10 @@
 /**
- * proxy.ts 
- * 
+ * proxy.ts
+ *
  * Sesuai dokumentasi Next.js 16:
  * Menggunakan auth() dari NextAuth v5 untuk cek sesi,
- * memproteksi rute, menangani pengalihan role (Admin/User), 
- * dan memvalidasi akses tryout.
+ * memproteksi rute, menangani pengalihan role (Admin/User).
+ * Validasi kepemilikan volume tryout dilakukan di page level (/tryout/[id]/page.tsx).
  */
 
 import { auth } from "@/auth";
@@ -18,7 +18,6 @@ const ROUTES = {
   login: "/login",
   admin: "/admin",
   dashboard: "/dashboard",
-  checkoutPrefix: "/checkout",
 } as const;
 
 const ROUTE_GROUPS = {
@@ -28,10 +27,6 @@ const ROUTE_GROUPS = {
 
 const ROLES = {
   admin: "ADMIN",
-} as const;
-
-const COOKIES = {
-  purchasedMock: "asn_purchased",
 } as const;
 
 // ==========================================
@@ -44,15 +39,19 @@ export async function proxy(request: NextRequest) {
   const isLoggedIn = !!session?.user;
 
   // 1. Arahkan pengguna ke tempat yang benar setelah login
-  const isAuthRoute = ROUTE_GROUPS.authOnly.some((route) => pathname.startsWith(route));
+  const isAuthRoute = ROUTE_GROUPS.authOnly.some((route) =>
+    pathname.startsWith(route)
+  );
   if (isLoggedIn && isAuthRoute) {
-    // Jika yang login adalah Admin, arahkan ke /admin. Jika User biasa, ke /dashboard
-    const destination = session.user.role === ROLES.admin ? ROUTES.admin : ROUTES.dashboard;
+    const destination =
+      session.user.role === ROLES.admin ? ROUTES.admin : ROUTES.dashboard;
     return NextResponse.redirect(new URL(destination, request.url));
   }
 
   // 2. Periksa apakah rute saat ini membutuhkan login (dilindungi)
-  const isProtected = ROUTE_GROUPS.protected.some((route) => pathname.startsWith(route));
+  const isProtected = ROUTE_GROUPS.protected.some((route) =>
+    pathname.startsWith(route)
+  );
   if (!isProtected) return NextResponse.next();
 
   // 3. Belum login tapi mencoba akses rute dilindungi → redirect ke login
@@ -62,23 +61,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // 4. Cek kepemilikan volume (Logika Tryout)
-  const tryoutRegex = /^\/tryout\/(\d+)/;
-  const tryoutMatch = pathname.match(tryoutRegex);
-  
-  if (tryoutMatch) {
-    const volumeId = parseInt(tryoutMatch[1], 10);
-
-    // Fallback cookie untuk mock
-    const purchasedCookie = request.cookies.get(COOKIES.purchasedMock)?.value ?? "";
-    const purchasedIds = purchasedCookie.split(",").map(Number).filter(Boolean);
-    
-    if (!purchasedIds.includes(volumeId)) {
-      return NextResponse.redirect(
-        new URL(`${ROUTES.checkoutPrefix}/${volumeId}`, request.url)
-      );
-    }
-  }
+  // 4. ✅ Validasi kepemilikan volume tryout tidak dilakukan di sini.
+  // Pengecekan akses ditangani sepenuhnya oleh app/tryout/[id]/page.tsx
+  // agar kompatibel dengan Edge Runtime dan lebih aman di sisi server.
 
   // 5. Lolos semua pemeriksaan, izinkan permintaan diteruskan
   return NextResponse.next();

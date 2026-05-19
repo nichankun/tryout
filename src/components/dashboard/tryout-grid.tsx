@@ -33,6 +33,7 @@ const TEXT_CONTENT = {
   availableBadge: "Tersedia",
   actionStart: "Mulai Kerjakan",
   actionBuy: "Beli Sekarang",
+  actionFree: "Akses Gratis",
   unitMinutes: "Menit",
   unitQuestions: "Soal",
 } as const;
@@ -66,23 +67,37 @@ function VolumeCard({ vol }: { vol: TryoutVolume }) {
 
   return (
     <Card className="overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group flex flex-col p-0 gap-0">
-      {/* Menggunakan bg-linear-to-br bawaan Tailwind v4 yang dikombinasikan dengan token warna semantik */}
       <CardHeader
         className={`h-32 flex items-center justify-center relative p-0 rounded-t-xl
-          ${vol.isUnlocked
-            ? "bg-linear-to-br from-emerald-500 to-teal-600 dark:from-emerald-600 dark:to-teal-700"
-            : "bg-linear-to-br from-primary to-primary/70"
+          ${
+            vol.isUnlocked
+              ? "bg-linear-to-br from-emerald-500 to-teal-600 dark:from-emerald-600 dark:to-teal-700"
+              : vol.harga === 0
+                ? "bg-linear-to-br from-violet-500 to-purple-600 dark:from-violet-600 dark:to-purple-700"
+                : "bg-linear-to-br from-primary to-primary/70"
           }`}
       >
-        <span className="text-white/20 font-black text-6xl absolute left-4 top-1 select-none leading-none" aria-hidden>
+        <span
+          className="text-white/20 font-black text-6xl absolute left-4 top-1 select-none leading-none"
+          aria-hidden
+        >
           {paddedId}
         </span>
         <div className="bg-white/20 backdrop-blur-sm px-4 py-1 rounded-full text-white text-xs font-bold z-10">
           {TEXT_CONTENT.volumeLabel} {paddedId}
         </div>
-        {!vol.isUnlocked && (
+
+        {/* Icon kunci hanya untuk paket berbayar yang belum dimiliki */}
+        {!vol.isUnlocked && vol.harga > 0 && (
           <div className="absolute top-3 right-3">
             <Lock className="w-4 h-4 text-white/60" />
+          </div>
+        )}
+
+        {/* Badge GRATIS untuk paket harga 0 yang belum dimiliki */}
+        {!vol.isUnlocked && vol.harga === 0 && (
+          <div className="absolute top-3 right-3 bg-white/20 px-2 py-0.5 rounded-full">
+            <span className="text-white text-[10px] font-bold">GRATIS</span>
           </div>
         )}
       </CardHeader>
@@ -114,15 +129,34 @@ function VolumeCard({ vol }: { vol: TryoutVolume }) {
 
       <CardFooter className="px-5 pb-5 pt-0 flex items-center justify-between mt-auto">
         {vol.isUnlocked ? (
+          // ── KONDISI A: Sudah dimiliki → langsung ke ruang ujian ──
           <>
-            <span className="text-xs text-muted-foreground italic">{TEXT_CONTENT.unlockedStatus}</span>
-            <Button asChild size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold border-0">
+            <span className="text-xs text-muted-foreground italic">
+              {TEXT_CONTENT.unlockedStatus}
+            </span>
+            <Button
+              asChild
+              size="sm"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold border-0"
+            >
               <Link href={`${ROUTES.tryout}/${vol.id}`} transitionTypes={["slide"]}>
                 {TEXT_CONTENT.actionStart}
               </Link>
             </Button>
           </>
+        ) : vol.harga === 0 ? (
+          // ── KONDISI B: Paket gratis → checkout (auto-insert akses + redirect ke tryout) ──
+          <Button
+            asChild
+            size="sm"
+            className="rounded-lg font-bold w-full bg-violet-600 hover:bg-violet-700 text-white border-0"
+          >
+            <Link href={`${ROUTES.checkout}/${vol.id}`}>
+              {TEXT_CONTENT.actionFree}
+            </Link>
+          </Button>
         ) : (
+          // ── KONDISI C: Paket berbayar → ke halaman checkout normal ──
           <>
             <div>
               <p className="text-[10px] text-muted-foreground line-through leading-none mb-0.5">
@@ -133,7 +167,9 @@ function VolumeCard({ vol }: { vol: TryoutVolume }) {
               </p>
             </div>
             <Button asChild size="sm" className="rounded-lg font-bold">
-              <Link href={`${ROUTES.checkout}/${vol.id}`}>{TEXT_CONTENT.actionBuy}</Link>
+              <Link href={`${ROUTES.checkout}/${vol.id}`}>
+                {TEXT_CONTENT.actionBuy}
+              </Link>
             </Button>
           </>
         )}
@@ -148,9 +184,10 @@ function VolumeCard({ vol }: { vol: TryoutVolume }) {
 export function TryoutGrid({ volumes }: { volumes: TryoutVolume[] }) {
   const [query, setQuery] = useState("");
 
-  const filtered = volumes.filter((v) =>
-    v.title.toLowerCase().includes(query.toLowerCase()) ||
-    v.id.toString().includes(query)
+  const filtered = volumes.filter(
+    (v) =>
+      v.title.toLowerCase().includes(query.toLowerCase()) ||
+      v.id.toString().includes(query)
   );
 
   return (
@@ -164,13 +201,18 @@ export function TryoutGrid({ volumes }: { volumes: TryoutVolume[] }) {
           className="pl-9 rounded-xl"
           aria-label="Cari volume tryout"
         />
-        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" aria-hidden />
+        <Search
+          className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+          aria-hidden
+        />
       </div>
 
       {filtered.length === 0 && (
         <div className="text-center py-16 text-muted-foreground">
           <FileText className="w-10 h-10 mx-auto mb-3 opacity-30" aria-hidden />
-          <p className="font-medium">{TEXT_CONTENT.noMatch} "{query}"</p>
+          <p className="font-medium">
+            {TEXT_CONTENT.noMatch} "{query}"
+          </p>
         </div>
       )}
 
