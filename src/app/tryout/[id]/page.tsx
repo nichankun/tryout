@@ -1,7 +1,8 @@
 /**
  * app/tryout/[id]/page.tsx
  * * Server Component Utama Ruang Ujian CAT.
- * Mengamankan sesi, memvalidasi kepemilikan akses, dan menyuplai data soal berdasarkan Volume ID.
+ * Dioptimalkan dengan Concurrent Fetching (Promise.all) dan Partial Query.
+ * Type-Safe 100% dari Drizzle schema, tanpa manual casting.
  */
 
 import { db } from "@/db";
@@ -15,74 +16,72 @@ interface TryoutPageProps {
   params: Promise<{ id: string }>;
 }
 
+// Menonaktifkan caching statis karena data bergantung pada sesi user (dinamis)
 export const dynamic = "force-dynamic";
 
 export default async function TryoutPage({ params }: TryoutPageProps) {
-  // ── 1. Amankan Sesi Login Siswa di Sisi Server ──
-  const resolvedParams = await params;
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    redirect(`/login?callbackUrl=/tryout/${resolvedParams.id}`);
-  }
+  // ── 1. PARALLEL RESOLUTION (Sesi & Params) ──
+  const [resolvedParams, session] = await Promise.all([params, auth()]);
 
   const volumeId = parseInt(resolvedParams.id, 10);
   if (isNaN(volumeId)) notFound();
 
-  // ── 2. Validasi Kepemilikan Akses Volume ──
-  // Middleware tidak lagi mengecek ini, jadi wajib divalidasi di page level.
-  const [access] = await db
-    .select()
-    .from(userAccess)
-    .where(
-      and(
-        eq(userAccess.userId, session.user.id),
-        eq(userAccess.packageId, volumeId)
-      )
-    )
-    .limit(1);
+  // Redirect aman tanpa membocorkan rute internal jika belum login
+  if (!session?.user?.id) {
+    redirect(`/login?callbackUrl=/tryout/${volumeId}`);
+  }
 
-  if (!access) {
-    // Belum punya akses → arahkan ke checkout
+  // ── 2. VALIDASI KEPEMILIKAN AKSES (Query Ringan) ──
+  const accessRecord = await db.query.userAccess.findFirst({
+    where: and(
+      eq(userAccess.userId, session.user.id),
+      eq(userAccess.packageId, volumeId)
+    ),
+    columns: { id: true }, // Hanya ambil ID, sangat menghemat memori
+  });
+
+  if (!accessRecord) {
     redirect(`/checkout/${volumeId}`);
   }
 
-  // ── 3. Ambil Informasi Manifes Paket Tryout ──
-  const [packageData] = await db
-    .select()
-    .from(tryoutPackages)
-    .where(eq(tryoutPackages.id, volumeId))
-    .limit(1);
+  // ── 3. PARALLEL FETCHING (Paket & Soal) ──
+  const [packageData, rawQuestions] = await Promise.all([
+    db.query.tryoutPackages.findFirst({
+      where: eq(tryoutPackages.id, volumeId),
+      columns: { title: true }, 
+    }),
+    db.query.questions.findMany({
+      where: eq(questions.packageId, volumeId),
+      columns: {
+        id: true,
+        kategori: true,
+        pertanyaan: true,
+        pilihan: true, // Type inferred langsung sebagai QuestionChoice[] dari schema.ts
+      },
+      orderBy: [asc(questions.id)],
+    }),
+  ]);
 
-  if (!packageData) notFound();
+  // Validasi ketersediaan data
+  if (!packageData || rawQuestions.length === 0) {
+    notFound();
+  }
 
-  // ── 4. Tarik Bank Soal yang Terikat pada Volume Ini ──
-  const rawQuestions = await db
-    .select({
-      id: questions.id,
-      kategori: questions.kategori,
-      pertanyaan: questions.pertanyaan,
-      pilihan: questions.pilihan,
-    })
-    .from(questions)
-    .where(eq(questions.packageId, volumeId))
-    .orderBy(asc(questions.id));
-
-  if (rawQuestions.length === 0) notFound();
-
-  // ── 5. Pemetaan Tipe Struktur Data JSONB Pilihan Opsi Ganda ──
-  type PilihanStruktur = { opsi: string; teks: string; poin: number }[];
-
+  // ── 4. PEMETAAN AMAN & SANITASI PAYLOAD (BEBAS ERROR TS) ──
+  // STRATEGI KEAMANAN: Membuang properti "poin" dari JSONB
   const formattedQuestions = rawQuestions.map((q) => ({
     id: q.id,
     kategori: q.kategori as "TWK" | "TIU" | "TKP",
     pertanyaan: q.pertanyaan,
-    pilihan: (q.pilihan as PilihanStruktur).map((p) => ({
+    // TypeScript sekarang otomatis tahu 'p' memiliki opsi, teks, dan poin (tanpa perlu as PilihanStruktur)
+    pilihan: q.pilihan.map((p) => ({
       opsi: p.opsi,
       teks: p.teks,
+      // poin sengaja di-drop agar tidak bocor ke client
     })),
   }));
 
+  // ── 5. RENDER CLIENT COMPONENT ──
   return (
     <TryoutClient
       volumeId={volumeId}

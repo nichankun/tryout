@@ -1,8 +1,8 @@
 /**
  * app/tryout/[id]/hasil/page.tsx
  * * Async Server Component dinamis untuk menampilkan hasil analisis tryout SKD.
- * Menghubungkan PostgreSQL via Drizzle ORM dengan NextAuth v5 session.
- * Sudah dioptimalkan dengan deteksi searchParams historyId untuk akurasi data.
+ * Dioptimalkan dengan Partial Query (mengabaikan payload JSON besar),
+ * Parallel Fetching, dan perbaikan rantai propogasi historyId ke halaman Pembahasan.
  */
 
 import type { Metadata } from "next";
@@ -34,7 +34,8 @@ const EXAM_THRESHOLDS = {
 
 const ROUTES = {
   loginRedirect: (id: number) => `/login?callbackUrl=/tryout/${id}/hasil`,
-  pembahasan: (id: number) => `/tryout/${id}/pembahasan`,
+  // ✅ FIX: Membawa param historyId ke halaman pembahasan agar datanya sinkron
+  pembahasan: (id: number, hId?: string) => `/tryout/${id}/pembahasan${hId ? `?historyId=${hId}` : ""}`,
   dashboard: "/dashboard",
 } as const;
 
@@ -62,7 +63,7 @@ const TEXT_CONTENT = {
 // ── INTERFACES ──
 interface HasilPageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ historyId?: string }>; // ✅ Menangkap query ?historyId=... dari URL
+  searchParams: Promise<{ historyId?: string }>;
 }
 
 interface StatistikSubtest {
@@ -90,44 +91,49 @@ export async function generateMetadata({ params }: HasilPageProps): Promise<Meta
 // KOMPONEN UTAMA (SERVER COMPONENT)
 // ==========================================
 export default async function HasilTryoutPage({ params, searchParams }: HasilPageProps) {
-  const { id } = await params;
-  const { historyId } = await searchParams; // ✅ Resolve searchParams di server
+  // ── 1. PARALLEL RESOLUTION (Optimasi Waterfall) ──
+  const [resolvedParams, resolvedSearchParams, session] = await Promise.all([
+    params,
+    searchParams,
+    auth()
+  ]);
 
-  // Validasi parameter ID Volume paket tryout
+  const { id } = resolvedParams;
+  const { historyId } = resolvedSearchParams;
+
   const volumeId = parseInt(id, 10);
   if (isNaN(volumeId) || volumeId < 1 || volumeId > APP_CONFIG.maxVolumeAllowed) notFound();
 
-  // 1. Proteksi Halaman Sisi Server (Server-Side Auth)
-  const session = await auth();
   if (!session?.user?.id) {
     redirect(ROUTES.loginRedirect(volumeId));
   }
 
-  // 2. Merakit Kueri Kondisional Berbasis Drizzle
+  // ── 2. MERAKIT KUERI KONDISIONAL ──
   const queryConditions: SQL[] = [
     eq(tryoutHistories.userId, session.user.id),
     eq(tryoutHistories.packageId, volumeId)
   ];
 
-  // Jika di URL ada historyId yang spesifik, kunci pencarian ke ID tersebut
   if (historyId) {
     queryConditions.push(eq(tryoutHistories.id, historyId));
   }
 
-  // Tarik Data Riwayat Ujian dari Database PostgreSQL
-  const riwayatList = await db
-    .select()
-    .from(tryoutHistories)
-    .where(and(...queryConditions))
-    .orderBy(desc(tryoutHistories.endTime))
-    .limit(1);
+  // ── 3. OPTIMASI PARTIAL QUERY DARI DATABASE ──
+  // KUNCI PERFORMA: Membuang kolom 'jawabanSiswa' (JSON besar) karena tidak dirender di halaman ini.
+  const riwayatTerbaru = await db.query.tryoutHistories.findFirst({
+    where: and(...queryConditions),
+    orderBy: [desc(tryoutHistories.endTime)],
+    columns: {
+      id: true,
+      skorTwk: true,
+      skorTiu: true,
+      skorTkp: true,
+    }
+  });
 
-  const riwayatTerbaru = riwayatList[0];
-
-  // Batasi akses jika data riwayat pengerjaan tidak ditemukan
   if (!riwayatTerbaru) notFound();
 
-  // 3. Mapping Data Komponen Nilai Riil
+  // ── 4. MAPPING DATA KOMPONEN NILAI RIIL ──
   const nilaiSiswa = { 
     twk: riwayatTerbaru.skorTwk, 
     tiu: riwayatTerbaru.skorTiu, 
@@ -304,7 +310,8 @@ export default async function HasilTryoutPage({ params, searchParams }: HasilPag
         {/* TOMBOL AKSI UTAMA FOOTER */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Button size="lg" className="rounded-xl font-bold gap-2" asChild>
-            <Link href={ROUTES.pembahasan(volumeId)}>
+            {/* ✅ FIX: Menyuntikkan historyId ke dalam URL Halaman Pembahasan */}
+            <Link href={ROUTES.pembahasan(volumeId, historyId)}>
               <FileText className="w-5 h-5" aria-hidden /> {TEXT_CONTENT.actionPembahasan}
             </Link>
           </Button>

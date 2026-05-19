@@ -1,38 +1,30 @@
 /**
  * app/api/soal/route.ts
- * 
- * Route Handler untuk mengambil data bank soal ujian simulasi CAT.
- * Proteksi keamanan menggunakan session native NextAuth v5, validasi skema integritas JSONB 
- * via Zod, serta implementasi mekanisme anti-cheat tab inspeksi network.
+ * * Route Handler untuk mengambil data bank soal ujian simulasi CAT.
+ * Dioptimalkan dengan Relational API (Partial Query) dan Defensive Parsing.
  */
 
 import { NextResponse } from "next/server";
-import { auth } from "@/auth"; // Menggunakan helper NextAuth v5 secara native
+import { auth } from "@/auth";
 import { z } from "zod";
 import { db } from "@/db";
 import { questions, userAccess } from "@/db/database/schema";
 import { eq, and } from "drizzle-orm";
 
-// Menjamin API selalu dievaluasi secara dinamis tanpa tersangkut caching runtime Next.js
 export const dynamic = "force-dynamic";
 
 // ==========================================
-// KONSTANTA & KONFIGURASI (Bebas Hardcode)
+// KONSTANTA
 // ==========================================
-const APP_CONFIG = {
-  maxVolumeAllowed: 20,
-} as const;
-
 const API_ERRORS = {
   unauthorized: "UNAUTHORIZED",
   forbidden: "FORBIDDEN",
-  missingParam: "Parameter volumeId wajib disertakan.",
-  invalidParam: "volumeId tidak valid. Harus angka antara 1–20.",
+  invalidParam: "volumeId tidak valid.",
   notFound: "Soal untuk volume ini belum tersedia.",
-  serverError: "Gagal mengambil data soal. Coba lagi nanti.",
+  serverError: "Gagal mengambil data soal.",
 } as const;
 
-// Schema Zod untuk validasi struktur array opsi pilihan ganda dari database (jsonb)
+// Skema untuk sanitasi JSONB
 const PilihanSchema = z.array(
   z.object({
     opsi: z.string(),
@@ -45,60 +37,56 @@ const PilihanSchema = z.array(
 // METHOD HANDLER: GET
 // ==========================================
 export async function GET(request: Request) {
-  // ── 1. PROTEKSI SESI OTENTIKASI NATIVE (NextAuth v5) ──
+  // 1. Autentikasi
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: API_ERRORS.unauthorized }, { status: 401 });
   }
 
-  const userId = session.user.id;
-
-  // ── 2. VALIDASI PARAMETER QUERY STRING ──
+  // 2. Validasi Parameter
   const { searchParams } = new URL(request.url);
-  const rawVolumeId = searchParams.get("volumeId");
+  const volumeId = parseInt(searchParams.get("volumeId") ?? "", 10);
 
-  if (!rawVolumeId) {
-    return NextResponse.json({ error: API_ERRORS.missingParam }, { status: 400 });
-  }
-
-  const volumeId = parseInt(rawVolumeId, 10);
-  if (isNaN(volumeId) || volumeId < 1 || volumeId > APP_CONFIG.maxVolumeAllowed) {
+  if (isNaN(volumeId) || volumeId < 1) {
     return NextResponse.json({ error: API_ERRORS.invalidParam }, { status: 400 });
   }
 
   try {
-    // ── 3. VERIFIKASI HAK KEPEMILIKAN AKSES PAKET (Real DB Verification) ──
-    const access = await db.query.userAccess.findFirst({
-      where: and(
-        eq(userAccess.userId, userId),
-        eq(userAccess.packageId, volumeId)
-      ),
-    });
+    // 3. PARALLEL FETCHING: Cek Akses & Tarik Soal
+    const [access, dataSoal] = await Promise.all([
+      db.query.userAccess.findFirst({
+        where: and(eq(userAccess.userId, session.user.id), eq(userAccess.packageId, volumeId)),
+        columns: { id: true }
+      }),
+      db.query.questions.findMany({
+        where: eq(questions.packageId, volumeId),
+        columns: {
+          id: true,
+          kategori: true,
+          pertanyaan: true,
+          pilihan: true,
+        }
+      })
+    ]);
 
     if (!access) {
       return NextResponse.json({ error: API_ERRORS.forbidden }, { status: 403 });
     }
 
-    // ── 4. AMBIL DATA BANK SOAL DARI DATABASE NEON ──
-    const dataSoal = await db
-      .select()
-      .from(questions)
-      .where(eq(questions.packageId, volumeId));
-
     if (dataSoal.length === 0) {
       return NextResponse.json({ error: API_ERRORS.notFound }, { status: 404 });
     }
 
-    // ── 5. SANITASI DATA (Anti-Cheat Mechanism) ──
+    // 4. Sanitasi Data (Anti-Cheat)
+    // Menggunakan safeParse agar tidak crash jika ada data JSON yang tidak sesuai
     const soalSanitized = dataSoal.map((soal) => {
-      // Memvalidasi integritas bentuk data JSONB menggunakan skema Zod
-      const daftarPilihan = PilihanSchema.parse(soal.pilihan);
+      const parsed = PilihanSchema.safeParse(soal.pilihan);
+      const daftarPilihan = parsed.success ? parsed.data : [];
 
       return {
         id: soal.id,
-        kategori: soal.kategori, // "TWK" | "TIU" | "TKP"
+        kategori: soal.kategori,
         pertanyaan: soal.pertanyaan,
-        // Kunci jawaban (poin) dan pembahasan sengaja dibuang di endpoint ini agar tidak bisa diintip via Network Tab
         pilihan: daftarPilihan.map((p) => ({
           opsi: p.opsi,
           teks: p.teks,

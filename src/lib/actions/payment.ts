@@ -4,8 +4,8 @@
  * lib/actions/payment.ts
  *
  * Server Action Produksi untuk Pemrosesan Gerbang Transaksi Pembayaran.
- * Memvalidasi sesi NextAuth v5, melakukan kueri harga paket riil ke database,
- * dan mendaftarkan Snap Token pembayaran secara langsung lewat Midtrans SDK.
+ * Dioptimalkan dengan Concurrent Promise.all, Partial Query Drizzle, 
+ * dan pembungkusan Try-Catch menyeluruh untuk fail-safe eksekusi Midtrans SDK.
  */
 
 import { auth } from "@/auth";
@@ -15,10 +15,9 @@ import { eq, and } from "drizzle-orm";
 import midtransClient from "midtrans-client";
 
 // ==========================================
-// KONSTANTA & KONFIGURASI (Bebas Hardcode)
+// KONSTANTA & KONFIGURASI
 // ==========================================
 const APP_CONFIG = {
-  maxVolumeAllowed: 20,
   adminFee: 1000,
 } as const;
 
@@ -27,7 +26,7 @@ const ACTION_ERRORS = {
   invalidVolume: "invalid_volume",
   alreadyOwned: "already_owned",
   paymentFailed: "payment_failed",
-  freePackage: "free_package", // ✅ Tambahan: error khusus paket gratis
+  freePackage: "free_package",
 } as const;
 
 const PAYMENT_CHANNELS = {
@@ -37,10 +36,11 @@ const PAYMENT_CHANNELS = {
 } as const;
 
 // ── INTERFACES ──
-type PaymentMethod = "qris" | "transfer" | "ewallet";
+// OPTIMASI: Otomatis mendeteksi tipe dari key PAYMENT_CHANNELS tanpa menulis ulang
+type PaymentMethod = keyof typeof PAYMENT_CHANNELS;
 
 interface CreatePaymentInput {
-  volumeId: string;
+  volumeId: string | number; // Mendukung string dari params atau number
   paymentMethod: PaymentMethod;
 }
 
@@ -48,7 +48,7 @@ type ActionResponse =
   | { success: true; snapToken: string; orderId: string }
   | { success: false; error: string };
 
-// Inisialisasi Instans SDK Midtrans Snap Gateway
+// Inisialisasi Instans SDK Midtrans Snap Gateway (Singleton)
 const snapGateway = new midtransClient.Snap({
   isProduction: process.env.MIDTRANS_IS_PRODUCTION === "true",
   serverKey: process.env.MIDTRANS_SERVER_KEY ?? "",
@@ -60,58 +60,56 @@ const snapGateway = new midtransClient.Snap({
 export async function createPaymentAction(
   input: CreatePaymentInput
 ): Promise<ActionResponse> {
-  // ── 1. VALIDASI KEAMANAN SESI PENGGUNA (NextAuth v5) ──
-  const session = await auth();
-  if (!session?.user?.id || !session?.user?.name || !session?.user?.email) {
-    return { success: false, error: ACTION_ERRORS.unauthorized };
-  }
-
-  const userId = session.user.id;
-  const { volumeId, paymentMethod } = input;
-
-  // ── 2. VALIDASI INTEGRITAS FORMAT INPUT ──
-  const parsedVolumeId = parseInt(volumeId, 10);
-  if (
-    isNaN(parsedVolumeId) ||
-    parsedVolumeId < 1 ||
-    parsedVolumeId > APP_CONFIG.maxVolumeAllowed
-  ) {
-    return { success: false, error: ACTION_ERRORS.invalidVolume };
-  }
-
-  if (!["qris", "transfer", "ewallet"].includes(paymentMethod)) {
-    return { success: false, error: ACTION_ERRORS.invalidVolume };
-  }
-
+  // OPTIMASI: Try-Catch membungkus SELURUH blok, mencegah server crash jika SDK Midtrans timeout
   try {
-    // ── 3. TARIK INFORMASI HARGA PAKET AKTIF DARI DATABASE ──
-    const pkg = await db.query.tryoutPackages.findFirst({
-      where: and(
-        eq(tryoutPackages.id, parsedVolumeId),
-        eq(tryoutPackages.isActive, true)
-      ),
-    });
+    // ── 1. VALIDASI KEAMANAN SESI PENGGUNA (NextAuth v5) ──
+    const session = await auth();
+    if (!session?.user?.id || !session?.user?.name || !session?.user?.email) {
+      return { success: false, error: ACTION_ERRORS.unauthorized };
+    }
 
-    if (!pkg) {
+    const userId = session.user.id;
+    const { volumeId, paymentMethod } = input;
+
+    // ── 2. VALIDASI INTEGRITAS FORMAT INPUT ──
+    const parsedVolumeId = typeof volumeId === "string" ? parseInt(volumeId, 10) : volumeId;
+    
+    if (isNaN(parsedVolumeId) || parsedVolumeId < 1) {
       return { success: false, error: ACTION_ERRORS.invalidVolume };
     }
 
-    // ── 3b. GUARD: Paket gratis tidak boleh diproses lewat payment gateway ──
-    // ✅ Defense in depth — seharusnya sudah ditangani di checkout page
-    if (pkg.price === 0) {
-      return { success: false, error: ACTION_ERRORS.freePackage };
+    if (!(paymentMethod in PAYMENT_CHANNELS)) {
+      return { success: false, error: ACTION_ERRORS.invalidVolume };
     }
 
-    // ── 4. CEK STATUS KEPEMILIKAN (Pencegahan Pembelian Ganda) ──
-    const existingAccess = await db.query.userAccess.findFirst({
-      where: and(
-        eq(userAccess.userId, userId),
-        eq(userAccess.packageId, parsedVolumeId)
-      ),
-    });
+    // ── 3. CONCURRENT DB FETCHING (Kunci Performa) ──
+    // Menarik harga paket & mengecek kepemilikan User secara BERSAMAAN
+    const [pkg, existingAccess] = await Promise.all([
+      db.query.tryoutPackages.findFirst({
+        where: and(
+          eq(tryoutPackages.id, parsedVolumeId),
+          eq(tryoutPackages.isActive, true)
+        ),
+        columns: { title: true, price: true } // Partial Query
+      }),
+      db.query.userAccess.findFirst({
+        where: and(
+          eq(userAccess.userId, userId),
+          eq(userAccess.packageId, parsedVolumeId)
+        ),
+        columns: { id: true } // Partial Query
+      })
+    ]);
 
+    // ── 4. GUARD KONDISI TRANSAKSI ──
+    if (!pkg) {
+      return { success: false, error: ACTION_ERRORS.invalidVolume };
+    }
     if (existingAccess) {
       return { success: false, error: ACTION_ERRORS.alreadyOwned };
+    }
+    if (pkg.price === 0) {
+      return { success: false, error: ACTION_ERRORS.freePackage };
     }
 
     // ── 5. GENERATE ORDER ID & TOKEN TRANSAKSI VIA MIDTRANS SDK ──
@@ -155,9 +153,9 @@ export async function createPaymentAction(
       snapToken: snapToken,
     });
 
-    // Mengembalikan data lengkap payload untuk dieksekusi oleh window.snap.pay() di sisi client
     return { success: true, snapToken, orderId };
   } catch (err) {
+    // Log disembunyikan dari client, hanya tampil di console server Vercel/VPS
     console.error("[Server Action Error] createPaymentAction:", err);
     return { success: false, error: ACTION_ERRORS.paymentFailed };
   }

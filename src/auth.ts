@@ -22,6 +22,7 @@ const AUTH_ROUTES = {
 
 const AUTH_ERRORS = {
   notVerified: "email_not_verified",
+  invalidCredentials: "invalid_credentials",
 } as const;
 
 const DEFAULT_ROLES = {
@@ -45,8 +46,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     // ── 1. GOOGLE OAUTH PROVIDER ──
     Google({
-      clientId: process.env.AUTH_GOOGLE_ID!,
-      clientSecret: process.env.AUTH_GOOGLE_SECRET!,
+      // Auth.js v5 secara otomatis mendeteksi AUTH_GOOGLE_ID & AUTH_GOOGLE_SECRET dari .env,
+      // tapi mendefinisikannya secara eksplisit tetap aman sebagai dokumentasi.
+      clientId: process.env.AUTH_GOOGLE_ID,
+      clientSecret: process.env.AUTH_GOOGLE_SECRET,
       authorization: {
         params: {
           prompt: "consent",
@@ -70,8 +73,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const email = credentials.email as string;
         const password = credentials.password as string;
 
+        // OPTIMASI: Hanya ambil kolom yang benar-benar dibutuhkan untuk login
         const user = await db.query.users.findFirst({
           where: eq(users.email, email),
+          columns: {
+            id: true,
+            name: true,
+            email: true,
+            image: true,
+            role: true,
+            passwordHash: true,
+            emailVerified: true,
+          }
         });
 
         if (!user?.passwordHash) return null;
@@ -81,42 +94,53 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         const isValid = await bcrypt.compare(password, user.passwordHash);
-        if (!isValid) return null;
+        if (!isValid) throw new Error(AUTH_ERRORS.invalidCredentials);
 
         return {
           id: user.id,
           name: user.name,
           email: user.email,
           image: user.image,
-          role: user.role,
+          role: user.role || DEFAULT_ROLES.user, // Pastikan selalu ada role
         };
       },
     }),
   ],
 
   callbacks: {
-    async jwt({ token, user }) {
+    // ── JWT CALLBACK (Sangat Berpengaruh pada Performa) ──
+    async jwt({ token, user, trigger, session }) {
+      // 1. Saat pertama kali login, objek `user` tersedia.
+      // Kita tanamkan data ke dalam token di sini agar tersimpan di cookies (stateless).
       if (user) {
         token.userId = user.id;
+        token.role = user.role;
       }
 
-      if (token.userId) {
+      // 2. Jika ada pembaruan sesi secara manual dari client (misal: user di-upgrade ke admin)
+      if (trigger === "update" && session?.role) {
+        token.role = session.role;
+      }
+
+      // 3. FALLBACK: Hanya hit database JIKA token.role tidak ada (sangat jarang terjadi).
+      // Menghindari query DB pada setiap request halaman!
+      if (token.userId && !token.role) {
         const dbUser = await db.query.users.findFirst({
           where: eq(users.id, token.userId as string),
+          columns: { role: true }, // OPTIMASI: Hanya ambil kolom 'role', hemat memori & bandwidth
         });
-
-        if (dbUser) {
-          // Fallback ke default 'USER' jika role tidak di-set di DB
-          token.role = (dbUser as any).role || DEFAULT_ROLES.user;
-        }
+        token.role = dbUser?.role || DEFAULT_ROLES.user;
       }
 
       return token;
     },
 
+    // ── SESSION CALLBACK ──
     async session({ session, token }) {
-      if (token.userId) session.user.id = token.userId as string;
-      if (token.role) session.user.role = token.role as "ADMIN" | "USER";
+      if (token.userId && session.user) {
+        session.user.id = token.userId as string;
+        session.user.role = (token.role as "ADMIN" | "USER") || DEFAULT_ROLES.user;
+      }
       return session;
     },
 
@@ -127,9 +151,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
   events: {
     async createUser({ user }) {
-      console.log(`[Auth] Registrasi berhasil via Google: ${user.email}`);
+      // Menggunakan logger produksi jika ada, fallback ke console.log
+      console.info(`[Auth] Registrasi baru berhasil: ${user.email} (Provider: Google)`);
     },
   },
 
+  // Matikan debug di production agar log tidak bocor
   debug: process.env.NODE_ENV === "development",
 });

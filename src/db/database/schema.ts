@@ -15,11 +15,24 @@ import { relations } from "drizzle-orm";
 import type { AdapterAccountType } from "next-auth/adapters";
 
 // ==========================================
-// KONSTANTA ENUM (Bisa diimpor ke file lain)
+// KONSTANTA ENUM & TYPE DEFINITIONS
 // ==========================================
 export const USER_ROLES = ["USER", "ADMIN"] as const;
 export const ORDER_STATUSES = ["pending", "paid", "failed"] as const;
 export const QUESTION_CATEGORIES = ["TWK", "TIU", "TKP"] as const;
+
+// OPTIMASI: Interface untuk kolom JSONB agar Type-Safe di seluruh aplikasi
+export interface QuestionChoice {
+  opsi: string; // misal: "A", "B", "C", "D", "E"
+  teks: string;
+  poin: number; // TKP punya poin 1-5, TIU/TWK 0 atau 5
+}
+
+export interface StudentAnswer {
+  questionId: number;
+  jawaban: string | null; // null jika tidak dijawab
+  poinSiswa: number;
+}
 
 // ── 1. USERS ──────────────────────────────────────────────────────────────
 export const users = pgTable("user", {
@@ -53,15 +66,23 @@ export const accounts = pgTable(
     compoundKey: primaryKey({
       columns: [account.provider, account.providerAccountId],
     }),
+    // OPTIMASI: Index untuk mempercepat login OAuth
+    userIdIdx: index("account_user_id_idx").on(account.userId),
   })
 );
 
 // ── 3. NEXTAUTH: sessions ──────────────────────────────────────────────────
-export const sessions = pgTable("session", {
-  sessionToken: text("sessionToken").primaryKey(),
-  userId:       uuid("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
-  expires:      timestamp("expires", { mode: "date" }).notNull(),
-});
+export const sessions = pgTable(
+  "session", 
+  {
+    sessionToken: text("sessionToken").primaryKey(),
+    userId:       uuid("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    expires:      timestamp("expires", { mode: "date" }).notNull(),
+  },
+  (session) => ({
+    userIdIdx: index("session_user_id_idx").on(session.userId),
+  })
+);
 
 // ── 4. NEXTAUTH: verificationTokens ───────────────────────────────────────
 export const verificationTokens = pgTable(
@@ -100,18 +121,26 @@ export const tryoutPackages = pgTable("tryout_packages", {
 });
 
 // ── 7. ORDERS ─────────────────────────────────────────────────────────────
-export const orders = pgTable("orders", {
-  id:            text("id").primaryKey(), // format: ASN-{volumeId}-{timestamp}
-  userId:        uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  packageId:     integer("package_id").notNull().references(() => tryoutPackages.id),
-  amount:        integer("amount").notNull(),
-  status:        text("status", { enum: ORDER_STATUSES }).notNull().default("pending"),
-  paymentMethod: text("payment_method"),
-  snapToken:     text("snap_token"),
-  transactionId: text("transaction_id"),
-  paidAt:        timestamp("paid_at"),
-  createdAt:     timestamp("created_at").defaultNow(),
-});
+export const orders = pgTable(
+  "orders", 
+  {
+    id:            text("id").primaryKey(), // format: ASN-{packageId}-{timestamp}
+    userId:        uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    packageId:     integer("package_id").notNull().references(() => tryoutPackages.id),
+    amount:        integer("amount").notNull(),
+    status:        text("status", { enum: ORDER_STATUSES }).notNull().default("pending"),
+    paymentMethod: text("payment_method"),
+    snapToken:     text("snap_token"),
+    transactionId: text("transaction_id"),
+    paidAt:        timestamp("paid_at"),
+    createdAt:     timestamp("created_at").defaultNow(),
+  },
+  (table) => ({
+    // OPTIMASI: Sangat penting untuk dashboard histori pesanan pengguna
+    userIdIdx: index("orders_user_id_idx").on(table.userId),
+    packageIdIdx: index("orders_package_id_idx").on(table.packageId),
+  })
+);
 
 // ── 8. AKSES PEMBELIAN ────────────────────────────────────────────────────
 export const userAccess = pgTable(
@@ -127,6 +156,8 @@ export const userAccess = pgTable(
       table.userId,
       table.packageId
     ),
+    // OPTIMASI: Pencarian relasi berdasarkan User
+    userIdIdx: index("user_access_user_id_idx").on(table.userId),
   })
 );
 
@@ -135,10 +166,11 @@ export const questions = pgTable(
   "questions",
   {
     id:         serial("id").primaryKey(),
-    packageId:  integer("package_id").notNull().references(() => tryoutPackages.id),
+    packageId:  integer("package_id").notNull().references(() => tryoutPackages.id, { onDelete: "cascade" }), // Cascade agar aman saat hapus paket
     kategori:   text("kategori", { enum: QUESTION_CATEGORIES }).notNull(),
     pertanyaan: text("pertanyaan").notNull(),
-    pilihan:    jsonb("pilihan").notNull(), // Disarankan nanti membuat type TS untuk struktur JSON ini
+    // OPTIMASI: Injeksi Type ke JSONB
+    pilihan:    jsonb("pilihan").$type<QuestionChoice[]>().notNull(),
     pembahasan: text("pembahasan").notNull(),
   },
   (table) => ({
@@ -147,19 +179,27 @@ export const questions = pgTable(
 );
 
 // ── 10. RIWAYAT UJIAN ──────────────────────────────────────────────────────
-export const tryoutHistories = pgTable("tryout_histories", {
-  id:           uuid("id").defaultRandom().primaryKey(),
-  userId:       uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  packageId:    integer("package_id").notNull().references(() => tryoutPackages.id),
-  skorTwk:      integer("skor_twk").notNull().default(0),
-  skorTiu:      integer("skor_tiu").notNull().default(0),
-  skorTkp:      integer("skor_tkp").notNull().default(0),
-  totalSkor:    integer("total_skor").notNull().default(0),
-  isLolos:      boolean("is_lolos").notNull().default(false),
-  jawabanSiswa: jsonb("jawaban_siswa").notNull(),
-  startTime:    timestamp("start_time").defaultNow(),
-  endTime:      timestamp("end_time"),
-});
+export const tryoutHistories = pgTable(
+  "tryout_histories", 
+  {
+    id:           uuid("id").defaultRandom().primaryKey(),
+    userId:       uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    packageId:    integer("package_id").notNull().references(() => tryoutPackages.id),
+    skorTwk:      integer("skor_twk").notNull().default(0),
+    skorTiu:      integer("skor_tiu").notNull().default(0),
+    skorTkp:      integer("skor_tkp").notNull().default(0),
+    totalSkor:    integer("total_skor").notNull().default(0),
+    isLolos:      boolean("is_lolos").notNull().default(false),
+    // OPTIMASI: Injeksi Type ke JSONB
+    jawabanSiswa: jsonb("jawaban_siswa").$type<Record<string, string>>().notNull(),
+    startTime:    timestamp("start_time").defaultNow(),
+    endTime:      timestamp("end_time"),
+  },
+  (table) => ({
+    // OPTIMASI: Wajib ada agar query "Riwayat Tryout Saya" bisa load instan
+    userIdIdx: index("tryout_histories_user_id_idx").on(table.userId),
+  })
+);
 
 // ==========================================
 // RELASI (RELATIONS)
@@ -179,7 +219,6 @@ export const packagesRelations = relations(tryoutPackages, ({ many }) => ({
   orders:    many(orders),
 }));
 
-// ✅ Relasi balik untuk Questions (sebelumnya belum ada)
 export const questionsRelations = relations(questions, ({ one }) => ({
   package: one(tryoutPackages, { fields: [questions.packageId], references: [tryoutPackages.id] }),
 }));
@@ -198,3 +237,16 @@ export const historiesRelations = relations(tryoutHistories, ({ one }) => ({
   user:    one(users,          { fields: [tryoutHistories.userId],    references: [users.id] }),
   package: one(tryoutPackages, { fields: [tryoutHistories.packageId], references: [tryoutPackages.id] }),
 }));
+
+// ==========================================
+// TYPE EXPORTS (UNTUK SHADCN & APP)
+// ==========================================
+export type User = typeof users.$inferSelect;
+export type TryoutPackage = typeof tryoutPackages.$inferSelect;
+export type Question = typeof questions.$inferSelect;
+export type Order = typeof orders.$inferSelect;
+export type TryoutHistory = typeof tryoutHistories.$inferSelect;
+
+// (Opsional) Export insert types jika Anda butuh validasi di form (Zod/React Hook Form)
+export type NewUser = typeof users.$inferInsert;
+export type NewOrder = typeof orders.$inferInsert;

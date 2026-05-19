@@ -1,8 +1,8 @@
 /**
  * app/tryout/[id]/pembahasan/page.tsx
  * * Async Server Component dinamis untuk menampilkan pembahasan tryout SKD.
- * Menghubungkan PostgreSQL via Drizzle ORM dengan NextAuth v5 session.
- * Sudah dioptimalkan dengan penayangan bobot distribusi poin per butir opsi jawaban.
+ * Dioptimalkan dengan Concurrent Promise.all, Partial Query (hanya kolom spesifik), 
+ * dan Defensive Parsing untuk performa rendering instan dan keandalan tinggi.
  */
 
 import type { Metadata } from "next";
@@ -11,7 +11,7 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { questions, tryoutHistories } from "@/db/database/schema";
-import { eq, and, desc, SQL } from "drizzle-orm";
+import { eq, and, desc, asc, SQL } from "drizzle-orm";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +20,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ArrowLeft, CheckCircle2, XCircle, BookOpen, ChevronRight, AlertCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, BookOpen, ChevronRight } from "lucide-react";
 
 // ==========================================
 // KONSTANTA & KONFIGURASI
@@ -69,7 +69,8 @@ const SUBTEST_CONFIG: Record<SubTest, { label: string; badgeClass: string }> = {
   },
 };
 
-const PilihanSchema = z.array(z.object({ opsi: z.string(), teks: z.string(), poin: z.number() }));
+// Skema Zod untuk berjaga-jaga memvalidasi JSONB dari DB
+const PilihanSchema = z.array(z.object({ opsi: z.string(), teks: z.string().optional(), poin: z.number() }));
 
 interface PembahasanPageProps {
   params: Promise<{ id: string }>;
@@ -91,52 +92,67 @@ export async function generateMetadata({ params }: PembahasanPageProps): Promise
 // KOMPONEN UTAMA (SERVER COMPONENT)
 // ==========================================
 export default async function PembahasanPage({ params, searchParams }: PembahasanPageProps) {
-  const { id } = await params;
-  const { historyId } = await searchParams;
+  // ── 1. PARALLEL RESOLUTION (Params, SearchParams, Auth) ──
+  const [resolvedParams, resolvedSearchParams, session] = await Promise.all([
+    params, 
+    searchParams, 
+    auth()
+  ]);
 
-  // ── 1. Validasi Otentikasi Sesi Sisi Server ──
-  const session = await auth();
+  const { id } = resolvedParams;
+  const { historyId } = resolvedSearchParams;
+
   if (!session?.user?.id) redirect(ROUTES.login(id));
 
-  // ── 2. Validasi Parameter ID Volume ──
   const volumeId = parseInt(id, 10);
   if (isNaN(volumeId) || volumeId < 1) notFound();
 
-  // ── 3. Merakit Kueri Riwayat Kondisional Berbasis Select Standar Drizzle ──
+  // ── 2. MERAKIT KONDISI KUERI RIWAYAT ──
   const queryConditions: SQL[] = [
     eq(tryoutHistories.userId, session.user.id),
     eq(tryoutHistories.packageId, volumeId)
   ];
-
   if (historyId) {
     queryConditions.push(eq(tryoutHistories.id, historyId));
   }
 
-  const riwayatList = await db
-    .select()
-    .from(tryoutHistories)
-    .where(and(...queryConditions))
-    .orderBy(desc(tryoutHistories.endTime))
-    .limit(1);
+  // ── 3. PARALLEL DATA FETCHING (Riwayat & Soal) ──
+  // Menarik Data Riwayat dan Bank Soal sekaligus memotong waktu akses database
+  const [history, soalList] = await Promise.all([
+    db.query.tryoutHistories.findFirst({
+      where: and(...queryConditions),
+      orderBy: [desc(tryoutHistories.endTime)],
+      columns: { jawabanSiswa: true }, // OPTIMASI: Hanya butuh jawaban siswa, abaikan kolom skor lain
+    }),
+    db.query.questions.findMany({
+      where: eq(questions.packageId, volumeId),
+      orderBy: [asc(questions.id)],
+      columns: {
+        id: true,
+        kategori: true,
+        pertanyaan: true,
+        pembahasan: true,
+        pilihan: true,
+      }, // OPTIMASI: Partial Select untuk memori yang lebih efisien
+    })
+  ]);
 
-  const history = riwayatList[0];
-  if (!history) notFound();
+  // Validasi ketersediaan data
+  if (!history || soalList.length === 0) notFound();
 
-  const jawabanSiswa = (history.jawabanSiswa as Record<string, string>) || {};
+  const jawabanSiswa = history.jawabanSiswa || {};
 
-  // ── 4. Ambil Daftar Bank Soal Berdasarkan Volume Paket Ujian ──
-  const soalList = await db
-    .select()
-    .from(questions)
-    .where(eq(questions.packageId, volumeId))
-    .orderBy(questions.id);
-
-  if (soalList.length === 0) notFound();
-
-  // ── 5. Sinkronisasi Gabungan Data Soal dengan Hasil Lembar Jawaban Siswa ──
+  // ── 4. SINKRONISASI DATA SOAL & HASIL UJIAN SISWA ──
   const enrichedSoal = soalList.map((soal, i) => {
-    const daftarPilihan = PilihanSchema.parse(soal.pilihan);
-    const jawabanBenar = daftarPilihan.reduce((a, b) => (a.poin >= b.poin ? a : b)).opsi;
+    // Parsing defensive dengan fallback array kosong jika data opsi corrupt
+    const parsed = PilihanSchema.safeParse(soal.pilihan);
+    const daftarPilihan = parsed.success ? parsed.data : [];
+    
+    // Cari jawaban poin tertinggi sebagai Kunci Jawaban Benar
+    const jawabanBenar = daftarPilihan.length > 0 
+      ? daftarPilihan.reduce((a, b) => (a.poin >= b.poin ? a : b)).opsi 
+      : "N/A";
+      
     const jawabanUser = jawabanSiswa[String(soal.id)] ?? null;
 
     return {
@@ -145,17 +161,26 @@ export default async function PembahasanPage({ params, searchParams }: Pembahasa
       subTest: soal.kategori as SubTest,
       pertanyaan: soal.pertanyaan,
       pembahasan: soal.pembahasan,
-      pilihan: daftarPilihan.map((p) => ({ opsi: p.opsi, teks: p.teks, poin: p.poin })), // ✅ Menyertakan poin ke frontend
+      pilihan: daftarPilihan, 
       jawabanBenar,
       jawabanUser,
     };
   });
 
-  const totalBenar = enrichedSoal.filter((s) => s.jawabanUser === s.jawabanBenar).length;
-  const totalSalah = enrichedSoal.filter((s) => s.jawabanUser !== null && s.jawabanUser !== s.jawabanBenar).length;
-  const totalKosong = enrichedSoal.filter((s) => s.jawabanUser === null).length;
+  // ── 5. KALKULASI STATISTIK RINGKAS ──
+  let totalBenar = 0;
+  let totalSalah = 0;
+  let totalKosong = 0;
+
+  for (const s of enrichedSoal) {
+    if (s.jawabanUser === null) totalKosong++;
+    else if (s.jawabanUser === s.jawabanBenar) totalBenar++;
+    else totalSalah++;
+  }
+
   const subtests: SubTest[] = ["TWK", "TIU", "TKP"];
 
+  // ── 6. RENDER KOMPONEN UI ──
   return (
     <div className="min-h-screen bg-background text-foreground py-10 px-4 md:px-8">
       <div className="max-w-4xl mx-auto space-y-8">
@@ -169,7 +194,7 @@ export default async function PembahasanPage({ params, searchParams }: Pembahasa
             </Link>
           </Button>
           <span className="text-xs font-semibold bg-muted text-muted-foreground px-3 py-1.5 rounded-full border border-border">
-            Vol. {volumeId} · {enrichedSoal.length} {TEXT_CONTENT.unitQuestions} Soal
+            Vol. {volumeId} · {enrichedSoal.length} {TEXT_CONTENT.unitQuestions}
           </span>
         </div>
 
@@ -263,7 +288,7 @@ export default async function PembahasanPage({ params, searchParams }: Pembahasa
                                   <span className="font-bold shrink-0">{p.opsi}.</span>
                                   <span className="flex-1">{p.teks}</span>
                                   
-                                  {/* ✅ EKSTRA INDIKATOR: Menampilkan bobot nilai tiap opsi (Sangat berguna untuk materi TKP) */}
+                                  {/* Indikator Bobot Poin Opsi */}
                                   <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md ${
                                     p.poin === 5 
                                       ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" 

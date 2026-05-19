@@ -1,8 +1,8 @@
 /**
  * app/dashboard/page.tsx
  * * Server Component Utama Dashboard Siswa.
- * Mengamankan sesi, menghitung manifes kepemilikan paket, dan menyusun grid volume tryout.
- * Sudah dioptimalkan dengan penambahan pengurutan sekuensial pada daftar paket.
+ * Dioptimalkan dengan Concurrent Database Fetching (Promise.all)
+ * dan Query Partial Selection untuk load time berkecepatan tinggi.
  */
 
 import type { Metadata } from "next";
@@ -11,7 +11,7 @@ import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
 import { db } from "@/db";
 import { userAccess, tryoutPackages } from "@/db/database/schema";
-import { eq, asc } from "drizzle-orm"; // ✅ Mengimpor 'asc' untuk pengurutan sekuensial
+import { eq, asc } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -68,22 +68,31 @@ export default async function DashboardPage() {
 
   const userId = session.user.id;
 
-  // ── 2. Ambil Riwayat Akses Paket Milik User ──
-  const accessList = await db
-    .select({ packageId: userAccess.packageId })
-    .from(userAccess)
-    .where(eq(userAccess.userId, userId));
+  // ── 2. Concurrent Fetching (Optimasi Load Time) ──
+  // Menarik Hak Akses User dan Daftar Paket Tryout secara bersamaan
+  const [accessList, packages] = await Promise.all([
+    // Ambil hanya packageId untuk meminimalkan beban bandwidth
+    db.query.userAccess.findMany({
+      where: eq(userAccess.userId, userId),
+      columns: { packageId: true },
+    }),
+    
+    // Ambil paket yang aktif dan hanya tarik kolom yang dipakai di UI
+    db.query.tryoutPackages.findMany({
+      where: eq(tryoutPackages.isActive, true),
+      orderBy: [asc(tryoutPackages.id)],
+      columns: {
+        id: true,
+        title: true,
+        price: true,
+      },
+    }),
+  ]);
 
+  // Ekstrak ID paket yang sudah terbuka ke struktur Set (O(1) lookup time)
   const unlockedIds = new Set(accessList.map((a) => a.packageId));
 
-  // ── 3. Ambil Semua Paket yang Aktif Berurutan Berdasarkan ID ──
-  const packages = await db
-    .select()
-    .from(tryoutPackages)
-    .where(eq(tryoutPackages.isActive, true))
-    .orderBy(asc(tryoutPackages.id)); // ✅ FIX: Kunci susunan letak grid agar konsisten sekuensial
-
-  // ── 4. Transformasi Data Paket Menjadi Volume Grid ──
+  // ── 3. Transformasi Data Paket Menjadi Volume Grid ──
   const volumes: TryoutVolume[] = packages.map((pkg) => ({
     id:          pkg.id,
     title:       pkg.title,
@@ -95,7 +104,7 @@ export default async function DashboardPage() {
     isAvailable: true,
   }));
 
-  // ── 5. Pengolahan Data Profil Ringkas User ──
+  // ── 4. Pengolahan Data Profil Ringkas User ──
   const userName  = session.user.name ?? "Pengguna";
   const userImage = session.user.image ?? undefined;
   const userInitials = userName

@@ -2,7 +2,7 @@
  * app/riwayat/page.tsx
  * * Async Server Component untuk menampilkan visualisasi riwayat pengerjaan tryout.
  * Terhubung langsung ke PostgreSQL melalui Drizzle ORM dan diproteksi auth v5.
- * Sudah dioptimalkan dengan penguncian parameter historyId pada tombol detail aksi.
+ * Dioptimalkan dengan Singleton Formatter (Zero CPU Leak) dan Relational Query Builder.
  */
 
 import type { Metadata } from "next";
@@ -39,7 +39,6 @@ const EXAM_THRESHOLDS = {
 const ROUTES = {
   loginRedirect: "/login?callbackUrl=/riwayat",
   dashboard: "/dashboard",
-  // ✅ FIX: Teruskan rute lengkap beserta search parameter historyId uniknya
   detailHasil: (packageId: number, historyId: string) => `/tryout/${packageId}/hasil?historyId=${historyId}`,
 } as const;
 
@@ -76,12 +75,19 @@ export const metadata: Metadata = {
   description: TEXT_CONTENT.metaDesc,
 };
 
+// ==========================================
+// OPTIMASI CPU: SINGLETON FORMATTER
+// ==========================================
+// Mencegah memory/CPU leak dengan meletakkan instance Intl di luar fungsi render.
+// Instance ini hanya dibuat satu kali selamanya di memori server.
+const dateTimeFormatter = new Intl.DateTimeFormat(APP_CONFIG.locale, {
+  day: "numeric", month: "long", year: "numeric",
+  hour: "2-digit", minute: "2-digit",
+});
+
 function formatTanggal(date: Date | null): string {
   if (!date) return "-";
-  return new Intl.DateTimeFormat(APP_CONFIG.locale, {
-    day: "numeric", month: "long", year: "numeric",
-    hour: "2-digit", minute: "2-digit",
-  }).format(date);
+  return dateTimeFormatter.format(date);
 }
 
 // ==========================================
@@ -93,6 +99,7 @@ export default async function RiwayatPage() {
   if (!session?.user?.id) redirect(ROUTES.loginRedirect);
 
   // 2. Tarik Data Komparatif Riwayat dari Database Relasional
+  // Anda sudah sangat brilian melakukan Partial Select (tidak mengambil JSON jawabanSiswa)
   const histories = await db
     .select({
       id:           tryoutHistories.id,
@@ -110,14 +117,20 @@ export default async function RiwayatPage() {
     .where(eq(tryoutHistories.userId, session.user.id))
     .orderBy(desc(tryoutHistories.endTime));
 
-  const totalUjian    = histories.length;
-  const totalLolos    = histories.filter((r) => r.isLolos).length;
-  const rerataSkor    = totalUjian > 0
-    ? Math.round(histories.reduce((acc, r) => acc + r.totalSkor, 0) / totalUjian)
-    : 0;
-  const skorTertinggi = totalUjian > 0
-    ? Math.max(...histories.map((r) => r.totalSkor))
-    : 0;
+  // 3. Kalkulasi Cepat Skalar
+  const totalUjian = histories.length;
+  let totalLolos = 0;
+  let akumulasiSkor = 0;
+  let skorTertinggi = 0;
+
+  // OPTIMASI: Menggunakan satu iterasi loop (O(n)) untuk seluruh perhitungan statistik
+  for (const r of histories) {
+    if (r.isLolos) totalLolos++;
+    akumulasiSkor += r.totalSkor;
+    if (r.totalSkor > skorTertinggi) skorTertinggi = r.totalSkor;
+  }
+
+  const rerataSkor = totalUjian > 0 ? Math.round(akumulasiSkor / totalUjian) : 0;
 
   return (
     <div className="min-h-screen bg-background text-foreground py-10 px-4 md:px-8">
@@ -248,7 +261,6 @@ export default async function RiwayatPage() {
                       <TableCell className="text-center">
                         <Button variant="ghost" size="sm" asChild
                           className="rounded-lg gap-1 text-primary hover:text-primary hover:bg-primary/10 transition-colors">
-                          {/* ✅ SEKARANG SYNC: Mengirim parameter volumeId dan historyId string secara akurat */}
                           <Link href={ROUTES.detailHasil(item.packageId, item.id)}>
                             {TEXT_CONTENT.btnDetail}
                             <ChevronRight className="w-3 h-3" />

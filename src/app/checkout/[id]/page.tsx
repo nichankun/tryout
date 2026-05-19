@@ -2,8 +2,8 @@
  * app/checkout/[id]/page.tsx
  *
  * Async Server Component untuk memproses halaman peninjauan belanja (Checkout).
- * Terintegrasi penuh dengan Drizzle ORM (Core Query), skema userAccess, dan sesi NextAuth v5.
- * Sudah dioptimalkan menggunakan arsitektur penulisan kueri Drizzle yang seragam dan type-safe.
+ * Dioptimalkan dengan Concurrent Data Fetching, Singleton Formatter, 
+ * dan Relational Partial Query Drizzle untuk performa tingkat tinggi.
  */
 
 import type { Metadata } from "next";
@@ -63,12 +63,20 @@ interface CheckoutPageProps {
   params: Promise<{ id: string }>;
 }
 
+// OPTIMASI: Singleton Instance untuk Intl.NumberFormat 
+// Mencegah pembuatan instance berulang kali yang memakan CPU Server
+const currencyFormatter = new Intl.NumberFormat(APP_CONFIG.locale, {
+  style: "currency",
+  currency: APP_CONFIG.currency,
+  minimumFractionDigits: 0,
+});
+
 function formatMataUang(amount: number): string {
-  return `Rp ${amount.toLocaleString(APP_CONFIG.locale)}`;
+  return currencyFormatter.format(amount);
 }
 
 // ==========================================
-// GENERATE METADATA DYNAMIC (Strict Core Query)
+// GENERATE METADATA DYNAMIC
 // ==========================================
 export async function generateMetadata({
   params,
@@ -77,12 +85,11 @@ export async function generateMetadata({
   const volumeId = parseInt(id, 10);
   if (isNaN(volumeId)) return { title: TEXT_CONTENT.metaTitleDefault };
 
-  const [pkg] = await db
-    .select({ title: tryoutPackages.title })
-    .from(tryoutPackages)
-    .where(eq(tryoutPackages.id, volumeId))
-    .limit(1);
-
+  // OPTIMASI: Drizzle Relational Query untuk syntax lebih rapi dan seleksi parsial
+  const pkg = await db.query.tryoutPackages.findFirst({
+    where: eq(tryoutPackages.id, volumeId),
+    columns: { title: true },
+  });
 
   return {
     title: pkg
@@ -95,62 +102,59 @@ export async function generateMetadata({
 // KOMPONEN UTAMA (SERVER COMPONENT)
 // ==========================================
 export default async function CheckoutPage({ params }: CheckoutPageProps) {
-  const { id } = await params;
-
-  // ── 1. Validasi Parameter ID Paket Volume ──
-  const volumeId = parseInt(id, 10);
+  // ── 1. PARALLEL RESOLUTION (Sesi & Params) ──
+  const [resolvedParams, session] = await Promise.all([params, auth()]);
+  
+  const volumeId = parseInt(resolvedParams.id, 10);
   if (isNaN(volumeId) || volumeId < 1) notFound();
 
-  // ── 2. Validasi Proteksi Keamanan Sesi Akun Pengguna ──
-  const session = await auth();
+  // ── 2. PROTEKSI SESI ──
   if (!session?.user?.id) redirect(ROUTES.loginRedirect(volumeId));
 
-  // ── 3. Ambil Data Informasi Paket Aktif Langsung Dari DB ──
-  const [pkg] = await db
-    .select()
-    .from(tryoutPackages)
-    .where(
-      and(
+  // ── 3. PARALLEL DATA FETCHING (Kunci Performa Utama) ──
+  // Menarik Data Paket sekaligus memeriksa Kepemilikan Akses secara bersamaan
+  const [pkg, ownedAccess] = await Promise.all([
+    // Ambil Data Paket Tryout
+    db.query.tryoutPackages.findFirst({
+      where: and(
         eq(tryoutPackages.id, volumeId),
         eq(tryoutPackages.isActive, true)
-      )
-    )
-    .limit(1);
-
-  if (!pkg) notFound();
-console.log("[CHECKOUT DEBUG] pkg:", pkg);
-console.log("[CHECKOUT DEBUG] pkg.price:", pkg?.price, typeof pkg?.price);
-  // ── 3b. ✅ REDIRECT OTOMATIS JIKA PAKET GRATIS ──
-  // Insert akses langsung tanpa perlu pembayaran, lalu redirect ke ruang ujian.
- if (pkg.price === 0) {
-  try {
-    await db
-      .insert(userAccess)
-      .values({ userId: session.user.id, packageId: volumeId })
-      .onConflictDoNothing();
-  } catch (err) {
-    console.error("[INSERT ERROR]", err);
-  }
-
-  console.log("[REDIRECT] Menuju:", ROUTES.tryoutDashboard(volumeId));
-  redirect(ROUTES.tryoutDashboard(volumeId));
-}
-
-  // ── 4. Validasi Status Kepemilikan (Pencegahan Pembelian Ganda) ──
-  const [owned] = await db
-    .select()
-    .from(userAccess)
-    .where(
-      and(
+      ),
+      columns: { title: true, description: true, price: true }, // Partial Select
+    }),
+    
+    // Cek Akses Kepemilikan User
+    db.query.userAccess.findFirst({
+      where: and(
         eq(userAccess.userId, session.user.id),
         eq(userAccess.packageId, volumeId)
-      )
-    )
-    .limit(1);
+      ),
+      columns: { id: true }, // Cukup ambil ID untuk cek eksistensi
+    })
+  ]);
 
-  if (owned) redirect(ROUTES.tryoutDashboard(volumeId));
+  // Jika paket tidak ada atau tidak aktif
+  if (!pkg) notFound();
 
-  // ── 5. Hitung total pembayaran (hanya untuk paket berbayar) ──
+  // ── 4. PENCEGAHAN PEMBELIAN GANDA ──
+  // Jika sudah punya akses, lewati checkout dan langsung ke ruang ujian
+  if (ownedAccess) redirect(ROUTES.tryoutDashboard(volumeId));
+
+  // ── 5. REDIRECT OTOMATIS JIKA PAKET GRATIS ──
+  if (pkg.price === 0) {
+    try {
+      await db
+        .insert(userAccess)
+        .values({ userId: session.user.id, packageId: volumeId })
+        .onConflictDoNothing();
+    } catch (err) {
+      console.error(`[Checkout Error] Gagal memberikan akses gratis. User: ${session.user.id}, Vol: ${volumeId}`, err);
+    }
+    // Wajib di luar try-catch karena redirect melemparkan error (Next.js logic)
+    redirect(ROUTES.tryoutDashboard(volumeId));
+  }
+
+  // ── 6. KALKULASI TOTAL BIAYA ──
   const totalPembayaran = pkg.price + APP_CONFIG.adminFee;
 
   return (

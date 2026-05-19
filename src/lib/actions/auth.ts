@@ -1,7 +1,9 @@
 "use server";
 
 /**
- * lib/actions/auth.ts — Production Version (Optimized & Clean)
+ * lib/actions/auth.ts — Production Version (Ultra-Optimized)
+ * Dioptimalkan dengan Zod Validation, Drizzle Atomic Transactions, 
+ * Token Garbage Collection, dan Partial Queries.
  */
 
 import { signIn } from "@/auth"; 
@@ -11,19 +13,17 @@ import { users, verificationTokens, passwordResetTokens } from "@/db/database/sc
 import { eq, and } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { Resend } from "resend";
+import { z } from "zod";
 
 // ==========================================
-// KONFIGURASI INTERNAL (Tidak Boleh Diekspor)
+// KONFIGURASI INTERNAL & SCHEMAS
 // ==========================================
 const resend = new Resend(process.env.RESEND_API_KEY);
-
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 const AUTH_CONFIG = {
   bcryptSaltRounds: 12,
-  tokenExpiryMs: 3600000, // 1 jam masa berlaku token
-  minPasswordLength: 8,
-  minNameLength: 2,
+  tokenExpiryMs: 3600000, // 1 jam
 } as const;
 
 const EMAIL_CONFIG = {
@@ -37,9 +37,6 @@ const EMAIL_CONFIG = {
 const AUTH_ERRORS = {
   invalid_credentials: "invalid_credentials",
   email_not_verified: "email_not_verified",
-  invalid_name: "invalid_name",
-  invalid_email: "invalid_email",
-  weak_password: "weak_password",
   email_taken: "email_taken",
   invalid_fields: "invalid_fields",
   invalid_token: "invalid_token",
@@ -48,6 +45,28 @@ const AUTH_ERRORS = {
 } as const;
 
 type ActionResult = { error: string } | null;
+
+// ── ZOD SCHEMAS (Validasi Server-Side yang Kuat) ──
+const LoginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
+
+const RegisterSchema = z.object({
+  name: z.string().min(2).trim(),
+  email: z.string().email().toLowerCase(),
+  password: z.string().min(8),
+});
+
+const ForgotPasswordSchema = z.object({
+  email: z.string().email().toLowerCase(),
+});
+
+const ResetPasswordSchema = z.object({
+  email: z.string().email().toLowerCase(),
+  token: z.string().uuid(), // Token harus berupa UUID valid
+  password: z.string().min(8),
+});
 
 // ==========================================
 // HELPER: TEMPLATE EMAIL REUSABLE
@@ -59,7 +78,7 @@ function generateEmailLayout(title: string, body: string, actionText: string, ac
       <p style="color: #475569; line-height: 1.6;">${body}</p>
       <a href="${actionLink}" style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; margin: 20px 0;">${actionText}</a>
       ${description ? `<p style="color: #475569; line-height: 1.6;">${description}</p>` : ""}
-      <p style="color: #94a3b8; font-size: 12px;">Tautan ini aman dan hanya berlaku selama 1 hour.</p>
+      <p style="color: #94a3b8; font-size: 12px;">Tautan ini aman dan hanya berlaku selama 1 jam.</p>
     </div>
   `;
 }
@@ -68,29 +87,22 @@ function generateEmailLayout(title: string, body: string, actionText: string, ac
 // 1. LOGIN ACTION
 // ─────────────────────────────────────────
 export async function loginAction(formData: FormData): Promise<ActionResult> {
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
-
-  if (!email || !email.includes("@") || !password) {
-    return { error: AUTH_ERRORS.invalid_credentials };
-  }
+  const parsed = LoginSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: AUTH_ERRORS.invalid_credentials };
 
   try {
-    // Memanggil NextAuth untuk memproses validasi di auth.ts
     await signIn("credentials", {
-      email,
-      password,
-      redirect: false, // Handle redirect secara aman di sisi client (via proxy.ts)
+      email: parsed.data.email,
+      password: parsed.data.password,
+      redirect: false,
     });
     
-    return null; // Sukses, tidak ada error
+    return null;
   } catch (error) {
     if (error instanceof AuthError) {
-      // Tangkap custom error dari auth.ts jika email belum diverifikasi
       if (error.cause?.err?.message === AUTH_ERRORS.email_not_verified) {
         return { error: AUTH_ERRORS.email_not_verified };
       }
-
       switch (error.type) {
         case "CredentialsSignin":
           return { error: AUTH_ERRORS.invalid_credentials };
@@ -98,7 +110,7 @@ export async function loginAction(formData: FormData): Promise<ActionResult> {
           return { error: AUTH_ERRORS.something_went_wrong };
       }
     }
-    throw error;
+    throw error; // Wajib di-throw agar Next.js bisa memproses redirect (jika ada)
   }
 }
 
@@ -106,64 +118,59 @@ export async function loginAction(formData: FormData): Promise<ActionResult> {
 // 2. REGISTER ACTION
 // ─────────────────────────────────────────
 export async function registerAction(formData: FormData): Promise<ActionResult> {
-  const name = formData.get("name") as string;
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
+  const parsed = RegisterSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: AUTH_ERRORS.invalid_fields };
 
-  // Validasi input server-side menggunakan konfigurasi tersentralisasi
-  if (!name || name.trim().length < AUTH_CONFIG.minNameLength) return { error: AUTH_ERRORS.invalid_name };
-  if (!email || !email.includes("@")) return { error: AUTH_ERRORS.invalid_email };
-  if (!password || password.length < AUTH_CONFIG.minPasswordLength) return { error: AUTH_ERRORS.weak_password };
+  const { name, email, password } = parsed.data;
 
   try {
-    // 1. Cek apakah email sudah terdaftar di database via Drizzle
+    // OPTIMASI: Partial Query, hanya mengambil ID
     const existingUser = await db.query.users.findFirst({
       where: eq(users.email, email),
+      columns: { id: true } 
     });
 
-    if (existingUser) {
-      return { error: AUTH_ERRORS.email_taken };
-    }
+    if (existingUser) return { error: AUTH_ERRORS.email_taken };
 
-    // 2. Hash password menggunakan bcrypt
     const hashedPassword = await bcrypt.hash(password, AUTH_CONFIG.bcryptSaltRounds);
-
-    // 3. Simpan user baru (kolom emailVerified otomatis null/belum aktif)
-    await db.insert(users).values({
-      name: name.trim(),
-      email: email,
-      passwordHash: hashedPassword,
-    });
-
-    // 4. Generate token verifikasi unik (UUID v4)
     const token = crypto.randomUUID();
     const expires = new Date(Date.now() + AUTH_CONFIG.tokenExpiryMs);
 
-    // 5. Simpan token ke tabel verificationToken
-    await db.insert(verificationTokens).values({
-      identifier: email,
-      token: token,
-      expires: expires,
+    // OPTIMASI: Transaksi Atomic. Insert User & Hapus Token Lama & Insert Token Baru
+    await db.transaction(async (tx) => {
+      await tx.insert(users).values({
+        name,
+        email,
+        passwordHash: hashedPassword,
+      });
+
+      // GARBAGE COLLECTION: Hapus token verifikasi lama jika user mencoba register ulang dengan email sama
+      await tx.delete(verificationTokens).where(eq(verificationTokens.identifier, email));
+
+      await tx.insert(verificationTokens).values({
+        identifier: email,
+        token,
+        expires,
+      });
     });
 
-    // 6. Kirim email verifikasi menggunakan Resend secara aman (URL encoded)
+    // Jalankan email async (tidak nge-block proses database)
     const verificationLink = `${APP_URL}/verify-email?token=${token}&email=${encodeURIComponent(email)}`;
-
     await resend.emails.send({
       from: EMAIL_CONFIG.sender,
       to: email,
       subject: EMAIL_CONFIG.subjects.verify,
       html: generateEmailLayout(
-        `Halo ${name.trim()}, Terima kasih telah mendaftar!`,
+        `Halo ${name}, Terima kasih telah mendaftar!`,
         "Langkah terakhir, silakan klik tombol di bawah ini untuk memverifikasi alamat email Anda agar bisa mengakses Dashboard ASNPedia:",
         "Verifikasi Email",
         verificationLink
       ),
     });
 
-    return null; // Sukses
+    return null;
   } catch (error) {
-    console.error("[Server Action] Error register:", error);
+    console.error("[Register Action Error]:", error);
     return { error: AUTH_ERRORS.something_went_wrong };
   }
 }
@@ -172,30 +179,34 @@ export async function registerAction(formData: FormData): Promise<ActionResult> 
 // 3. FORGOT PASSWORD ACTION
 // ─────────────────────────────────────────
 export async function forgotPasswordAction(formData: FormData): Promise<ActionResult> {
-  const email = formData.get("email") as string;
+  const parsed = ForgotPasswordSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: AUTH_ERRORS.invalid_fields };
 
-  if (!email || !email.includes("@")) return { error: AUTH_ERRORS.invalid_email };
+  const { email } = parsed.data;
 
   try {
+    // OPTIMASI: Partial Query, hanya butuh passwordHash untuk tahu ini akun credentials atau OAuth
     const user = await db.query.users.findFirst({
       where: eq(users.email, email),
+      columns: { passwordHash: true }
     });
 
-    // Keamanan: Jika user tidak ada atau daftar via Google, return null (pura-pura sukses)
-    // agar pihak luar tidak bisa mendeteksi email siapa saja yang terdaftar di sistem.
-    if (!user || !user.passwordHash) return null;
+    if (!user || !user.passwordHash) return null; // Keamanan Anti-Enumeration
 
     const token = crypto.randomUUID();
     const expires = new Date(Date.now() + AUTH_CONFIG.tokenExpiryMs);
 
-    await db.insert(passwordResetTokens).values({
-      identifier: email,
-      token: token,
-      expires: expires,
+    // GARBAGE COLLECTION: Hapus token reset lama agar tidak menumpuk di DB
+    await db.transaction(async (tx) => {
+      await tx.delete(passwordResetTokens).where(eq(passwordResetTokens.identifier, email));
+      await tx.insert(passwordResetTokens).values({
+        identifier: email,
+        token,
+        expires,
+      });
     });
 
     const resetLink = `${APP_URL}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
-
     await resend.emails.send({
       from: EMAIL_CONFIG.sender,
       to: email,
@@ -211,7 +222,7 @@ export async function forgotPasswordAction(formData: FormData): Promise<ActionRe
 
     return null;
   } catch (error) {
-    console.error("[Server Action] Error forgot password:", error);
+    console.error("[Forgot Password Error]:", error);
     return { error: AUTH_ERRORS.something_went_wrong };
   }
 }
@@ -220,47 +231,44 @@ export async function forgotPasswordAction(formData: FormData): Promise<ActionRe
 // 4. RESET PASSWORD ACTION
 // ─────────────────────────────────────────
 export async function resetPasswordAction(formData: FormData): Promise<ActionResult> {
-  const email = formData.get("email") as string;
-  const token = formData.get("token") as string;
-  const password = formData.get("password") as string;
+  const parsed = ResetPasswordSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: AUTH_ERRORS.invalid_fields };
 
-  if (!email || !token || !password || password.length < AUTH_CONFIG.minPasswordLength) {
-    return { error: AUTH_ERRORS.invalid_fields };
-  }
+  const { email, token, password } = parsed.data;
 
   try {
-    // 1. Validasi kecocokan token dan email di database
+    // 1. Validasi kecocokan token
     const existingToken = await db.query.passwordResetTokens.findFirst({
       where: and(
         eq(passwordResetTokens.identifier, email),
         eq(passwordResetTokens.token, token)
       ),
+      columns: { expires: true }
     });
 
     if (!existingToken) return { error: AUTH_ERRORS.invalid_token };
 
-    // 2. Periksa apakah token sudah kedaluwarsa
-    const hasExpired = new Date(existingToken.expires) < new Date();
-    if (hasExpired) {
+    // 2. Periksa expiry
+    if (new Date(existingToken.expires) < new Date()) {
       await db.delete(passwordResetTokens).where(eq(passwordResetTokens.token, token));
       return { error: AUTH_ERRORS.token_expired };
     }
 
-    // 3. Hash kata sandi baru menggunakan bcrypt
     const hashedPassword = await bcrypt.hash(password, AUTH_CONFIG.bcryptSaltRounds);
 
-    // 4. Update data kata sandi user di database
-    await db
-      .update(users)
-      .set({ passwordHash: hashedPassword })
-      .where(eq(users.email, email));
+    // 3. OPTIMASI: Atomic Transaction (Ganti Password sekaligus buang Token)
+    await db.transaction(async (tx) => {
+      await tx.update(users)
+        .set({ passwordHash: hashedPassword })
+        .where(eq(users.email, email));
 
-    // 5. Hapus token reset yang sudah sukses digunakan
-    await db.delete(passwordResetTokens).where(eq(passwordResetTokens.token, token));
+      await tx.delete(passwordResetTokens)
+        .where(eq(passwordResetTokens.token, token));
+    });
 
     return null;
   } catch (error) {
-    console.error("[Server Action] Error reset password:", error);
+    console.error("[Reset Password Error]:", error);
     return { error: AUTH_ERRORS.something_went_wrong };
   }
 }

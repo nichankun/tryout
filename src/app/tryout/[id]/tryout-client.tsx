@@ -2,11 +2,13 @@
 
 /**
  * app/tryout/[id]/tryout-client.tsx
- * * Client Component Simulator CAT Premium (100% Strict Type Safe).
- * Menyatukan Desain Premium Shadcn UI Anda dengan Engine Auto-Save & Server Action Produksi.
+ * * Client Component Simulator CAT Premium (100% Strict Type Safe & Ultra Optimized).
+ * Arsitektur diperbarui untuk mencegah re-render global setiap detik akibat timer.
+ * Menggunakan useTransition untuk eksekusi Server Action yang non-blocking.
  */
 
 import * as React from "react";
+import { useTransition, useCallback, useMemo, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card";
@@ -70,7 +72,7 @@ interface Question {
   id: number;
   kategori: SubTest;
   pertanyaan: string;
-  pilihan: { opsi: string; teks: string }[];
+  pilihan: { opsi: string; teks: string; poin?: number }[];
 }
 
 interface UserAnswer {
@@ -86,11 +88,40 @@ interface TryoutClientProps {
   userImage?: string;
 }
 
-function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60).toString().padStart(2, "0");
-  const s = (seconds % 60).toString().padStart(2, "0");
-  return `${m}:${s}`;
-}
+// ==========================================
+// OPTIMASI: ISOLATED TIMER COMPONENT
+// Mencegah re-render seluruh halaman setiap detik. Hanya komponen kecil ini yang re-render.
+// ==========================================
+const ExamTimer = React.memo(({ endTime, onExpire }: { endTime: number; onExpire: () => void }) => {
+  const [timeLeft, setTimeLeft] = useState(() => Math.max(0, Math.floor((endTime - Date.now()) / 1000)));
+
+  useEffect(() => {
+    if (timeLeft <= 0) {
+      onExpire();
+      return;
+    }
+    const interval = setInterval(() => {
+      const newTimeLeft = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
+      setTimeLeft(newTimeLeft);
+      if (newTimeLeft <= 0) onExpire();
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [endTime, timeLeft, onExpire]);
+
+  const isWarning = timeLeft < TIMER_CONFIG.warningThresholdSeconds;
+  const m = Math.floor(timeLeft / 60).toString().padStart(2, "0");
+  const s = (timeLeft % 60).toString().padStart(2, "0");
+
+  return (
+    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border font-mono font-bold text-sm transition-colors
+      ${isWarning ? "bg-destructive/10 border-destructive/20 text-destructive" : "bg-muted border-border text-muted-foreground"}`}
+    >
+      <Clock className="w-4 h-4" />
+      <span>{m}:{s}</span>
+    </div>
+  );
+});
+ExamTimer.displayName = "ExamTimer";
 
 // ==========================================
 // RUNTIME DESCRIPTOR ENGINE Component
@@ -102,62 +133,54 @@ export default function TryoutClient({
   userName,
   userImage,
 }: TryoutClientProps) {
-  const [activeId, setActiveId] = React.useState<number>(questions[0]?.id ?? 1);
-  const [answers, setAnswers] = React.useState<Record<number, UserAnswer>>({});
-  const [timeLeft, setTimeLeft] = React.useState<number>(TIMER_CONFIG.durationSeconds);
-  const [isSubmitting, setIsSubmitting] = React.useState<boolean>(false);
+  const [activeId, setActiveId] = useState<number>(questions[0]?.id ?? 1);
+  const [answers, setAnswers] = useState<Record<number, UserAnswer>>({});
+  const [endTime, setEndTime] = useState<number | null>(null);
+  
+  // React 18+ Transition untuk mencegah UI freeze saat memanggil Server Action
+  const [isPending, startTransition] = useTransition();
 
   const STORAGE_KEY = `cat_exam_session_vol_${volumeId}`;
   const userInitials = userName.split(" ").slice(0, 2).map((n) => n[0]).join("").toUpperCase();
 
-  // ── 1. SINKRONISASI LOG STATE (LOCAL STORAGE AUTO-SAVE) ──
-  React.useEffect(() => {
+  // ── 1. SINKRONISASI LOG STATE (LOCAL STORAGE) ──
+  useEffect(() => {
     const savedSession = localStorage.getItem(STORAGE_KEY);
     if (savedSession) {
       try {
         const parsed = JSON.parse(savedSession);
         setAnswers(parsed.answers || {});
         
-        const elapsed = Math.floor((Date.now() - parsed.timestamp) / 1000);
-        const calculatedTime = parsed.timeLeft - elapsed;
-        setTimeLeft(calculatedTime > 0 ? calculatedTime : 0);
+        // Cek apakah waktu sudah kedaluwarsa dari backup
+        if (parsed.endTime && parsed.endTime > Date.now()) {
+          setEndTime(parsed.endTime);
+        } else {
+          setEndTime(Date.now() + TIMER_CONFIG.durationSeconds * 1000);
+        }
       } catch {
         console.error("Gagal memuat restasi backup log sesi ujian.");
       }
     } else {
-      // Setup struktur awal kosong jika tidak ada data backup session
+      // Inisialisasi awal
       setAnswers(
         Object.fromEntries(
           questions.map((q) => [q.id, { selectedKey: null, status: "unanswered" as AnswerStatus }])
         )
       );
+      setEndTime(Date.now() + TIMER_CONFIG.durationSeconds * 1000);
     }
   }, [STORAGE_KEY, questions]);
 
-  React.useEffect(() => {
-    if (Object.keys(answers).length === 0) return;
-    const sessionPayload = {
-      answers,
-      timeLeft,
-      timestamp: Date.now(),
-    };
+  // OPTIMASI: Hanya simpan ke LocalStorage jika `answers` berubah, bukan setiap detik!
+  useEffect(() => {
+    if (Object.keys(answers).length === 0 || !endTime) return;
+    const sessionPayload = { answers, endTime };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionPayload));
-  }, [answers, timeLeft, STORAGE_KEY]);
+  }, [answers, endTime, STORAGE_KEY]);
 
-  // ── 2. ENGINE TIMER COUNTDOWN ──
-  React.useEffect(() => {
-    if (timeLeft <= 0) {
-      handleAutoSubmit();
-      return;
-    }
-    const interval = setInterval(() => {
-      setTimeLeft((prev) => prev - 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [timeLeft]);
 
-  // ── 3. USER INTERACTION METHODS ──
-  const handleAnswer = (key: string) => {
+  // ── 2. USER INTERACTION METHODS (Gunakan useCallback agar referensi stabil) ──
+  const handleAnswer = useCallback((key: string) => {
     setAnswers((prev) => ({
       ...prev,
       [activeId]: {
@@ -165,62 +188,75 @@ export default function TryoutClient({
         status: prev[activeId]?.status === "flagged" ? "flagged" : "answered",
       },
     }));
-  };
+  }, [activeId]);
 
-  const handleFlag = () => {
-    const currentStatus = answers[activeId]?.status;
-    setAnswers((prev) => ({
-      ...prev,
-      [activeId]: {
-        ...prev[activeId],
-        status: currentStatus === "flagged" ? (prev[activeId]?.selectedKey ? "answered" : "unanswered") : "flagged",
-      },
-    }));
-  };
+  const handleFlag = useCallback(() => {
+    setAnswers((prev) => {
+      const current = prev[activeId];
+      return {
+        ...prev,
+        [activeId]: {
+          ...current,
+          status: current?.status === "flagged" 
+            ? (current?.selectedKey ? "answered" : "unanswered") 
+            : "flagged",
+        },
+      };
+    });
+  }, [activeId]);
 
-  const handleAutoSubmit = () => {
+  const handleSubmitUjian = useCallback(() => {
+    if (isPending) return;
+    
+    // Gunakan transisi agar animasi "Mengirim..." muncul tanpa memblokir browser
+    startTransition(async () => {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+        await submitTryoutAction({ volumeId, answers });
+      } catch (error) {
+        console.error("Gagal memproses pengiriman data lembar ujian:", error);
+        alert("Terjadi masalah jaringan sewaktu menyerahkan lembar ujian Anda.");
+      }
+    });
+  }, [isPending, volumeId, answers, STORAGE_KEY]);
+
+  const handleAutoSubmit = useCallback(() => {
     alert("Waktu pengerjaan simulasi telah habis! Sistem otomatis mengunci lembar jawaban Anda.");
     handleSubmitUjian();
-  };
+  }, [handleSubmitUjian]);
 
-  const handleSubmitUjian = async () => {
-    if (isSubmitting) return;
-    setIsSubmitting(true);
 
-    try {
-      // Hapus backup lokal sesaat sebelum melempar muatan payload ke database
-      localStorage.removeItem(STORAGE_KEY);
+  // ── 3. DERIVED METRICS (Gunakan useMemo untuk kalkulasi berat) ──
+  const { currentQuestion, currentIdx } = useMemo(() => {
+    const idx = questions.findIndex((q) => q.id === activeId);
+    return { currentQuestion: questions[idx] || questions[0], currentIdx: idx !== -1 ? idx : 0 };
+  }, [activeId, questions]);
 
-      // Tembak langsung ke Server Action Produksi Anda (Strict Match)
-      await submitTryoutAction({
-        volumeId,
-        answers,
-      });
-    } catch (error) {
-      console.error("Gagal memproses pengiriman data lembar ujian:", error);
-      alert("Terjadi masalah jaringan sewaktu menyerahkan lembar ujian Anda.");
-      setIsSubmitting(false);
-    }
-  };
+  const { answeredCount, flaggedCount, unansweredCount, progressPercent } = useMemo(() => {
+    const vals = Object.values(answers);
+    const ansCount = vals.filter((a) => a.status === "answered").length;
+    const flgCount = vals.filter((a) => a.status === "flagged").length;
+    return {
+      answeredCount: ansCount,
+      flaggedCount: flgCount,
+      unansweredCount: questions.length - ansCount - flgCount,
+      progressPercent: questions.length > 0 ? Math.round((ansCount / questions.length) * 100) : 0
+    };
+  }, [answers, questions.length]);
 
-  // ── 4. DERIVED METRICS STATES ──
-  const currentQuestion = questions.find((q) => q.id === activeId) || questions[0];
   const currentAnswer = answers[activeId];
-  const currentIdx = questions.findIndex((q) => q.id === activeId);
 
-  const answeredCount = Object.values(answers).filter((a) => a.status === "answered").length;
-  const flaggedCount = Object.values(answers).filter((a) => a.status === "flagged").length;
-  const unansweredCount = questions.length - answeredCount - flaggedCount;
-  const progressPercent = questions.length > 0 ? Math.round((answeredCount / questions.length) * 100) : 0;
-  const isWarning = timeLeft < TIMER_CONFIG.warningThresholdSeconds;
-
-  function getNavStyle(qId: number, index: number) {
+  // Helper function untuk style navigasi grid
+  const getNavStyle = useCallback((qId: number) => {
     if (qId === activeId) return "bg-primary text-primary-foreground ring-2 ring-primary/20";
     const s = answers[qId]?.status;
     if (s === "answered") return "bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20";
     if (s === "flagged") return "bg-amber-500/10 text-amber-600 border border-amber-500/20 dark:text-amber-400 hover:bg-amber-500/20";
     return "bg-card text-muted-foreground border border-border hover:border-primary/50 hover:text-primary";
-  }
+  }, [activeId, answers]);
+
+  // Hindari render blank state sebelum endTime terhitung
+  if (!endTime) return null;
 
   return (
     <TooltipProvider>
@@ -241,12 +277,8 @@ export default function TryoutClient({
             </div>
 
             <div className="flex items-center gap-4">
-              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border font-mono font-bold text-sm
-                ${isWarning ? "bg-destructive/10 border-destructive/20 text-destructive" : "bg-muted border-border text-muted-foreground"}`}
-              >
-                <Clock className="w-4 h-4" />
-                <span>{formatTime(timeLeft)}</span>
-              </div>
+              {/* Komponen Timer Di-Isolasi */}
+              <ExamTimer endTime={endTime} onExpire={handleAutoSubmit} />
 
               <Avatar className="h-9 w-9 border border-border">
                 <AvatarImage src={userImage} alt={userName} />
@@ -380,7 +412,7 @@ export default function TryoutClient({
                       <button
                         key={q.id}
                         onClick={() => setActiveId(q.id)}
-                        className={`h-9 w-full rounded-lg text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary font-mono ${getNavStyle(q.id, idx)}`}
+                        className={`h-9 w-full rounded-lg text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary font-mono ${getNavStyle(q.id)}`}
                       >
                         {(idx + 1).toString().padStart(2, "0")}
                       </button>
@@ -390,8 +422,8 @@ export default function TryoutClient({
 
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold" disabled={isSubmitting}>
-                      {isSubmitting ? (
+                    <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold" disabled={isPending}>
+                      {isPending ? (
                         <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{TEXT_CONTENT.btnSubmitting}</>
                       ) : (
                         <><CheckCircle2 className="w-4 h-4 mr-2" />{TEXT_CONTENT.btnSubmit}</>
@@ -408,9 +440,13 @@ export default function TryoutClient({
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>{TEXT_CONTENT.alertCancel}</AlertDialogCancel>
-                      <AlertDialogAction className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleSubmitUjian}>
-                        {TEXT_CONTENT.alertConfirm}
+                      <AlertDialogCancel disabled={isPending}>{TEXT_CONTENT.alertCancel}</AlertDialogCancel>
+                      <AlertDialogAction 
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white" 
+                        onClick={handleSubmitUjian}
+                        disabled={isPending}
+                      >
+                        {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : TEXT_CONTENT.alertConfirm}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>

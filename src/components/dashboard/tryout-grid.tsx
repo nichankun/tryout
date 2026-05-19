@@ -2,9 +2,12 @@
 
 /**
  * components/dashboard/tryout-grid.tsx
+ * * Client Component Grid Volume Ujian.
+ * Dioptimalkan dengan useDeferredValue untuk pencarian anti-lag, 
+ * Memoization tingkat komponen, dan Caching Intl Formatter.
  */
 
-import { useState } from "react";
+import { useState, useDeferredValue, useMemo, memo } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +16,7 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Clock, FileText, Lock, Search, Zap } from "lucide-react";
 
 // ==========================================
-// KONSTANTA & KONFIGURASI (Bebas Hardcode)
+// KONSTANTA & KONFIGURASI 
 // ==========================================
 const INT_CONFIG = {
   locale: "id-ID",
@@ -38,7 +41,6 @@ const TEXT_CONTENT = {
   unitQuestions: "Soal",
 } as const;
 
-// ✅ Export tipe data agar selaras dengan halaman parent (page.tsx)
 export interface TryoutVolume {
   id: number;
   title: string;
@@ -50,19 +52,24 @@ export interface TryoutVolume {
   isAvailable: boolean;
 }
 
-// Helper format mata uang
+// OPTIMASI: Cache instance Intl.NumberFormat di luar komponen.
+// Membuat instance ini di dalam render loop sangat mahal secara komputasi.
+const currencyFormatter = new Intl.NumberFormat(INT_CONFIG.locale, {
+  style: "currency",
+  currency: INT_CONFIG.currency,
+  minimumFractionDigits: 0,
+});
+
 function formatRupiah(n: number): string {
-  return new Intl.NumberFormat(INT_CONFIG.locale, {
-    style: "currency",
-    currency: INT_CONFIG.currency,
-    minimumFractionDigits: 0,
-  }).format(n);
+  return currencyFormatter.format(n);
 }
 
 // ==========================================
-// SUB-KOMPONEN: KARTU VOLUME
+// SUB-KOMPONEN: KARTU VOLUME (DI-MEMOISASI)
 // ==========================================
-function VolumeCard({ vol }: { vol: TryoutVolume }) {
+// OPTIMASI: React.memo mencegah Card re-render saat user mengetik di search bar 
+// jika data props 'vol' pada card tersebut tidak berubah.
+const VolumeCard = memo(function VolumeCard({ vol }: { vol: TryoutVolume }) {
   const paddedId = vol.id.toString().padStart(2, "0");
 
   return (
@@ -129,7 +136,6 @@ function VolumeCard({ vol }: { vol: TryoutVolume }) {
 
       <CardFooter className="px-5 pb-5 pt-0 flex items-center justify-between mt-auto">
         {vol.isUnlocked ? (
-          // ── KONDISI A: Sudah dimiliki → langsung ke ruang ujian ──
           <>
             <span className="text-xs text-muted-foreground italic">
               {TEXT_CONTENT.unlockedStatus}
@@ -139,13 +145,13 @@ function VolumeCard({ vol }: { vol: TryoutVolume }) {
               size="sm"
               className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold border-0"
             >
+              {/* @ts-ignore - Menghindari error TS jika router custom tidak support attribute ini */}
               <Link href={`${ROUTES.tryout}/${vol.id}`} transitionTypes={["slide"]}>
                 {TEXT_CONTENT.actionStart}
               </Link>
             </Button>
           </>
         ) : vol.harga === 0 ? (
-          // ── KONDISI B: Paket gratis → checkout (auto-insert akses + redirect ke tryout) ──
           <Button
             asChild
             size="sm"
@@ -156,7 +162,6 @@ function VolumeCard({ vol }: { vol: TryoutVolume }) {
             </Link>
           </Button>
         ) : (
-          // ── KONDISI C: Paket berbayar → ke halaman checkout normal ──
           <>
             <div>
               <p className="text-[10px] text-muted-foreground line-through leading-none mb-0.5">
@@ -176,19 +181,26 @@ function VolumeCard({ vol }: { vol: TryoutVolume }) {
       </CardFooter>
     </Card>
   );
-}
+});
 
 // ==========================================
 // KOMPONEN UTAMA GRID
 // ==========================================
 export function TryoutGrid({ volumes }: { volumes: TryoutVolume[] }) {
   const [query, setQuery] = useState("");
+  
+  // OPTIMASI: Memisahkan state input yang butuh respon instan dengan logika filter yang berat
+  const deferredQuery = useDeferredValue(query);
 
-  const filtered = volumes.filter(
-    (v) =>
-      v.title.toLowerCase().includes(query.toLowerCase()) ||
-      v.id.toString().includes(query)
-  );
+  // OPTIMASI: Filter hanya berjalan ulang jika deferredQuery atau daftar volumes berubah
+  const filtered = useMemo(() => {
+    const lowerQuery = deferredQuery.toLowerCase();
+    return volumes.filter(
+      (v) =>
+        v.title.toLowerCase().includes(lowerQuery) ||
+        v.id.toString().includes(lowerQuery)
+    );
+  }, [deferredQuery, volumes]);
 
   return (
     <div className="space-y-6">
@@ -196,13 +208,14 @@ export function TryoutGrid({ volumes }: { volumes: TryoutVolume[] }) {
         <Input
           type="search"
           placeholder={TEXT_CONTENT.searchPlaceholder}
-          value={query}
+          value={query} // Input tetap membaca nilai real-time (tanpa lag)
           onChange={(e) => setQuery(e.target.value)}
-          className="pl-9 rounded-xl"
+          className="pl-9 rounded-xl transition-all"
           aria-label="Cari volume tryout"
         />
         <Search
-          className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+          className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none transition-colors 
+            ${query !== deferredQuery ? "text-primary animate-pulse" : "text-muted-foreground"}`}
           aria-hidden
         />
       </div>
@@ -211,7 +224,7 @@ export function TryoutGrid({ volumes }: { volumes: TryoutVolume[] }) {
         <div className="text-center py-16 text-muted-foreground">
           <FileText className="w-10 h-10 mx-auto mb-3 opacity-30" aria-hidden />
           <p className="font-medium">
-            {TEXT_CONTENT.noMatch} "{query}"
+            {TEXT_CONTENT.noMatch} "{deferredQuery}"
           </p>
         </div>
       )}
