@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/table";
 import {
   CheckCircle2, XCircle, BarChart3,
-  BookOpen, Clock, ChevronRight, FileText,
+  Clock, ChevronRight, FileText,
 } from "lucide-react";
 
 // ==========================================
@@ -39,7 +39,7 @@ const EXAM_THRESHOLDS = {
 const ROUTES = {
   loginRedirect: "/login?callbackUrl=/riwayat",
   dashboard: "/dashboard",
-  detailHasil: (packageId: number, historyId: string) => `/tryout/${packageId}/hasil?historyId=${historyId}`,
+  detailHasil: (packageId: number, historyId: string) => `/dashboard/${packageId}/hasil?historyId=${historyId}`,
 } as const;
 
 const TEXT_CONTENT = {
@@ -47,7 +47,6 @@ const TEXT_CONTENT = {
   metaDesc: "Lihat riwayat dan hasil semua tryout SKD yang pernah kamu kerjakan.",
   title: "Riwayat Tryout",
   subtitle: "Semua tryout SKD yang pernah kamu kerjakan",
-  btnActionMain: "Coba Volume Lain",
   statTotalExams: "Total Ujian",
   statPassed: "Lolos",
   statAvgScore: "Rerata Skor",
@@ -149,12 +148,7 @@ export default async function RiwayatPage() {
               {TEXT_CONTENT.subtitle}
             </p>
           </div>
-          <Button asChild className="rounded-xl font-bold gap-2">
-            <Link href={ROUTES.dashboard}>
-              <BookOpen className="w-4 h-4" aria-hidden />
-              {TEXT_CONTENT.btnActionMain}
-            </Link>
-          </Button>
+         
         </div>
 
         {/* TENGAH: GRID MATRIKS RINGKASAN METRIK PERFORMA */}

@@ -193,13 +193,16 @@ export const tryoutHistories = pgTable(
     // OPTIMASI: Injeksi Type ke JSONB
     jawabanSiswa: jsonb("jawaban_siswa").$type<Record<string, string>>().notNull(),
     startTime:    timestamp("start_time").defaultNow(),
-    endTime:      timestamp("end_time"),
+    endTime: timestamp("end_time").defaultNow().notNull(),
   },
   (table) => ({
-    // OPTIMASI: Wajib ada agar query "Riwayat Tryout Saya" bisa load instan
     userIdIdx: index("tryout_histories_user_id_idx").on(table.userId),
+    // TAMBAHKAN INI agar sorting riwayat cepat:
+    endTimeIdx: index("tryout_histories_end_time_idx").on(table.endTime),
   })
 );
+
+
 
 // ==========================================
 // RELASI (RELATIONS)
@@ -217,6 +220,8 @@ export const packagesRelations = relations(tryoutPackages, ({ many }) => ({
   questions: many(questions),
   access:    many(userAccess),
   orders:    many(orders),
+  // TAMBAHKAN INI agar dashboard bisa tarik riwayat langsung dari paket:
+  histories: many(tryoutHistories), 
 }));
 
 export const questionsRelations = relations(questions, ({ one }) => ({

@@ -44,7 +44,6 @@ const TEXT_CONTENT = {
   labelCorrect: "Benar",
   labelIncorrect: "Salah",
   labelEmpty: "Kosong",
-  btnBack: "Kembali ke Hasil",
   btnNextVol: "Coba Volume Lain",
   explanationHeader: "Pembahasan",
   yourAnswerLabel: "Jawaban kamu:",
@@ -185,18 +184,7 @@ export default async function PembahasanPage({ params, searchParams }: Pembahasa
     <div className="min-h-screen bg-background text-foreground py-10 px-4 md:px-8">
       <div className="max-w-4xl mx-auto space-y-8">
 
-        {/* BAR NAVIGASI ATAS */}
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" size="sm" asChild className="gap-2 rounded-xl text-muted-foreground hover:text-foreground">
-            <Link href={ROUTES.backToResults(id, historyId)}>
-              <ArrowLeft className="w-4 h-4" />
-              {TEXT_CONTENT.btnBack}
-            </Link>
-          </Button>
-          <span className="text-xs font-semibold bg-muted text-muted-foreground px-3 py-1.5 rounded-full border border-border">
-            Vol. {volumeId} · {enrichedSoal.length} {TEXT_CONTENT.unitQuestions}
-          </span>
-        </div>
+      
 
         {/* JUDUL HALAMAN */}
         <div className="space-y-1">
@@ -343,18 +331,7 @@ export default async function PembahasanPage({ params, searchParams }: Pembahasa
         })}
 
         {/* FOOTER TOMBOL AKSI BAWAH */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-          <Button size="lg" className="rounded-xl font-bold gap-2" asChild>
-            <Link href={ROUTES.dashboard}>
-              {TEXT_CONTENT.btnNextVol}<ChevronRight className="w-4 h-4" />
-            </Link>
-          </Button>
-          <Button size="lg" variant="outline" className="rounded-xl font-bold" asChild>
-            <Link href={ROUTES.backToResults(id, historyId)}>
-              {TEXT_CONTENT.btnBack}
-            </Link>
-          </Button>
-        </div>
+
 
       </div>
     </div>

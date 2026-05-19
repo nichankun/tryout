@@ -1,45 +1,18 @@
 "use client";
 
-/**
- * components/dashboard/tryout-grid.tsx
- * * Client Component Grid Volume Ujian.
- * Dioptimalkan dengan useDeferredValue untuk pencarian anti-lag, 
- * Memoization tingkat komponen, dan Caching Intl Formatter.
- */
-
 import { useState, useDeferredValue, useMemo, memo } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
-import { Clock, FileText, Lock, Search, Zap } from "lucide-react";
+import { Clock, FileText, Lock, Search, Zap, RotateCcw } from "lucide-react";
 
 // ==========================================
-// KONSTANTA & KONFIGURASI 
+// KONFIGURASI & TYPES
 // ==========================================
-const INT_CONFIG = {
-  locale: "id-ID",
-  currency: "IDR",
-} as const;
-
-const ROUTES = {
-  tryout: "/tryout",
-  checkout: "/checkout",
-} as const;
-
-const TEXT_CONTENT = {
-  searchPlaceholder: "Cari volume...",
-  noMatch: "Tidak ada volume yang cocok dengan",
-  volumeLabel: "Volume",
-  unlockedStatus: "Sudah diaktifkan",
-  availableBadge: "Tersedia",
-  actionStart: "Mulai Kerjakan",
-  actionBuy: "Beli Sekarang",
-  actionFree: "Akses Gratis",
-  unitMinutes: "Menit",
-  unitQuestions: "Soal",
-} as const;
+const INT_CONFIG = { locale: "id-ID", currency: "IDR" } as const;
+const ROUTES = { tryout: "/tryout", checkout: "/checkout" } as const;
 
 export interface TryoutVolume {
   id: number;
@@ -50,10 +23,11 @@ export interface TryoutVolume {
   hargaAsli: number;
   isUnlocked: boolean;
   isAvailable: boolean;
+  // Data tambahan untuk evaluasi
+  lastHistory?: { totalSkor: number, isLolos: boolean } | null;
+  totalPengerjaan?: number;
 }
 
-// OPTIMASI: Cache instance Intl.NumberFormat di luar komponen.
-// Membuat instance ini di dalam render loop sangat mahal secara komputasi.
 const currencyFormatter = new Intl.NumberFormat(INT_CONFIG.locale, {
   style: "currency",
   currency: INT_CONFIG.currency,
@@ -65,119 +39,86 @@ function formatRupiah(n: number): string {
 }
 
 // ==========================================
-// SUB-KOMPONEN: KARTU VOLUME (DI-MEMOISASI)
+// SUB-KOMPONEN: KARTU VOLUME (Dinamis)
 // ==========================================
-// OPTIMASI: React.memo mencegah Card re-render saat user mengetik di search bar 
-// jika data props 'vol' pada card tersebut tidak berubah.
 const VolumeCard = memo(function VolumeCard({ vol }: { vol: TryoutVolume }) {
   const paddedId = vol.id.toString().padStart(2, "0");
+  const isFinished = (vol.totalPengerjaan ?? 0) > 0;
 
   return (
-    <Card className="overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group flex flex-col p-0 gap-0">
-      <CardHeader
-        className={`h-32 flex items-center justify-center relative p-0 rounded-t-xl
-          ${
-            vol.isUnlocked
-              ? "bg-linear-to-br from-emerald-500 to-teal-600 dark:from-emerald-600 dark:to-teal-700"
-              : vol.harga === 0
-                ? "bg-linear-to-br from-violet-500 to-purple-600 dark:from-violet-600 dark:to-purple-700"
-                : "bg-linear-to-br from-primary to-primary/70"
-          }`}
-      >
-        <span
-          className="text-white/20 font-black text-6xl absolute left-4 top-1 select-none leading-none"
-          aria-hidden
-        >
+    <Card className={`overflow-hidden transition-all duration-300 group flex flex-col p-0 gap-0 border-2
+      ${isFinished ? 'border-emerald-500 shadow-emerald-500/10' : 'hover:shadow-xl'}`}>
+      
+      {/* Header dengan status dinamis */}
+      <CardHeader className={`h-32 flex items-center justify-center relative p-0 rounded-t-lg
+        ${isFinished ? 'bg-emerald-600' : vol.harga === 0 ? 'bg-violet-600' : 'bg-primary'}`}>
+        
+        <span className="text-white/20 font-black text-6xl absolute left-4 top-1 select-none leading-none">
           {paddedId}
         </span>
-        <div className="bg-white/20 backdrop-blur-sm px-4 py-1 rounded-full text-white text-xs font-bold z-10">
-          {TEXT_CONTENT.volumeLabel} {paddedId}
-        </div>
-
-        {/* Icon kunci hanya untuk paket berbayar yang belum dimiliki */}
-        {!vol.isUnlocked && vol.harga > 0 && (
-          <div className="absolute top-3 right-3">
-            <Lock className="w-4 h-4 text-white/60" />
-          </div>
-        )}
-
-        {/* Badge GRATIS untuk paket harga 0 yang belum dimiliki */}
-        {!vol.isUnlocked && vol.harga === 0 && (
-          <div className="absolute top-3 right-3 bg-white/20 px-2 py-0.5 rounded-full">
-            <span className="text-white text-[10px] font-bold">GRATIS</span>
-          </div>
+        
+        {isFinished && (
+          <Badge className="absolute top-3 right-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm border-none text-white text-[10px]">
+            {vol.totalPengerjaan}x Pengerjaan
+          </Badge>
         )}
       </CardHeader>
 
       <CardContent className="p-5 flex flex-col grow">
-        <h3 className="font-bold text-foreground text-base mb-2 leading-tight">
-          {vol.title}
-        </h3>
-        <div className="flex flex-wrap items-center gap-2 mb-4">
-          {vol.isUnlocked ? (
-            <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/10">
-              <Zap className="w-3 h-3 mr-1" aria-hidden />
-              {TEXT_CONTENT.availableBadge}
+        <h3 className="font-bold text-foreground text-base mb-2 leading-tight">{vol.title}</h3>
+        
+        {/* Preview Riwayat (Evaluasi) */}
+        {isFinished && vol.lastHistory ? (
+          <div className="text-xs text-muted-foreground bg-emerald-50 p-2.5 rounded-lg border border-emerald-100 mb-4">
+            <p className="flex justify-between">
+              <span>Skor Terakhir:</span>
+              <strong className="text-emerald-700">{vol.lastHistory.totalSkor}</strong>
+            </p>
+            <p className="flex justify-between">
+              <span>Status:</span>
+              <strong className={vol.lastHistory.isLolos ? "text-emerald-600" : "text-red-600"}>
+                {vol.lastHistory.isLolos ? "Lolos" : "Belum Lolos"}
+              </strong>
+            </p>
+            {/* Tombol Lihat Semua Riwayat Volume */}
+      <div className="mt-3 pt-2 border-t border-emerald-200">
+              <Button variant="link" className="text-[10px] h-auto p-0 text-emerald-700 hover:text-emerald-900 font-semibold" asChild>
+                <Link href={`/dashboard/${vol.id}/riwayat?packageId=${vol.id}`}>
+                  Lihat riwayat
+                </Link>
+              </Button>
+            </div>
+    
+          </div>
+          
+        ) : (
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <Badge variant="outline" className="text-muted-foreground text-xs gap-1">
+              <Clock className="w-3 h-3" /> {vol.durasiMenit} Menit
             </Badge>
-          ) : (
-            <>
-              <Badge variant="outline" className="text-muted-foreground text-xs gap-1">
-                <Clock className="w-3 h-3" aria-hidden />
-                {vol.durasiMenit} {TEXT_CONTENT.unitMinutes}
-              </Badge>
-              <Badge variant="outline" className="text-muted-foreground text-xs gap-1">
-                <FileText className="w-3 h-3" aria-hidden />
-                {vol.totalSoal} {TEXT_CONTENT.unitQuestions}
-              </Badge>
-            </>
-          )}
-        </div>
+            <Badge variant="outline" className="text-muted-foreground text-xs gap-1">
+              <FileText className="w-3 h-3" /> {vol.totalSoal} Soal
+            </Badge>
+          </div>
+        )}
       </CardContent>
 
-      <CardFooter className="px-5 pb-5 pt-0 flex items-center justify-between mt-auto">
-        {vol.isUnlocked ? (
-          <>
-            <span className="text-xs text-muted-foreground italic">
-              {TEXT_CONTENT.unlockedStatus}
-            </span>
-            <Button
-              asChild
-              size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold border-0"
-            >
-              {/* @ts-ignore - Menghindari error TS jika router custom tidak support attribute ini */}
-              <Link href={`${ROUTES.tryout}/${vol.id}`} transitionTypes={["slide"]}>
-                {TEXT_CONTENT.actionStart}
-              </Link>
-            </Button>
-          </>
-        ) : vol.harga === 0 ? (
-          <Button
-            asChild
-            size="sm"
-            className="rounded-lg font-bold w-full bg-violet-600 hover:bg-violet-700 text-white border-0"
-          >
-            <Link href={`${ROUTES.checkout}/${vol.id}`}>
-              {TEXT_CONTENT.actionFree}
-            </Link>
-          </Button>
-        ) : (
-          <>
-            <div>
-              <p className="text-[10px] text-muted-foreground line-through leading-none mb-0.5">
-                {formatRupiah(vol.hargaAsli)}
-              </p>
-              <p className="text-primary font-bold text-sm leading-none">
-                {formatRupiah(vol.harga)}
-              </p>
-            </div>
-            <Button asChild size="sm" className="rounded-lg font-bold">
-              <Link href={`${ROUTES.checkout}/${vol.id}`}>
-                {TEXT_CONTENT.actionBuy}
-              </Link>
-            </Button>
-          </>
-        )}
+      <CardFooter className="px-5 pb-5 pt-0 mt-auto">
+        <Button 
+          asChild 
+          className="w-full rounded-lg font-bold" 
+          variant={isFinished ? "outline" : "default"}
+        >
+          <Link href={`${ROUTES.tryout}/${vol.id}`}>
+            {isFinished ? (
+              <><RotateCcw className="w-4 h-4 mr-2" /> Kerjakan Ulang (Evaluasi)</>
+            ) : vol.isUnlocked ? (
+              "Mulai Kerjakan"
+            ) : (
+              `Beli ${formatRupiah(vol.harga)}`
+            )}
+          </Link>
+        </Button>
       </CardFooter>
     </Card>
   );
@@ -188,17 +129,12 @@ const VolumeCard = memo(function VolumeCard({ vol }: { vol: TryoutVolume }) {
 // ==========================================
 export function TryoutGrid({ volumes }: { volumes: TryoutVolume[] }) {
   const [query, setQuery] = useState("");
-  
-  // OPTIMASI: Memisahkan state input yang butuh respon instan dengan logika filter yang berat
   const deferredQuery = useDeferredValue(query);
 
-  // OPTIMASI: Filter hanya berjalan ulang jika deferredQuery atau daftar volumes berubah
   const filtered = useMemo(() => {
     const lowerQuery = deferredQuery.toLowerCase();
     return volumes.filter(
-      (v) =>
-        v.title.toLowerCase().includes(lowerQuery) ||
-        v.id.toString().includes(lowerQuery)
+      (v) => v.title.toLowerCase().includes(lowerQuery) || v.id.toString().includes(lowerQuery)
     );
   }, [deferredQuery, volumes]);
 
@@ -207,27 +143,13 @@ export function TryoutGrid({ volumes }: { volumes: TryoutVolume[] }) {
       <div className="relative w-full md:w-80">
         <Input
           type="search"
-          placeholder={TEXT_CONTENT.searchPlaceholder}
-          value={query} // Input tetap membaca nilai real-time (tanpa lag)
+          placeholder="Cari volume..."
+          value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="pl-9 rounded-xl transition-all"
-          aria-label="Cari volume tryout"
+          className="pl-9 rounded-xl"
         />
-        <Search
-          className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none transition-colors 
-            ${query !== deferredQuery ? "text-primary animate-pulse" : "text-muted-foreground"}`}
-          aria-hidden
-        />
+        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
       </div>
-
-      {filtered.length === 0 && (
-        <div className="text-center py-16 text-muted-foreground">
-          <FileText className="w-10 h-10 mx-auto mb-3 opacity-30" aria-hidden />
-          <p className="font-medium">
-            {TEXT_CONTENT.noMatch} "{deferredQuery}"
-          </p>
-        </div>
-      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {filtered.map((vol) => (
