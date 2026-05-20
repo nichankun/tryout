@@ -122,7 +122,7 @@ export default async function RiwayatPage() {
 
   const rerataSkor = totalUjian > 0 ? Math.round(akumulasiSkor / totalUjian) : 0;
 
-  // Konfigurasi stat cards dengan tema warna tegas per metrik (tanpa hardcode hex)
+  // Konfigurasi stat cards dengan tema warna tegas per metrik
   const STAT_CARDS = [
     {
       label: TEXT_CONTENT.statTotalExams,
@@ -163,14 +163,15 @@ export default async function RiwayatPage() {
   ] as const;
 
   return (
-    <div className="container mx-auto flex flex-col gap-8 py-8 md:py-10 max-w-5xl">
+    // Penyesuaian px-4 md:px-6 agar aman di layar HP
+    <div className="container mx-auto flex flex-col gap-6 md:gap-8 px-4 md:px-6 py-6 md:py-10 max-w-5xl">
 
       {/* ── HEADER ── */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex flex-col gap-1 border-l-4 border-primary pl-4">
           <div className="flex items-center gap-2">
             <Clock className="h-5 w-5 text-primary" aria-hidden />
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground">
               {TEXT_CONTENT.title}
             </h1>
           </div>
@@ -182,20 +183,20 @@ export default async function RiwayatPage() {
 
       {/* ── STAT CARDS ── */}
       {totalUjian > 0 && (
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
           {STAT_CARDS.map((s) => (
             <div
               key={s.label}
-              className={`flex flex-col items-center gap-3 rounded-2xl border p-5 transition-all duration-200 hover:-translate-y-1 ${s.card}`}
+              className={`flex flex-col items-center gap-2 md:gap-3 rounded-2xl border p-4 md:p-5 transition-all duration-200 hover:-translate-y-1 ${s.card}`}
             >
-              <div className={`flex h-10 w-10 items-center justify-center rounded-full ${s.iconBg}`}>
-                <s.icon className="h-5 w-5 text-white" aria-hidden />
+              <div className={`flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-full ${s.iconBg}`}>
+                <s.icon className="h-4 w-4 md:h-5 md:w-5 text-white" aria-hidden />
               </div>
               <div className="flex flex-col items-center text-center">
-                <span className={`text-3xl font-extrabold ${s.valueColor}`}>
+                <span className={`text-2xl md:text-3xl font-extrabold ${s.valueColor}`}>
                   {s.value}
                 </span>
-                <span className={`mt-0.5 text-xs font-medium ${s.labelColor}`}>
+                <span className={`mt-0.5 text-[10px] md:text-xs font-medium ${s.labelColor}`}>
                   {s.label}
                 </span>
               </div>
@@ -206,15 +207,15 @@ export default async function RiwayatPage() {
 
       {/* ── TABEL / EMPTY STATE ── */}
       {totalUjian === 0 ? (
-        <Card className="border-purple-200 bg-purple-50">
-          <CardContent className="space-y-3 py-20 text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary">
-              <FileText className="h-8 w-8 text-white" aria-hidden />
+        <Card className="border-purple-200 bg-purple-50 mx-auto w-full max-w-lg">
+          <CardContent className="space-y-3 py-16 md:py-20 text-center">
+            <div className="mx-auto flex h-14 w-14 md:h-16 md:w-16 items-center justify-center rounded-full bg-primary">
+              <FileText className="h-6 w-6 md:h-8 md:w-8 text-white" aria-hidden />
             </div>
             <p className="font-semibold text-purple-900">
               {TEXT_CONTENT.emptyStateTitle}
             </p>
-            <p className="mx-auto max-w-sm text-sm text-purple-800">
+            <p className="mx-auto max-w-sm text-xs md:text-sm text-purple-800 px-4">
               {TEXT_CONTENT.emptyStateDesc}
             </p>
             <Button
@@ -226,9 +227,9 @@ export default async function RiwayatPage() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="overflow-hidden border-purple-200">
-          {/* Card header — ungu */}
-          <CardHeader className="border-b border-purple-200 bg-purple-50 px-5 py-3">
+        <Card className="w-full overflow-hidden border-purple-200 shadow-sm">
+          {/* Card header */}
+          <CardHeader className="border-b border-purple-200 bg-purple-50 px-4 md:px-5 py-3 md:py-4">
             <div className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4 text-primary" aria-hidden />
               <span className="text-sm font-bold text-purple-900">
@@ -237,118 +238,121 @@ export default async function RiwayatPage() {
             </div>
           </CardHeader>
 
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader className="bg-purple-50/60">
-                <TableRow className="border-b border-purple-200">
-                  <TableHead className="font-bold text-purple-900">{TEXT_CONTENT.thPackage}</TableHead>
-                  <TableHead className="text-center font-bold text-purple-900">{TEXT_CONTENT.thTwk}</TableHead>
-                  <TableHead className="text-center font-bold text-purple-900">{TEXT_CONTENT.thTiu}</TableHead>
-                  <TableHead className="text-center font-bold text-purple-900">{TEXT_CONTENT.thTkp}</TableHead>
-                  <TableHead className="text-center font-bold text-purple-900">{TEXT_CONTENT.thTotal}</TableHead>
-                  <TableHead className="text-center font-bold text-purple-900">{TEXT_CONTENT.thStatus}</TableHead>
-                  <TableHead className="text-right font-bold text-purple-900">{TEXT_CONTENT.thDate}</TableHead>
-                  <TableHead className="text-center font-bold text-purple-900">{TEXT_CONTENT.thAction}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {histories.map((item) => (
-                  <TableRow key={item.id} className="border-b border-purple-200/40 hover:bg-purple-50/40">
-                    <TableCell>
-                      <p className="text-sm font-semibold text-foreground">
-                        {item.packageTitle}
-                      </p>
-                    </TableCell>
-
-                    {/* Skor TWK */}
-                    <TableCell className="text-center">
-                      <span className={`text-sm font-bold ${
-                        item.skorTwk >= EXAM_THRESHOLDS.passingGrade.twk
-                          ? "text-teal-600"
-                          : "text-red-600"
-                      }`}>
-                        {item.skorTwk}
-                      </span>
-                    </TableCell>
-
-                    {/* Skor TIU */}
-                    <TableCell className="text-center">
-                      <span className={`text-sm font-bold ${
-                        item.skorTiu >= EXAM_THRESHOLDS.passingGrade.tiu
-                          ? "text-teal-600"
-                          : "text-red-600"
-                      }`}>
-                        {item.skorTiu}
-                      </span>
-                    </TableCell>
-
-                    {/* Skor TKP */}
-                    <TableCell className="text-center">
-                      <span className={`text-sm font-bold ${
-                        item.skorTkp >= EXAM_THRESHOLDS.passingGrade.tkp
-                          ? "text-teal-600"
-                          : "text-red-600"
-                      }`}>
-                        {item.skorTkp}
-                      </span>
-                    </TableCell>
-
-                    {/* Total skor */}
-                    <TableCell className="text-center">
-                      <span className="text-base font-extrabold text-foreground">
-                        {item.totalSkor}
-                      </span>
-                    </TableCell>
-
-                    {/* Status badge */}
-                    <TableCell className="text-center">
-                      {item.isLolos ? (
-                        <span className="inline-flex items-center gap-1 rounded-md bg-teal-400 px-2.5 py-0.5 text-[11px] font-bold text-white">
-                          <CheckCircle2 className="h-3 w-3" />
-                          {TEXT_CONTENT.badgePassed}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 rounded-md bg-red-400 px-2.5 py-0.5 text-[11px] font-bold text-white">
-                          <XCircle className="h-3 w-3" />
-                          {TEXT_CONTENT.badgeFailed}
-                        </span>
-                      )}
-                    </TableCell>
-
-                    {/* Tanggal */}
-                    <TableCell className="whitespace-nowrap text-right text-xs text-muted-foreground">
-                      {formatTanggal(item.endTime)}
-                    </TableCell>
-
-                    {/* Tombol detail */}
-                    <TableCell className="text-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        asChild
-                        className="gap-1 text-primary hover:bg-purple-50 hover:text-purple-800 font-semibold"
-                      >
-                        <Link href={ROUTES.detailHasil(item.packageId, item.id)}>
-                          {TEXT_CONTENT.btnDetail}
-                          <ChevronRight className="h-3 w-3" />
-                        </Link>
-                      </Button>
-                    </TableCell>
+          {/* Menambahkan wrapper overflow-x-auto agar tabel responsif di mobile */}
+          <CardContent className="p-0 overflow-x-auto">
+            <div className="min-w-200">
+              <Table>
+                <TableHeader className="bg-purple-50/60">
+                  <TableRow className="border-b border-purple-200 hover:bg-transparent">
+                    <TableHead className="font-bold text-purple-900 whitespace-nowrap px-4">{TEXT_CONTENT.thPackage}</TableHead>
+                    <TableHead className="text-center font-bold text-purple-900 px-2">{TEXT_CONTENT.thTwk}</TableHead>
+                    <TableHead className="text-center font-bold text-purple-900 px-2">{TEXT_CONTENT.thTiu}</TableHead>
+                    <TableHead className="text-center font-bold text-purple-900 px-2">{TEXT_CONTENT.thTkp}</TableHead>
+                    <TableHead className="text-center font-bold text-purple-900 px-4">{TEXT_CONTENT.thTotal}</TableHead>
+                    <TableHead className="text-center font-bold text-purple-900 px-4">{TEXT_CONTENT.thStatus}</TableHead>
+                    <TableHead className="text-right font-bold text-purple-900 px-4">{TEXT_CONTENT.thDate}</TableHead>
+                    <TableHead className="text-center font-bold text-purple-900 px-4">{TEXT_CONTENT.thAction}</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {histories.map((item) => (
+                    <TableRow key={item.id} className="border-b border-purple-200/40 hover:bg-purple-50/40">
+                      <TableCell className="px-4">
+                        <p className="text-sm font-semibold text-foreground whitespace-nowrap">
+                          {item.packageTitle}
+                        </p>
+                      </TableCell>
+
+                      {/* Skor TWK */}
+                      <TableCell className="text-center px-2">
+                        <span className={`text-sm font-bold ${
+                          item.skorTwk >= EXAM_THRESHOLDS.passingGrade.twk
+                            ? "text-teal-600"
+                            : "text-red-600"
+                        }`}>
+                          {item.skorTwk}
+                        </span>
+                      </TableCell>
+
+                      {/* Skor TIU */}
+                      <TableCell className="text-center px-2">
+                        <span className={`text-sm font-bold ${
+                          item.skorTiu >= EXAM_THRESHOLDS.passingGrade.tiu
+                            ? "text-teal-600"
+                            : "text-red-600"
+                        }`}>
+                          {item.skorTiu}
+                        </span>
+                      </TableCell>
+
+                      {/* Skor TKP */}
+                      <TableCell className="text-center px-2">
+                        <span className={`text-sm font-bold ${
+                          item.skorTkp >= EXAM_THRESHOLDS.passingGrade.tkp
+                            ? "text-teal-600"
+                            : "text-red-600"
+                        }`}>
+                          {item.skorTkp}
+                        </span>
+                      </TableCell>
+
+                      {/* Total skor */}
+                      <TableCell className="text-center px-4">
+                        <span className="text-base font-extrabold text-foreground">
+                          {item.totalSkor}
+                        </span>
+                      </TableCell>
+
+                      {/* Status badge */}
+                      <TableCell className="text-center px-4">
+                        {item.isLolos ? (
+                          <span className="inline-flex items-center justify-center gap-1 rounded-md bg-teal-400 px-2.5 py-0.5 text-[11px] font-bold text-white whitespace-nowrap">
+                            <CheckCircle2 className="h-3 w-3" />
+                            {TEXT_CONTENT.badgePassed}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center justify-center gap-1 rounded-md bg-red-400 px-2.5 py-0.5 text-[11px] font-bold text-white whitespace-nowrap">
+                            <XCircle className="h-3 w-3" />
+                            {TEXT_CONTENT.badgeFailed}
+                          </span>
+                        )}
+                      </TableCell>
+
+                      {/* Tanggal */}
+                      <TableCell className="text-right text-xs text-muted-foreground whitespace-nowrap px-4">
+                        {formatTanggal(item.endTime)}
+                      </TableCell>
+
+                      {/* Tombol detail */}
+                      <TableCell className="text-center px-4">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          asChild
+                          className="gap-1 text-primary hover:bg-purple-50 hover:text-purple-800 font-semibold whitespace-nowrap"
+                        >
+                          <Link href={ROUTES.detailHasil(item.packageId, item.id)}>
+                            {TEXT_CONTENT.btnDetail}
+                            <ChevronRight className="h-3 w-3" />
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       )}
 
       {/* ── FOOTER PASSING GRADE ── */}
-      <div className="flex flex-wrap justify-center gap-3 rounded-xl border border-purple-200 bg-purple-50 px-6 py-3 text-xs text-primary">
-        <span className="font-semibold">{TEXT_CONTENT.footerThresholds}</span>
+      <div className="flex flex-wrap justify-center items-center gap-x-3 gap-y-2 rounded-xl border border-purple-200 bg-purple-50 p-4 text-xs text-primary w-full max-w-lg mx-auto md:max-w-none">
+        <span className="font-semibold w-full text-center md:w-auto md:text-left">{TEXT_CONTENT.footerThresholds}</span>
         <span className="font-bold">TWK ≥ {EXAM_THRESHOLDS.passingGrade.twk}</span>
-        <span className="text-purple-200">·</span>
+        <span className="text-purple-200 hidden md:inline">·</span>
         <span className="font-bold">TIU ≥ {EXAM_THRESHOLDS.passingGrade.tiu}</span>
-        <span className="text-purple-200">·</span>
+        <span className="text-purple-200 hidden md:inline">·</span>
         <span className="font-bold">TKP ≥ {EXAM_THRESHOLDS.passingGrade.tkp}</span>
       </div>
 
