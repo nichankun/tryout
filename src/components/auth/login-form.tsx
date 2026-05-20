@@ -142,8 +142,8 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
       
       {/* BANNER INFORMASI VERIFIKASI */}
       {status === "verification_sent" && !globalError && (
-        <Alert className="bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-400">
-          <CheckCircle2 className="h-4 w-4 stroke-emerald-600 dark:stroke-emerald-400" />
+        <Alert className="bg-teal-50 border-teal-200 text-teal-900">
+          <CheckCircle2 className="h-4 w-4 stroke-teal-600" />
           <AlertTitle>{MESSAGES.success.verificationTitle}</AlertTitle>
           <AlertDescription className="text-xs opacity-90">
             {MESSAGES.success.verificationDesc}

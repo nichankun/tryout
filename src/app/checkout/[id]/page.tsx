@@ -194,7 +194,7 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
                   <h2 className="text-lg font-bold text-foreground mb-2">
                     {TEXT_CONTENT.sectionDetail}
                   </h2>
-                  <div className="bg-primary/5 p-4 rounded-xl border border-primary/10">
+                  <div className="bg-purple-50 p-4 rounded-xl border border-purple-200">
                     <p className="font-semibold text-primary">{pkg.title}</p>
                     {pkg.description && (
                       <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
@@ -214,7 +214,7 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
                         key={benefit}
                         className="flex items-start gap-3 text-sm text-muted-foreground"
                       >
-                        <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+                        <CheckCircle2 className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
                         <span className="leading-relaxed">{benefit}</span>
                       </li>
                     ))}

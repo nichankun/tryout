@@ -178,8 +178,8 @@ export function CheckoutForm({ volumeId, total }: CheckoutFormProps) {
                   onClick={() => setSelectedMethod(key)}
                   className={`flex flex-col items-center py-4 gap-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary
                     ${isActive
-                      ? "border-primary bg-primary/5 text-primary"
-                      : "border-border bg-card text-muted-foreground hover:border-border/80 hover:bg-muted/30"
+                      ? "border-primary bg-purple-50 text-primary"
+                      : "border-border bg-card text-muted-foreground hover:border-purple-200 hover:bg-purple-50/50"
                     }`}
                 >
                   <Icon className={`w-6 h-6 ${isActive ? "text-primary" : "text-muted-foreground"}`} aria-hidden />
@@ -212,10 +212,10 @@ export function CheckoutForm({ volumeId, total }: CheckoutFormProps) {
                 required
                 disabled={isLoading}
                 aria-describedby={fieldErrors.name ? "name-error" : undefined}
-                className={`h-11 rounded-xl ${fieldErrors.name ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                className={`h-11 rounded-xl ${fieldErrors.name ? "border-red-400 focus-visible:ring-red-400" : ""}`}
               />
               {fieldErrors.name && (
-                <p id="name-error" role="alert" className="text-xs text-destructive font-medium">{fieldErrors.name}</p>
+                <p id="name-error" role="alert" className="text-xs text-red-600 font-medium">{fieldErrors.name}</p>
               )}
             </div>
 
@@ -231,10 +231,10 @@ export function CheckoutForm({ volumeId, total }: CheckoutFormProps) {
                 required
                 disabled={isLoading}
                 aria-describedby={fieldErrors.email ? "email-error" : undefined}
-                className={`h-11 rounded-xl ${fieldErrors.email ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                className={`h-11 rounded-xl ${fieldErrors.email ? "border-red-400 focus-visible:ring-red-400" : ""}`}
               />
               {fieldErrors.email && (
-                <p id="email-error" role="alert" className="text-xs text-destructive font-medium">{fieldErrors.email}</p>
+                <p id="email-error" role="alert" className="text-xs text-red-600 font-medium">{fieldErrors.email}</p>
               )}
             </div>
 
@@ -252,10 +252,10 @@ export function CheckoutForm({ volumeId, total }: CheckoutFormProps) {
                 autoComplete="tel"
                 disabled={isLoading}
                 aria-describedby={fieldErrors.phone ? "phone-error" : undefined}
-                className={`h-11 rounded-xl ${fieldErrors.phone ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                className={`h-11 rounded-xl ${fieldErrors.phone ? "border-red-400 focus-visible:ring-red-400" : ""}`}
               />
               {fieldErrors.phone && (
-                <p id="phone-error" role="alert" className="text-xs text-destructive font-medium">{fieldErrors.phone}</p>
+                <p id="phone-error" role="alert" className="text-xs text-red-600 font-medium">{fieldErrors.phone}</p>
               )}
             </div>
 
@@ -264,7 +264,7 @@ export function CheckoutForm({ volumeId, total }: CheckoutFormProps) {
               <div
                 role="alert"
                 aria-live="assertive"
-                className="text-sm text-destructive bg-destructive/10 border border-destructive/20 px-4 py-3 rounded-xl font-medium"
+                className="text-sm text-red-600 bg-red-50 border border-red-200 px-4 py-3 rounded-xl font-medium"
               >
                 {error}
               </div>

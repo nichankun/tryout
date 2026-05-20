@@ -147,12 +147,11 @@ function VerifyResult({ success, title, message }: VerifyResultProps) {
         {/* Indikator Status (Icon) */}
         <div className="flex justify-center mb-6">
           {success ? (
-            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-full text-emerald-600 dark:text-emerald-400">
+            <div className="p-3 bg-teal-50 rounded-full text-teal-600">
               <CheckCircle2 className="w-16 h-16" />
             </div>
           ) : (
-            // Menggunakan variabel destruktif bawaan shadcn untuk error
-            <div className="p-3 bg-destructive/10 rounded-full text-destructive">
+            <div className="p-3 bg-red-50 rounded-full text-red-600">
               <XCircle className="w-16 h-16" />
             </div>
           )}
@@ -161,7 +160,7 @@ function VerifyResult({ success, title, message }: VerifyResultProps) {
         {/* Judul Status */}
         <h1 
           className={`text-2xl font-extrabold tracking-tight mb-3 ${
-            success ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"
+            success ? "text-teal-900" : "text-red-900"
           }`}
         >
           {title}
@@ -173,7 +172,7 @@ function VerifyResult({ success, title, message }: VerifyResultProps) {
         </p>
 
         {/* Tombol Aksi - Menggunakan asChild sesuai standar shadcn */}
-        <Button asChild className="w-full h-11 rounded-xl font-bold">
+        <Button asChild className="w-full h-11 rounded-xl font-bold bg-primary text-primary-foreground hover:bg-purple-800">
           <Link href={ROUTES.login}>
             {VERIFY_CONTENT.btnText}
           </Link>

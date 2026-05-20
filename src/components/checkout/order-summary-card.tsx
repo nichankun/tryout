@@ -44,7 +44,7 @@ export function OrderSummaryCard({ tryoutName, price, adminFee, total }: OrderSu
         </h2>
 
         {/* Blok Informasi Nama Paket */}
-        <div className="bg-primary/5 px-4 py-3 rounded-xl border border-primary/10">
+        <div className="bg-purple-50 px-4 py-3 rounded-xl border border-purple-200">
           <p className="text-sm font-semibold text-primary leading-snug">
             {tryoutName}
           </p>
@@ -71,7 +71,7 @@ export function OrderSummaryCard({ tryoutName, price, adminFee, total }: OrderSu
 
         {/* Indikator Spanduk Keamanan Transaksi */}
         <div className="flex items-start gap-2 pt-1">
-          <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" aria-hidden />
+          <ShieldCheck className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" aria-hidden />
           <p className="text-xs text-muted-foreground/80 leading-relaxed">
             {TEXT_CONTENT.securePaymentHint}
           </p>

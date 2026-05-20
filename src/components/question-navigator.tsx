@@ -68,8 +68,8 @@ export function QuestionNavigator({
               className={cn(
                 "w-10 h-10 p-0 text-xs font-bold rounded-xl transition-all border-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                 isCurrent && "border-primary ring-2 ring-primary/20",
-                isAnswered && !isDoubt && "bg-primary text-primary-foreground border-primary hover:bg-primary/90 hover:text-primary-foreground",
-                isDoubt && "bg-amber-500 dark:bg-amber-600 text-white border-amber-500 dark:border-amber-600 hover:bg-amber-600 dark:hover:bg-amber-700 hover:text-white",
+                isAnswered && !isDoubt && "bg-primary text-primary-foreground border-primary hover:bg-primary/90",
+                isDoubt && "bg-amber-400 text-white border-amber-400 hover:bg-amber-600",
                 !isAnswered && !isDoubt && "text-muted-foreground border-border bg-card hover:border-primary/50 hover:bg-muted/50",
                 isCurrent && isAnswered && "ring-offset-2 ring-offset-background"
               )}
@@ -108,7 +108,7 @@ export function QuestionNavigator({
           {TEXT_CONTENT.legendEmpty}
         </div>
         <div className="flex items-center gap-2.5">
-          <div className="w-3.5 h-3.5 rounded bg-amber-500 dark:bg-amber-600 shadow-sm" /> 
+          <div className="w-3.5 h-3.5 rounded bg-amber-400 shadow-sm" /> 
           {TEXT_CONTENT.legendDoubt}
         </div>
         <div className="flex items-center gap-2.5">

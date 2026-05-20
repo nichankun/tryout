@@ -46,41 +46,134 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* ── Ekspos custom palette ke Tailwind utilities ── */
+  /* Memungkinkan: bg-purple-50, text-teal-600, border-red-200 dst. */
+
+  --color-purple-50:  var(--purple-50);
+  --color-purple-100: var(--purple-100);
+  --color-purple-200: var(--purple-200);
+  --color-purple-400: var(--purple-400);
+  --color-purple-600: var(--purple-600);
+  --color-purple-800: var(--purple-800);
+  --color-purple-900: var(--purple-900);
+
+  --color-teal-50:  var(--teal-50);
+  --color-teal-100: var(--teal-100);
+  --color-teal-200: var(--teal-200);
+  --color-teal-400: var(--teal-400);
+  --color-teal-600: var(--teal-600);
+  --color-teal-800: var(--teal-800);
+  --color-teal-900: var(--teal-900);
+
+  --color-red-50:  var(--red-50);
+  --color-red-100: var(--red-100);
+  --color-red-200: var(--red-200);
+  --color-red-400: var(--red-400);
+  --color-red-600: var(--red-600);
+  --color-red-800: var(--red-800);
+  --color-red-900: var(--red-900);
+
+  --color-amber-50:  var(--amber-50);
+  --color-amber-100: var(--amber-100);
+  --color-amber-200: var(--amber-200);
+  --color-amber-400: var(--amber-400);
+  --color-amber-600: var(--amber-600);
+  --color-amber-800: var(--amber-800);
+  --color-amber-900: var(--amber-900);
+
+  --color-gray-50:  var(--gray-50);
+  --color-gray-100: var(--gray-100);
+  --color-gray-200: var(--gray-200);
+  --color-gray-400: var(--gray-400);
+  --color-gray-600: var(--gray-600);
+  --color-gray-800: var(--gray-800);
+  --color-gray-900: var(--gray-900);
 }
 
+/* ===========================================
+   DESIGN SYSTEM — PALETTE TOKEN DEFINITIONS
+   Semua warna komponen bersumber dari sini.
+   =========================================== */
 :root {
+  /* ── Shadcn core tokens ── */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.148 0.004 228.8);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.148 0.004 228.8);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.148 0.004 228.8);
-  --primary: oklch(0.457 0.24 277.023);
-  --primary-foreground: oklch(0.962 0.018 272.314);
-  --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.21 0.006 285.885);
+  --primary: #534AB7;
+  --primary-foreground: #ffffff;
+  --secondary: #EEEDFE;
+  --secondary-foreground: #26215C;
   --muted: oklch(0.963 0.002 197.1);
   --muted-foreground: oklch(0.56 0.021 213.5);
-  --accent: oklch(0.963 0.002 197.1);
-  --accent-foreground: oklch(0.218 0.008 223.9);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.925 0.005 214.3);
-  --input: oklch(0.925 0.005 214.3);
-  --ring: oklch(0.723 0.014 214.4);
+  --accent: #EEEDFE;
+  --accent-foreground: #534AB7;
+  --destructive: #A32D2D;
+  --border: #AFA9EC;
+  --input: #AFA9EC;
+  --ring: #534AB7;
+  --radius: 0.625rem;
   --chart-1: oklch(0.905 0.182 98.111);
   --chart-2: oklch(0.795 0.184 86.047);
   --chart-3: oklch(0.681 0.162 75.834);
   --chart-4: oklch(0.554 0.135 66.442);
   --chart-5: oklch(0.476 0.114 61.907);
-  --radius: 0;
-  --sidebar: oklch(0.987 0.002 197.1);
-  --sidebar-foreground: oklch(0.148 0.004 228.8);
-  --sidebar-primary: oklch(0.511 0.262 276.966);
-  --sidebar-primary-foreground: oklch(0.962 0.018 272.314);
-  --sidebar-accent: oklch(0.963 0.002 197.1);
-  --sidebar-accent-foreground: oklch(0.218 0.008 223.9);
-  --sidebar-border: oklch(0.925 0.005 214.3);
-  --sidebar-ring: oklch(0.723 0.014 214.4);
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.148 0.004 228.8);
+  --sidebar: #EEEDFE;
+  --sidebar-foreground: #26215C;
+  --sidebar-primary: #534AB7;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #CECBF6;
+  --sidebar-accent-foreground: #26215C;
+  --sidebar-border: #AFA9EC;
+  --sidebar-ring: #534AB7;
+
+  /* ── Purple ramp ── */
+  --purple-50:  #EEEDFE;
+  --purple-100: #CECBF6;
+  --purple-200: #AFA9EC;
+  --purple-400: #7F77DD;
+  --purple-600: #534AB7;
+  --purple-800: #3C3489;
+  --purple-900: #26215C;
+
+  /* ── Teal ramp (Benar / Lolos) ── */
+  --teal-50:  #E1F5EE;
+  --teal-100: #9FE1CB;
+  --teal-200: #5DCAA5;
+  --teal-400: #1D9E75;
+  --teal-600: #0F6E56;
+  --teal-800: #085041;
+  --teal-900: #04342C;
+
+  /* ── Red ramp (Salah / Gagal) ── */
+  --red-50:  #FCEBEB;
+  --red-100: #F7C1C1;
+  --red-200: #F09595;
+  --red-400: #E24B4A;
+  --red-600: #A32D2D;
+  --red-800: #791F1F;
+  --red-900: #501313;
+
+  /* ── Amber ramp (Ragu / Warning) ── */
+  --amber-50:  #FAEEDA;
+  --amber-100: #FAC775;
+  --amber-200: #EF9F27;
+  --amber-400: #BA7517;
+  --amber-600: #854F0B;
+  --amber-800: #633806;
+  --amber-900: #412402;
+
+  /* ── Gray ramp (Kosong / Netral) ── */
+  --gray-50:  #F1EFE8;
+  --gray-100: #D3D1C7;
+  --gray-200: #B4B2A9;
+  --gray-400: #888780;
+  --gray-600: #5F5E5A;
+  --gray-800: #444441;
+  --gray-900: #2C2C2A;
 }
 
 .dark {
@@ -90,18 +183,18 @@
   --card-foreground: oklch(0.987 0.002 197.1);
   --popover: oklch(0.218 0.008 223.9);
   --popover-foreground: oklch(0.987 0.002 197.1);
-  --primary: oklch(0.398 0.195 277.366);
-  --primary-foreground: oklch(0.962 0.018 272.314);
-  --secondary: oklch(0.274 0.006 286.033);
-  --secondary-foreground: oklch(0.985 0 0);
+  --primary: #7F77DD;
+  --primary-foreground: #ffffff;
+  --secondary: #26215C;
+  --secondary-foreground: #EEEDFE;
   --muted: oklch(0.275 0.011 216.9);
   --muted-foreground: oklch(0.723 0.014 214.4);
-  --accent: oklch(0.275 0.011 216.9);
-  --accent-foreground: oklch(0.987 0.002 197.1);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
+  --accent: #26215C;
+  --accent-foreground: #CECBF6;
+  --destructive: #E24B4A;
+  --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.56 0.021 213.5);
+  --ring: #7F77DD;
   --chart-1: oklch(0.905 0.182 98.111);
   --chart-2: oklch(0.795 0.184 86.047);
   --chart-3: oklch(0.681 0.162 75.834);
@@ -109,12 +202,57 @@
   --chart-5: oklch(0.476 0.114 61.907);
   --sidebar: oklch(0.218 0.008 223.9);
   --sidebar-foreground: oklch(0.987 0.002 197.1);
-  --sidebar-primary: oklch(0.585 0.233 277.117);
-  --sidebar-primary-foreground: oklch(0.962 0.018 272.314);
+  --sidebar-primary: #7F77DD;
+  --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: oklch(0.275 0.011 216.9);
   --sidebar-accent-foreground: oklch(0.987 0.002 197.1);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.56 0.021 213.5);
+  --sidebar-ring: #7F77DD;
+
+  /* ── Purple ramp dark — lebih terang untuk kontras ── */
+  --purple-50:  #26215C;
+  --purple-100: #3C3489;
+  --purple-200: #534AB7;
+  --purple-400: #7F77DD;
+  --purple-600: #AFA9EC;
+  --purple-800: #CECBF6;
+  --purple-900: #EEEDFE;
+
+  /* ── Teal ramp dark ── */
+  --teal-50:  #04342C;
+  --teal-100: #085041;
+  --teal-200: #0F6E56;
+  --teal-400: #1D9E75;
+  --teal-600: #5DCAA5;
+  --teal-800: #9FE1CB;
+  --teal-900: #E1F5EE;
+
+  /* ── Red ramp dark ── */
+  --red-50:  #501313;
+  --red-100: #791F1F;
+  --red-200: #A32D2D;
+  --red-400: #E24B4A;
+  --red-600: #F09595;
+  --red-800: #F7C1C1;
+  --red-900: #FCEBEB;
+
+  /* ── Amber ramp dark ── */
+  --amber-50:  #412402;
+  --amber-100: #633806;
+  --amber-200: #854F0B;
+  --amber-400: #BA7517;
+  --amber-600: #EF9F27;
+  --amber-800: #FAC775;
+  --amber-900: #FAEEDA;
+
+  /* ── Gray ramp dark ── */
+  --gray-50:  #2C2C2A;
+  --gray-100: #444441;
+  --gray-200: #5F5E5A;
+  --gray-400: #888780;
+  --gray-600: #B4B2A9;
+  --gray-800: #D3D1C7;
+  --gray-900: #F1EFE8;
 }
 
 @layer base {

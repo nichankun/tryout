@@ -3,22 +3,17 @@ import { auth } from "@/auth";
 import { db } from "@/db";
 import { userAccess, tryoutPackages, tryoutHistories } from "@/db/database/schema";
 import { eq, asc, desc } from "drizzle-orm";
-import { Badge } from "@/components/ui/badge";
 import { TryoutGrid } from "@/components/dashboard/tryout-grid";
 import { ExamTypeTabs } from "@/components/dashboard/exam-type-tabs";
-import { BookOpen, Clock, Target } from "lucide-react";
 
-const STATS_DATA = [
-  { icon: BookOpen, label: "Total Soal", value: "2.200+" },
-  { icon: Clock, label: "Durasi / Paket", value: "100 Menit" },
-  { icon: Target, label: "Akurasi Kisi-kisi", value: "98%" },
-];
+// ==========================================
+// DATA STATISTIK
+// ==========================================
 
 export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  // Logika pengambilan data TETAP SAMA
   const [accessList, packagesWithHistories] = await Promise.all([
     db.query.userAccess.findMany({
       where: eq(userAccess.userId, session.user.id),
@@ -51,68 +46,67 @@ export default async function DashboardPage() {
   }));
 
   return (
-    // PERBAIKAN 1: Hapus min-h-screen agar tidak bentrok dengan layout.tsx, gunakan w-full
     <div className="flex w-full flex-1 flex-col bg-background">
-      
-      {/* Hero Section */}
-      <section className="w-full border-b border-border bg-muted/40 py-12 md:py-16 lg:py-20">
-        {/* PERBAIKAN 2: Kembalikan px-4 md:px-6 agar konten tidak menabrak / mepet kiri-kanan layar HP */}
-        <div className="container mx-auto flex flex-col items-center gap-6 px-4 text-center md:px-6">
-          <Badge variant="secondary" className="rounded-full px-4 py-1.5 text-sm font-medium">
-            CPNS 2026 · Soal HOTS Terbaru
-          </Badge>
 
-          <div className="max-w-3xl space-y-4">
-            <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl md:text-5xl lg:text-6xl">
-              Siap Taklukkan Seleksi CPNS 2026?
+      {/* ==========================================
+          HERO SECTION
+      ========================================== */}
+      <section className="relative w-full overflow-hidden border-b border-purple-200 bg-purple-50">
+
+        {/* Dot pattern background */}
+        <div className="absolute inset-0 -z-10 opacity-20 bg-[radial-gradient(var(--color-primary)_1px,transparent_1px)] bg-size-[20px_20px]" />
+
+        <div className="container relative mx-auto flex flex-col items-center gap-6 px-4 py-14 text-center md:gap-8 md:py-20 md:px-6">
+
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-xs font-semibold uppercase tracking-widest text-white shadow-sm">
+            <span className="h-1.5 w-1.5 rounded-full bg-teal-100 animate-pulse" />
+            CPNS 2026 · Soal HOTS Terbaru
+          </div>
+
+          {/* Heading */}
+          <div className="max-w-3xl space-y-3">
+            <h1 className="text-4xl font-extrabold tracking-tight text-purple-900 dark:text-purple-800 sm:text-5xl md:text-6xl lg:text-7xl">
+              Siap Taklukkan{" "}
+              <br className="hidden sm:block" />
+              <span className="text-purple-600">
+                Seleksi CPNS 2026?
+              </span>
             </h1>
-            <p className="mx-auto max-w-2xl text-muted-foreground sm:text-lg sm:leading-8">
+            <p className="mx-auto max-w-2xl text-sm text-purple-800 dark:text-purple-600 sm:text-base md:text-lg md:leading-8">
               Latihan intensif dengan ribuan soal HOTS. Pilih paket tryout dan
               mulai simulasi CAT sekarang untuk mengukur kemampuanmu.
             </p>
           </div>
 
-          <div className="pt-4">
+          {/* Exam type tabs */}
+          <div>
             <ExamTypeTabs />
           </div>
-
-          <div className="flex flex-wrap items-center justify-center gap-6 pt-6 sm:gap-8">
-            {STATS_DATA.map((s) => (
-              <div
-                key={s.label}
-                className="flex items-center gap-3 text-sm sm:text-base"
-              >
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                  <s.icon className="h-5 w-5 text-primary" />
-                </div>
-                <div className="flex flex-col items-start text-left">
-                  <span className="font-semibold leading-none text-foreground">
-                    {s.value}
-                  </span>
-                  <span className="mt-1 text-xs text-muted-foreground">
-                    {s.label}
-                  </span>
-                </div>
-              </div>
-            ))}
           </div>
-        </div>
+          
       </section>
 
-      {/* Main Tryout Content */}
-      {/* PERBAIKAN 3: Ubah tag <main> menjadi <div> karena <main> sudah ada di layout.tsx. Tambahkan kembali padding horizontal (px-4). */}
+      {/* ==========================================
+          MAIN CONTENT — DAFTAR TRYOUT
+      ========================================== */}
       <div className="container mx-auto flex-1 px-4 py-10 md:px-6 md:py-14">
         <div className="flex flex-col space-y-8">
-          <div className="flex flex-col space-y-2">
-            <h2 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">
+
+          {/* Section header */}
+          <div className="flex flex-col gap-1 border-l-4 border-primary pl-4">
+            <h2 className="text-2xl font-extrabold tracking-tight text-foreground md:text-3xl">
               Daftar Tryout
             </h2>
-            <p className="text-muted-foreground">
-              {volumes.length} Volume tersedia · Kamu memiliki akses ke{" "}
-              <span className="font-medium text-foreground">{unlockedIds.size} volume</span>
+            <p className="text-sm text-muted-foreground md:text-base">
+              {volumes.length} volume tersedia &middot; Kamu memiliki akses ke{" "}
+              <span className="font-bold text-primary">
+                {unlockedIds.size} volume
+              </span>
             </p>
           </div>
 
+          {/* Grid kartu */}
           <TryoutGrid volumes={volumes} />
         </div>
       </div>
