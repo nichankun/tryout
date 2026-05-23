@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation"; // ✅ 1. Import useRouter
+import { useRouter } from "next/navigation";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -46,7 +46,7 @@ export function DataTable<TData, TValue>({
   searchKey,
   searchPlaceholder = "Cari data...",
 }: DataTableProps<TData, TValue>) {
-  const router = useRouter(); // ✅ 2. Inisialisasi router
+  const router = useRouter();
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
@@ -124,16 +124,15 @@ export function DataTable<TData, TValue>({
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => {
-                // ✅ 3. Cek properti untuk menentukan interaksi klik
-                const rowData = row.original as any;
-                const isPackageRow = "price" in rowData && "title" in rowData;
+                // DIUBAH: Mengamankan row.original menggunakan Record<string, unknown> agar runtime 'in' operator bekerja tanpa any
+                const rowData = row.original as Record<string, unknown>;
+                const isPackageRow = "price" in rowData && "title" in rowData && "id" in rowData;
 
                 return (
                   <TableRow
                     key={row.id}
                     className={`border-border hover:bg-muted/30 ${isPackageRow ? "cursor-pointer" : ""}`}
                     onClick={() => {
-                      // ✅ 4. Eksekusi perpindahan halaman jika ini baris paket
                       if (isPackageRow) {
                         router.push(`/admin/packages/${rowData.id}`);
                       }

@@ -39,7 +39,6 @@ const FormQuestionSchema = z.object({
 
 type FormValues = z.infer<typeof FormQuestionSchema>;
 
-// Nilai default awal untuk langsung mengunci slot opsi A sampai E
 const DEFAULT_OPTIONS = [
   { opsi: "A", teks: "", poin: 0 },
   { opsi: "B", teks: "", poin: 0 },
@@ -57,10 +56,8 @@ export default function AddQuestionPage() {
   const [isPending, setIsPending] = React.useTransition();
   const [statusMessage, setStatusMessage] = React.useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Mengubah parameter ID di URL menjadi integer biner untuk Database ID
   const packageId = parseInt(params.id as string, 10);
 
-  // Inisialisasi React Hook Form
   const {
     register,
     control,
@@ -77,19 +74,19 @@ export default function AddQuestionPage() {
     },
   });
 
-  // Memanfaatkan useFieldArray untuk mengontrol baris input pilihan jawaban secara rapi
   const { fields } = useFieldArray({
     control,
     name: "pilihan",
   });
 
-  // Handler eksekusi pengiriman data form ke Server Action
   const onSubmit = (values: FormValues) => {
     setStatusMessage(null);
 
     setIsPending(async () => {
+      // PERBAIKAN: Menyisipkan isFigural: false agar kompatibel dengan validasi tipe data baru di Server Action
       const result = await createQuestionAction({
         packageId,
+        isFigural: false, 
         ...values,
       });
 
@@ -106,9 +103,8 @@ export default function AddQuestionPage() {
         text: "Butir soal baru berhasil disimpan dengan aman!" 
       });
       
-      // Reset form ke kondisi kosong setelah berhasil, siap menerima soal berikutnya
       reset({
-        kategori: values.kategori, // Tetapkan kategori terpilih agar admin tidak perlu klik ulang
+        kategori: values.kategori,
         pertanyaan: "",
         pembahasan: "",
         pilihan: [...DEFAULT_OPTIONS],
@@ -152,7 +148,6 @@ export default function AddQuestionPage() {
         
         {/* BLOK 1: KATEGORI & ISI PERTANYAAN */}
         <div className="bg-card border border-border rounded-xl p-5 space-y-4 shadow-sm">
-          {/* Pilihan Kategori */}
           <div className="space-y-2">
             <label className="text-sm font-semibold">Kategori Soal SKD</label>
             <select 
@@ -166,7 +161,6 @@ export default function AddQuestionPage() {
             {errors.kategori && <p className="text-xs text-destructive font-medium">{errors.kategori.message}</p>}
           </div>
 
-          {/* Isi Teks Soal */}
           <div className="space-y-2">
             <label className="text-sm font-semibold">Pertanyaan / Narasi Kasus</label>
             <textarea 
@@ -189,12 +183,10 @@ export default function AddQuestionPage() {
           <div className="space-y-3">
             {fields.map((field, index) => (
               <div key={field.id} className="flex items-start gap-3">
-                {/* Penunjuk Huruf Opsi */}
                 <div className="w-9 h-9 flex items-center justify-center bg-muted border border-border rounded-lg text-xs font-bold shrink-0 mt-0.5">
                   {field.opsi}
                 </div>
 
-                {/* Input Teks Jawaban */}
                 <div className="flex-1 space-y-1">
                   <input 
                     {...register(`pilihan.${index}.teks` as const)}
@@ -206,7 +198,6 @@ export default function AddQuestionPage() {
                   )}
                 </div>
 
-                {/* Input Skor Nilai Opsi */}
                 <div className="w-20 space-y-1">
                   <input 
                     type="number"
@@ -261,4 +252,4 @@ export default function AddQuestionPage() {
       </form>
     </div>
   );
-}
+} 

@@ -74,7 +74,10 @@ export async function POST(request: Request) {
   try {
     // 1. Verifikasi Keaslian Notifikasi (Signature) langsung menembak API Midtrans
     // Method ini akan melempar catch jika signature_key tidak cocok/palsu
-    const verifiedNotification = await snapGateway.transaction.notification(notificationPayload);
+    // PERBAIKAN TYPE-CHECKING: Menambahkan "as MidtransNotificationPayload" 
+    const verifiedNotification = (await snapGateway.transaction.notification(
+      notificationPayload as Record<string, unknown>
+    )) as MidtransNotificationPayload;
 
     const orderId = verifiedNotification.order_id;
     const transactionStatus = verifiedNotification.transaction_status;

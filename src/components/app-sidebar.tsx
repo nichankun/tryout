@@ -48,6 +48,7 @@ const ADMIN_MENUS = [
   { title: "Manajemen User", url: "/admin/users", icon: Users },
   { title: "Bank Soal & Paket", url: "/admin/packages", icon: BookOpen },
   { title: "Transaksi", url: "/admin/orders", icon: CreditCard },
+  { title: "Figural", url: "/admin/figural", icon: CreditCard },
   { title: "Pengaturan", url: "/admin/settings", icon: Settings },
 ] as const;
 

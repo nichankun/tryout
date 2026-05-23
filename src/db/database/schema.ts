@@ -22,10 +22,16 @@ export const ORDER_STATUSES = ["pending", "paid", "failed"] as const;
 export const QUESTION_CATEGORIES = ["TWK", "TIU", "TKP"] as const;
 
 // OPTIMASI: Interface untuk kolom JSONB agar Type-Safe di seluruh aplikasi
+export interface FiguralConfig {
+  tipe: "deret_rotasi" | "matriks" | "pencerminan" | "analogi_gambar" | "analogi_matriks" | "ketidaksamaan" | "deret_bangun" | "tumpukan_balok";
+  deretSoal: (string | number)[];
+}
+
 export interface QuestionChoice {
   opsi: string; // misal: "A", "B", "C", "D", "E"
   teks: string;
   poin: number; // TKP punya poin 1-5, TIU/TWK 0 atau 5
+  figuralAngle?: number| null; // Tambahan untuk deteksi rotasi opsi figural
 }
 
 export interface StudentAnswer {
@@ -169,6 +175,11 @@ export const questions = pgTable(
     packageId:  integer("package_id").notNull().references(() => tryoutPackages.id, { onDelete: "cascade" }), // Cascade agar aman saat hapus paket
     kategori:   text("kategori", { enum: QUESTION_CATEGORIES }).notNull(),
     pertanyaan: text("pertanyaan").notNull(),
+    
+    // Penambahan kolom untuk Figural
+    isFigural:     boolean("is_figural").default(false),
+    figuralConfig: jsonb("figural_config").$type<FiguralConfig>(),
+
     // OPTIMASI: Injeksi Type ke JSONB
     pilihan:    jsonb("pilihan").$type<QuestionChoice[]>().notNull(),
     pembahasan: text("pembahasan").notNull(),
@@ -201,8 +212,6 @@ export const tryoutHistories = pgTable(
     endTimeIdx: index("tryout_histories_end_time_idx").on(table.endTime),
   })
 );
-
-
 
 // ==========================================
 // RELASI (RELATIONS)

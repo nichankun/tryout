@@ -29,7 +29,8 @@ const FormQuestionSchema = z.object({
 type FormValues = z.infer<typeof FormQuestionSchema>;
 
 interface EditFormProps {
-  initialData: FormValues & { id: number; packageId: number };
+  // Ditambahkan properti opsional atau tegas isFigural dari database jika ada
+  initialData: FormValues & { id: number; packageId: number; isFigural?: boolean };
 }
 
 export default function EditQuestionFormClient({ initialData }: EditFormProps) {
@@ -52,9 +53,11 @@ export default function EditQuestionFormClient({ initialData }: EditFormProps) {
   const onSubmit = (values: FormValues) => {
     setStatus(null);
     setIsPending(async () => {
+      // PERBAIKAN: Menyertakan isFigural agar lolos type-checking strict Server Action
       const result = await updateQuestionAction({
         id: initialData.id,
         packageId: initialData.packageId,
+        isFigural: !!initialData.isFigural, // Mengunci nilai boolean asli dari database
         ...values,
       });
 

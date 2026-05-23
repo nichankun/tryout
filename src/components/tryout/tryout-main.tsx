@@ -1,8 +1,14 @@
 "use client";
 
+/**
+ * components/tryout/tryout-main.tsx
+ *
+ * Komponen utama area pengerjaan soal tryout.
+ * Mendukung rendering otomatis soal figural (TIU Figural / Procedural SVG).
+ */
+
 import * as React from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -24,27 +30,35 @@ import {
   ChevronLeft, ChevronRight, CheckCircle2,
   AlertCircle, LayoutGrid, BookOpen, Loader2,
 } from "lucide-react";
-import { TEXT_CONTENT, Question, UserAnswer } from "@/types/tryout";
 
+import { TEXT_CONTENT, Question, UserAnswer } from "@/types/tryout";
+import { FiguralRenderer } from "./figural-renderer";
+
+// ==========================================
+// PROPS
+// ==========================================
 interface TryoutMainProps {
-  isPaused: boolean;
-  isPending: boolean;
-  questions: Question[];
+  isPaused:        boolean;
+  isPending:       boolean;
+  questions:       Question[];
   currentQuestion: Question;
-  currentIdx: number;
-  activeId: number;
-  setActiveId: (id: number) => void;
-  currentAnswer: UserAnswer;
-  answeredCount: number;
-  flaggedCount: number;
+  currentIdx:      number;
+  activeId:        number;
+  setActiveId:     (id: number) => void;
+  currentAnswer:   UserAnswer;
+  answeredCount:   number;
+  flaggedCount:    number;
   unansweredCount: number;
   progressPercent: number;
-  onAnswer: (key: string) => void;
-  onFlag: () => void;
-  onSubmit: () => void;
-  getNavStyle: (qId: number) => string;
+  onAnswer:        (key: string) => void;
+  onFlag:          () => void;
+  onSubmit:        () => void;
+  getNavStyle:     (qId: number) => string;
 }
 
+// ==========================================
+// KOMPONEN UTAMA
+// ==========================================
 export const TryoutMain = React.memo((props: TryoutMainProps) => {
   const {
     isPaused, isPending, questions, currentQuestion, currentIdx,
@@ -52,10 +66,17 @@ export const TryoutMain = React.memo((props: TryoutMainProps) => {
     unansweredCount, progressPercent, onAnswer, onFlag, onSubmit, getNavStyle,
   } = props;
 
+  // ── Guard: soal figural lengkap? ──────────────────────────────────────
+  const isFiguralSoal =
+    currentQuestion?.isFigural === true &&
+    currentQuestion?.figuralConfig != null;
+
   return (
     <main
       className={`container mx-auto flex-1 px-4 py-6 md:px-6 md:py-8 transition-opacity duration-300 ${
-        isPaused ? "pointer-events-none select-none opacity-30 blur-sm" : "opacity-100"
+        isPaused
+          ? "pointer-events-none select-none opacity-30 blur-sm"
+          : "opacity-100"
       }`}
     >
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
@@ -71,7 +92,6 @@ export const TryoutMain = React.memo((props: TryoutMainProps) => {
                 {answeredCount} dari {questions.length} soal terjawab ({progressPercent}%)
               </span>
             </div>
-            {/* Progress bar warna ungu */}
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-purple-200/30">
               <div
                 className="h-full rounded-full bg-primary transition-all duration-300"
@@ -89,17 +109,40 @@ export const TryoutMain = React.memo((props: TryoutMainProps) => {
                   {TEXT_CONTENT.questionNumberLabel} {currentIdx + 1}
                 </span>
               </div>
-              {/* Badge subtest — pill ungu */}
               <span className="rounded-full border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary">
                 {currentQuestion?.kategori}
               </span>
             </CardHeader>
 
             <CardContent className="space-y-5 p-6 md:p-8">
+              {/* Teks Pertanyaan */}
               <p className="select-none whitespace-pre-line text-base leading-relaxed text-foreground">
                 {currentQuestion?.pertanyaan}
               </p>
 
+              {/* ── BLOK DERET GAMBAR FIGURAL (hanya muncul jika isFigural=true) ── */}
+              {isFiguralSoal && (
+                <div className="flex flex-wrap items-center gap-4 rounded-xl border border-purple-200 bg-purple-50/50 p-4">
+                  {currentQuestion.figuralConfig!.deretSoal.map((val, idx) => (
+                    <div key={idx} className="flex items-center gap-4">
+                      <div className="rounded-lg border border-border bg-card p-2 shadow-sm">
+                        <FiguralRenderer
+                          tipe={currentQuestion.figuralConfig!.tipe}
+                          angle={val}
+                        />
+                      </div>
+                      {/* Panah pemisah antar frame, kecuali frame terakhir */}
+                      {idx < currentQuestion.figuralConfig!.deretSoal.length - 1 && (
+                        <span className="font-bold text-muted-foreground" aria-hidden>→</span>
+                      )}
+                    </div>
+                  ))}
+                  {/* Tanda tanya = jawaban yang dicari */}
+                  <span className="font-bold text-muted-foreground" aria-hidden>→ ?</span>
+                </div>
+              )}
+
+              {/* ── PILIHAN GANDA ── */}
               <RadioGroup
                 value={currentAnswer?.selectedKey ?? ""}
                 onValueChange={onAnswer}
@@ -107,6 +150,18 @@ export const TryoutMain = React.memo((props: TryoutMainProps) => {
               >
                 {currentQuestion?.pilihan.map((opt) => {
                   const isSelected = currentAnswer?.selectedKey === opt.opsi;
+
+                  /**
+                   * FIX: Gunakan `!= null` bukan `!== undefined`.
+                   * `figuralAngle` bisa bernilai `null` (dari DB) atau `undefined`
+                   * (tidak ada kunci). Keduanya berarti "tidak ada gambar figural".
+                   * Hanya jika nilainya adalah number (0 sekalipun) gambar dirender.
+                   */
+                  const hasFiguralOption =
+                    isFiguralSoal &&
+                    opt.figuralAngle != null &&
+                    typeof opt.figuralAngle === "number";
+
                   return (
                     <Label
                       key={opt.opsi}
@@ -118,15 +173,25 @@ export const TryoutMain = React.memo((props: TryoutMainProps) => {
                       }`}
                     >
                       <RadioGroupItem value={opt.opsi} id={`opt-${opt.opsi}`} />
-                      <span
-                        className={`text-sm ${
-                          isSelected
-                            ? "font-semibold text-primary"
-                            : "text-foreground"
-                        }`}
-                      >
-                        {opt.opsi}. {opt.teks}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span
+                          className={`text-sm ${
+                            isSelected ? "font-semibold text-primary" : "text-foreground"
+                          }`}
+                        >
+                          {opt.opsi}. {opt.teks}
+                        </span>
+
+                        {/* Render gambar opsi figural hanya jika figuralAngle adalah number */}
+                        {hasFiguralOption && (
+                          <div className="rounded-md border border-border bg-card p-1.5 shadow-sm">
+                            <FiguralRenderer
+                              tipe={currentQuestion.figuralConfig!.tipe}
+                              angle={opt.figuralAngle!}
+                            />
+                          </div>
+                        )}
+                      </div>
                     </Label>
                   );
                 })}
@@ -134,7 +199,7 @@ export const TryoutMain = React.memo((props: TryoutMainProps) => {
             </CardContent>
 
             <CardFooter className="flex flex-wrap justify-between gap-3 border-t border-purple-200/40 bg-purple-50/30 px-5 py-3">
-              {/* Tombol sebelumnya */}
+              {/* Tombol Sebelumnya */}
               <Button
                 variant="outline"
                 onClick={() => {
@@ -147,7 +212,7 @@ export const TryoutMain = React.memo((props: TryoutMainProps) => {
                 {TEXT_CONTENT.actionPrev}
               </Button>
 
-              {/* Tombol tandai ragu */}
+              {/* Tombol Ragu-Ragu */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -170,7 +235,7 @@ export const TryoutMain = React.memo((props: TryoutMainProps) => {
                 </TooltipContent>
               </Tooltip>
 
-              {/* Tombol berikutnya */}
+              {/* Tombol Selanjutnya */}
               <Button
                 onClick={() => {
                   if (currentIdx < questions.length - 1)
@@ -231,7 +296,7 @@ export const TryoutMain = React.memo((props: TryoutMainProps) => {
                 </div>
               </ScrollArea>
 
-              {/* Tombol submit */}
+              {/* Tombol Submit */}
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
@@ -259,7 +324,7 @@ export const TryoutMain = React.memo((props: TryoutMainProps) => {
                     </AlertDialogTitle>
                     <AlertDialogDescription>
                       Kamu baru menjawab{" "}
-                      <strong className="text-foreground font-semibold">
+                      <strong className="font-semibold text-foreground">
                         {answeredCount} dari {questions.length} soal
                       </strong>
                       .
@@ -293,7 +358,7 @@ export const TryoutMain = React.memo((props: TryoutMainProps) => {
             </CardContent>
           </Card>
 
-          {/* Tips card — ungu solid */}
+          {/* Tips card */}
           <div className="rounded-2xl bg-primary px-5 py-4">
             <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-purple-100">
               {TEXT_CONTENT.tipsTitle}
@@ -308,4 +373,5 @@ export const TryoutMain = React.memo((props: TryoutMainProps) => {
     </main>
   );
 });
+
 TryoutMain.displayName = "TryoutMain";
