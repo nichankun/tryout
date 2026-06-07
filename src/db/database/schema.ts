@@ -23,7 +23,8 @@ export const QUESTION_CATEGORIES = ["TWK", "TIU", "TKP"] as const;
 
 // OPTIMASI: Interface untuk kolom JSONB agar Type-Safe di seluruh aplikasi
 export interface FiguralConfig {
-  tipe: "deret_rotasi" | "matriks" | "pencerminan" | "analogi_gambar" | "analogi_matriks" | "ketidaksamaan" | "deret_bangun" | "tumpukan_balok";
+  // PERBAIKAN 1: Tambahkan "silogisme" di akhir daftar tipe
+  tipe: "deret_rotasi" | "matriks" | "pencerminan" | "analogi_gambar" | "analogi_matriks" | "ketidaksamaan" | "deret_bangun" | "tumpukan_balok" | "silogisme";
   deretSoal: (string | number)[];
 }
 
@@ -31,7 +32,7 @@ export interface QuestionChoice {
   opsi: string; // misal: "A", "B", "C", "D", "E"
   teks: string;
   poin: number; // TKP punya poin 1-5, TIU/TWK 0 atau 5
-  figuralAngle?: number| null; // Tambahan untuk deteksi rotasi opsi figural
+  figuralAngle?: number | string | null; 
 }
 
 export interface StudentAnswer {

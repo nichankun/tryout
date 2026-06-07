@@ -3,17 +3,17 @@
 /**
  * app/admin/packages/[id]/add-question/page.tsx
  * * Client Component Formulir Manual Pembuatan Soal Baru.
- * Menggunakan React Hook Form + Zod Client Validation.
- * Otomatis memetakan 5 baris opsi permanen (A-E) dengan input bobot poin (0-5).
+ * * SUDAH MENDUKUNG SOAL TEKS, FIGURAL, & SILOGISME (Diagram Venn).
+ * * Bebas dari Error Typescript (Payload Mismatch Fixed).
  */
 
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { createQuestionAction } from "@/lib/actions/questions";
-import { ArrowLeft, Save, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { ArrowLeft, Save, AlertCircle, CheckCircle2, Loader2, Image as ImageIcon } from "lucide-react";
 import Link from "next/link";
 
 // ==========================================
@@ -25,26 +25,38 @@ const FormQuestionSchema = z.object({
   }),
   pertanyaan: z.string().min(10, "Pertanyaan minimal berisi 10 karakter"),
   pembahasan: z.string().min(10, "Pembahasan jawaban minimal berisi 10 karakter"),
+  
+  // Penambahan Skema untuk Figural & Silogisme
+  isFigural: z.boolean().default(false),
+  figuralTipe: z.enum([
+    "deret_rotasi", "matriks", "pencerminan", "analogi_gambar",
+    "analogi_matriks", "ketidaksamaan", "deret_bangun", "tumpukan_balok", "silogisme"
+  ]).optional().nullable(),
+
   pilihan: z.array(
     z.object({
       opsi: z.enum(["A", "B", "C", "D", "E"]),
-      teks: z.string().min(1, "Teks opsi jawaban tidak boleh kosong"),
+      // Teks diubah jadi opsional karena soal gambar mungkin tidak ada teksnya
+      teks: z.string().optional(), 
       poin: z.number({ invalid_type_error: "Poin harus berupa angka" })
         .int()
         .min(0, "Poin minimal 0")
         .max(5, "Poin maksimal 5"),
+      // Parameter input angle/key untuk memanggil gambar SVG
+      figuralAngle: z.union([z.string(), z.number()]).optional().nullable(),
     })
   ).length(5),
 });
 
 type FormValues = z.infer<typeof FormQuestionSchema>;
 
+// Opsi A-E ditambahkan properti figuralAngle kosong sebagai default
 const DEFAULT_OPTIONS = [
-  { opsi: "A", teks: "", poin: 0 },
-  { opsi: "B", teks: "", poin: 0 },
-  { opsi: "C", teks: "", poin: 0 },
-  { opsi: "D", teks: "", poin: 0 },
-  { opsi: "E", teks: "", poin: 0 },
+  { opsi: "A", teks: "", poin: 0, figuralAngle: "" },
+  { opsi: "B", teks: "", poin: 0, figuralAngle: "" },
+  { opsi: "C", teks: "", poin: 0, figuralAngle: "" },
+  { opsi: "D", teks: "", poin: 0, figuralAngle: "" },
+  { opsi: "E", teks: "", poin: 0, figuralAngle: "" },
 ] as const;
 
 // ==========================================
@@ -70,7 +82,9 @@ export default function AddQuestionPage() {
       kategori: "TWK",
       pertanyaan: "",
       pembahasan: "",
-      pilihan: [...DEFAULT_OPTIONS],
+      isFigural: false,
+      figuralTipe: null,
+      pilihan: [...DEFAULT_OPTIONS] as any,
     },
   });
 
@@ -79,16 +93,45 @@ export default function AddQuestionPage() {
     name: "pilihan",
   });
 
+  // Pantau apakah mode figural sedang diaktifkan user untuk mengubah UI
+  const isFiguralActive = useWatch({
+    control,
+    name: "isFigural",
+  });
+
   const onSubmit = (values: FormValues) => {
     setStatusMessage(null);
 
     setIsPending(async () => {
-      // PERBAIKAN: Menyisipkan isFigural: false agar kompatibel dengan validasi tipe data baru di Server Action
-      const result = await createQuestionAction({
+      // 1. Format array pilihan agar Typescript backend tidak komplain
+      // Jika teks kosong, kita paksa jadi string "" (bukan undefined)
+      const formattedPilihan = values.pilihan.map((p) => ({
+        opsi: p.opsi,
+        teks: p.teks || "", 
+        poin: p.poin,
+        figuralAngle: p.figuralAngle || null,
+      }));
+
+      // 2. Susun Payload sesuai dengan Zod Schema di actions/questions.ts
+      const payload: any = {
         packageId,
-        isFigural: false, 
-        ...values,
-      });
+        kategori: values.kategori,
+        pertanyaan: values.pertanyaan,
+        pembahasan: values.pembahasan,
+        isFigural: values.isFigural,
+        pilihan: formattedPilihan,
+      };
+
+      // 3. Masukkan figuralConfig jika mode figural diaktifkan
+      if (values.isFigural && values.figuralTipe) {
+        payload.figuralConfig = {
+          tipe: values.figuralTipe,
+          deretSoal: [], // Dikosongkan sesuai interface Drizzle
+        };
+      }
+
+      // Kirim ke server action
+      const result = await createQuestionAction(payload);
 
       if (!result.success) {
         setStatusMessage({ 
@@ -107,7 +150,9 @@ export default function AddQuestionPage() {
         kategori: values.kategori,
         pertanyaan: "",
         pembahasan: "",
-        pilihan: [...DEFAULT_OPTIONS],
+        isFigural: false,
+        figuralTipe: null,
+        pilihan: [...DEFAULT_OPTIONS] as any,
       });
       
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -171,6 +216,45 @@ export default function AddQuestionPage() {
             />
             {errors.pertanyaan && <p className="text-xs text-destructive font-medium">{errors.pertanyaan.message}</p>}
           </div>
+
+          {/* TOGGLE MODE FIGURAL / GAMBAR */}
+          <div className="pt-4 mt-2 border-t border-border flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input 
+                type="checkbox" 
+                {...register("isFigural")}
+                className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <div className="flex flex-col">
+                <span className="text-sm font-bold flex items-center gap-2">
+                  <ImageIcon className="w-4 h-4 text-purple-600" /> Mode Gambar (Figural / Silogisme)
+                </span>
+                <span className="text-xs text-muted-foreground">Aktifkan untuk menyisipkan gambar prosedural di opsi A-E</span>
+              </div>
+            </label>
+
+            {/* MUNCUL JIKA TOGGLE DICENTANG */}
+            {isFiguralActive && (
+              <div className="w-full sm:w-1/2">
+                <select 
+                  {...register("figuralTipe")}
+                  className="w-full h-10 px-3 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-purple-500 cursor-pointer"
+                >
+                  <option value="">-- Pilih Tipe Gambar --</option>
+                  <option value="silogisme">Silogisme (Diagram Venn)</option>
+                  <option value="deret_rotasi">Deret Rotasi</option>
+                  <option value="matriks">Matriks Gambar</option>
+                  <option value="pencerminan">Pencerminan</option>
+                  <option value="analogi_gambar">Analogi Gambar</option>
+                  <option value="analogi_matriks">Analogi Matriks</option>
+                  <option value="ketidaksamaan">Ketidaksamaan</option>
+                  <option value="deret_bangun">Deret Bangun</option>
+                  <option value="tumpukan_balok">Tumpukan Balok 3D</option>
+                </select>
+                {errors.figuralTipe && <p className="text-xs text-destructive mt-1">{errors.figuralTipe.message}</p>}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* BLOK 2: DAFTAR OPSI LEMBAR JAWABAN (A-E) */}
@@ -182,30 +266,40 @@ export default function AddQuestionPage() {
 
           <div className="space-y-3">
             {fields.map((field, index) => (
-              <div key={field.id} className="flex items-start gap-3">
-                <div className="w-9 h-9 flex items-center justify-center bg-muted border border-border rounded-lg text-xs font-bold shrink-0 mt-0.5">
+              <div key={field.id} className="flex flex-col sm:flex-row items-start gap-3 p-3 bg-muted/30 border border-border/50 rounded-lg">
+                <div className="w-9 h-9 flex items-center justify-center bg-muted border border-border rounded-lg text-xs font-bold shrink-0">
                   {field.opsi}
                 </div>
 
-                <div className="flex-1 space-y-1">
+                <div className="flex-1 w-full space-y-2">
                   <input 
                     {...register(`pilihan.${index}.teks` as const)}
-                    placeholder={`Teks pilihan jawaban untuk opsi ${field.opsi}...`}
+                    placeholder={`Teks pilihan jawaban untuk opsi ${field.opsi} (Opsional jika figural)...`}
                     className="w-full h-9 px-3 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                   />
+                  
+                  {/* INPUT KHUSUS MUNCUL JIKA MODE FIGURAL AKTIF */}
+                  {isFiguralActive && (
+                    <input 
+                      {...register(`pilihan.${index}.figuralAngle` as const)}
+                      placeholder="Key Pola (misal: semua_dalam, huruf_e) atau Nilai Angka"
+                      className="w-full h-9 px-3 bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/50 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-purple-500 placeholder:text-purple-300"
+                    />
+                  )}
+
                   {errors.pilihan?.[index]?.teks && (
                     <p className="text-none text-[11px] text-destructive font-medium">{errors.pilihan[index]?.teks?.message}</p>
                   )}
                 </div>
 
-                <div className="w-20 space-y-1">
+                <div className="w-full sm:w-24 space-y-1">
                   <input 
                     type="number"
                     {...register(`pilihan.${index}.poin` as const, { valueAsNumber: true })}
                     placeholder="Poin"
                     min={0}
                     max={5}
-                    className="w-full h-9 px-2 text-center bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="w-full h-9 px-2 text-center bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary font-bold"
                   />
                   {errors.pilihan?.[index]?.poin && (
                     <p className="text-none text-[11px] text-destructive font-medium text-center">{errors.pilihan[index]?.poin?.message}</p>
@@ -252,4 +346,4 @@ export default function AddQuestionPage() {
       </form>
     </div>
   );
-} 
+}

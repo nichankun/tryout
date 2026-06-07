@@ -4,7 +4,7 @@
  * components/tryout/tryout-main.tsx
  *
  * Komponen utama area pengerjaan soal tryout.
- * Mendukung rendering otomatis soal figural (TIU Figural / Procedural SVG).
+ * Mendukung rendering otomatis soal figural (TIU Figural / Procedural SVG / Silogisme).
  */
 
 import * as React from "react";
@@ -121,7 +121,7 @@ export const TryoutMain = React.memo((props: TryoutMainProps) => {
               </p>
 
               {/* ── BLOK DERET GAMBAR FIGURAL (hanya muncul jika isFigural=true) ── */}
-              {isFiguralSoal && (
+              {isFiguralSoal && currentQuestion.figuralConfig!.deretSoal && currentQuestion.figuralConfig!.deretSoal.length > 0 && (
                 <div className="flex flex-wrap items-center gap-4 rounded-xl border border-purple-200 bg-purple-50/50 p-4">
                   {currentQuestion.figuralConfig!.deretSoal.map((val, idx) => (
                     <div key={idx} className="flex items-center gap-4">
@@ -152,28 +152,27 @@ export const TryoutMain = React.memo((props: TryoutMainProps) => {
                   const isSelected = currentAnswer?.selectedKey === opt.opsi;
 
                   /**
-                   * FIX: Gunakan `!= null` bukan `!== undefined`.
-                   * `figuralAngle` bisa bernilai `null` (dari DB) atau `undefined`
-                   * (tidak ada kunci). Keduanya berarti "tidak ada gambar figural".
-                   * Hanya jika nilainya adalah number (0 sekalipun) gambar dirender.
+                   * FIX: Perbaiki pengecekan hasFiguralOption. 
+                   * Sekarang bisa menerima string (untuk silogisme/kamus) ATAU number (untuk rotasi).
                    */
-                  const hasFiguralOption =
-                    isFiguralSoal &&
-                    opt.figuralAngle != null &&
-                    typeof opt.figuralAngle === "number";
+                 const hasFiguralOption =
+  isFiguralSoal &&
+  opt.figuralAngle !== null &&
+  opt.figuralAngle !== undefined &&
+  (typeof opt.figuralAngle === "number" || opt.figuralAngle !== "");
 
                   return (
                     <Label
                       key={opt.opsi}
                       htmlFor={`opt-${opt.opsi}`}
-                      className={`flex cursor-pointer items-center gap-4 rounded-xl border p-4 transition-colors ${
+                      className={`flex cursor-pointer items-start gap-4 rounded-xl border p-4 transition-colors ${
                         isSelected
                           ? "border-primary bg-purple-50"
                           : "border-border hover:border-purple-200 hover:bg-purple-50/30"
                       }`}
                     >
-                      <RadioGroupItem value={opt.opsi} id={`opt-${opt.opsi}`} />
-                      <div className="flex flex-wrap items-center gap-3">
+                      <RadioGroupItem value={opt.opsi} id={`opt-${opt.opsi}`} className="mt-1" />
+                      <div className="flex flex-col flex-1 gap-2">
                         <span
                           className={`text-sm ${
                             isSelected ? "font-semibold text-primary" : "text-foreground"
@@ -182,15 +181,19 @@ export const TryoutMain = React.memo((props: TryoutMainProps) => {
                           {opt.opsi}. {opt.teks}
                         </span>
 
-                        {/* Render gambar opsi figural hanya jika figuralAngle adalah number */}
+                        {/* 👇 Render gambar opsi figural di bawah teks 👇 */}
                         {hasFiguralOption && (
-                          <div className="rounded-md border border-border bg-card p-1.5 shadow-sm">
-                            <FiguralRenderer
-                              tipe={currentQuestion.figuralConfig!.tipe}
-                              angle={opt.figuralAngle!}
-                            />
+                          <div className="mt-1 block">
+                            <div className="inline-block rounded-md border border-border bg-white dark:bg-zinc-950 p-2 shadow-sm">
+                              <FiguralRenderer
+                                tipe={currentQuestion.figuralConfig!.tipe}
+                                angle={opt.figuralAngle!}
+                                size={80} // Ukuran lebih pas untuk di dalam opsi
+                              />
+                            </div>
                           </div>
                         )}
+                        {/* 👆 ------------------------------------------ 👆 */}
                       </div>
                     </Label>
                   );

@@ -6,6 +6,7 @@
  * Server Action Produksi untuk Manajemen Bank Soal (Admin Only).
  * Dioptimalkan dengan Zod Schema Composition (DRY), Centralized Auth,
  * dan Native Bulk Insert Drizzle ORM.
+ * * * UPDATE: Sudah ditambahkan dukungan "silogisme" dan figuralAngle tipe string.
  */
 
 import { auth } from "@/auth";
@@ -21,10 +22,12 @@ import { eq } from "drizzle-orm";
 const ADMIN_ROLE     = "ADMIN" as const;
 const KATEGORI_SOAL  = ["TWK", "TIU", "TKP"] as const;
 const OPSI_PILIHAN   = ["A", "B", "C", "D", "E"] as const;
+
+// PERBAIKAN 1: Tambahkan 'silogisme' pada array konstanta
 const FIGURAL_TIPE   = [
   "deret_rotasi", "matriks", "pencerminan",
   "analogi_gambar", "analogi_matriks", "ketidaksamaan",
-  "deret_bangun", "tumpukan_balok",
+  "deret_bangun", "tumpukan_balok", "silogisme"
 ] as const;
 
 const ERROR_MESSAGES = {
@@ -42,11 +45,10 @@ const ERROR_MESSAGES = {
 const PilihanSchema = z.array(
   z.object({
     opsi:         z.enum(OPSI_PILIHAN),
-    // FIX: tambah min(1) agar teks opsi tidak boleh kosong
     teks:         z.string().min(1, "Teks opsi tidak boleh kosong"),
     poin:         z.number().int().min(0).max(5),
-    // FIX: pakai null (bukan undefined) agar konsisten dengan kolom JSONB DB
-    figuralAngle: z.number().nullable().optional(),
+    // PERBAIKAN 2: Gunakan z.union agar bisa menerima angka (rotasi) ATAU string (key pola spt 'huruf_e')
+    figuralAngle: z.union([z.number(), z.string()]).nullable().optional(),
   })
 ).length(5, "Soal harus memiliki tepat 5 pilihan opsi (A-E)");
 
@@ -64,7 +66,6 @@ const BaseQuestionSchema = z.object({
   ),
 
   // preprocess: ubah null → undefined agar .optional() bekerja
-  // FIX: gunakan FIGURAL_TIPE dari konstanta agar tidak duplikat string literal
   figuralConfig: z.preprocess(
     (val) => (val === null ? undefined : val),
     z.object({
@@ -109,13 +110,11 @@ function normalizeQuestionPayload(q: BaseValidated) {
     pertanyaan:    q.pertanyaan,
     pembahasan:    q.pembahasan,
     isFigural:     q.isFigural ?? false,
-    // null jika tidak ada konfigurasi figural — konsisten dengan kolom DB nullable
     figuralConfig: q.figuralConfig ?? null,
     pilihan: q.pilihan.map((p) => ({
       opsi:  p.opsi,
       teks:  p.teks,
       poin:  p.poin,
-      // null jika bukan opsi figural — konsisten dengan interface QuestionChoice
       figuralAngle: p.figuralAngle ?? null,
     })),
   };
@@ -194,7 +193,6 @@ export async function importBulkQuestionsAction(
       return { success: false as const, error: ERROR_MESSAGES.emptyImport };
     }
 
-    // FIX: gunakan normalizeQuestionPayload agar tidak duplikasi mapper
     const insertPayload = parsed.data.map((q) => ({
       packageId,
       ...normalizeQuestionPayload(q),

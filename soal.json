@@ -1,0 +1,61 @@
+[
+  {
+    "kategori": "TIU",
+    "pertanyaan": "Semua Kucing (A) adalah Hewan peliharaan (B). Manakah diagram Venn di bawah ini yang paling tepat menggambarkan premis tersebut?",
+    "pembahasan": "Karena premis menggunakan kata 'Semua', maka himpunan Kucing (A) harus berada sepenuhnya di dalam himpunan Hewan peliharaan (B).",
+    "isFigural": true,
+    "figuralConfig": {
+      "tipe": "silogisme",
+      "deretSoal": []
+    },
+    "pilihan": [
+      {
+        "opsi": "A",
+        "teks": "Himpunan A dan B terpisah (Tidak ada A yang B)",
+        "poin": 0,
+        "figuralAngle": "tidak_ada_terpisah"
+      },
+      {
+        "opsi": "B",
+        "teks": "Himpunan A dan B beririsan (Sebagian A adalah B)",
+        "poin": 0,
+        "figuralAngle": "sebagian_irisan"
+      },
+      {
+        "opsi": "C",
+        "teks": "Himpunan A sepenuhnya di dalam B (Semua A adalah B)",
+        "poin": 5,
+        "figuralAngle": "semua_dalam"
+      },
+      {
+        "opsi": "D",
+        "teks": "Diagram tidak relevan",
+        "poin": 0,
+        "figuralAngle": "huruf_e"
+      },
+      {
+        "opsi": "E",
+        "teks": "Tidak dapat ditarik kesimpulan",
+        "poin": 0,
+        "figuralAngle": "potong_simetris_bujursangkar"
+      }
+    ]
+  },
+  {
+    "kategori": "TIU",
+    "pertanyaan": "Perhatikan pola rotasi berikut. Jika sebuah bentuk diputar 90 derajat searah jarum jam, manakah hasil yang benar?",
+    "pembahasan": "Perputaran 90 derajat searah jarum jam dari titik 0 akan menghasilkan sudut 90 derajat yang baru.",
+    "isFigural": true,
+    "figuralConfig": {
+      "tipe": "deret_rotasi",
+      "deretSoal": []
+    },
+    "pilihan": [
+      { "opsi": "A", "teks": "Rotasi 0 Derajat", "poin": 0, "figuralAngle": 0 },
+      { "opsi": "B", "teks": "Rotasi 45 Derajat", "poin": 0, "figuralAngle": 45 },
+      { "opsi": "C", "teks": "Rotasi 90 Derajat", "poin": 5, "figuralAngle": 90 },
+      { "opsi": "D", "teks": "Rotasi 180 Derajat", "poin": 0, "figuralAngle": 180 },
+      { "opsi": "E", "teks": "Rotasi 270 Derajat", "poin": 0, "figuralAngle": 270 }
+    ]
+  }
+]

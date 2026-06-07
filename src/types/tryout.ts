@@ -63,7 +63,8 @@ export type FiguralTipe =
   | "analogi_matriks"
   | "ketidaksamaan"
   | "deret_bangun"
-  | "tumpukan_balok";
+  | "tumpukan_balok"
+  | "silogisme";
 
 export interface FiguralConfig {
   tipe: FiguralTipe;
@@ -79,15 +80,12 @@ export interface FiguralConfig {
 // PILIHAN SOAL
 // ==========================================
 export interface QuestionChoice {
-  opsi:  string;  // "A", "B", "C", "D", "E"
+  opsi:  string;
   teks:  string;
-  poin?: number;  // TKP: 1-5 | TIU/TWK: 0 atau 5
-  /**
-   * Sudut/nilai figural untuk opsi ini.
-   * Gunakan `null` (bukan `undefined`) agar konsisten dengan kolom DB.
-   */
-  figuralAngle?: number | null;
+  poin?: number;
+  figuralAngle?: number | string | null; // ← tambahkan string
 }
+
 
 // ==========================================
 // SOAL

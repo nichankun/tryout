@@ -7,9 +7,38 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Copy, Sparkles, RefreshCw, Eye } from "lucide-react";
+import { Copy, Sparkles, RefreshCw, Eye, BookOpen } from "lucide-react";
 import { FiguralRenderer, FiguralTipe } from "@/components/tryout/figural-renderer";
-import { toast } from "sonner"; // Pastikan Anda punya library toast
+import { toast } from "sonner"; 
+import { Badge } from "@/components/ui/badge";
+
+// Data kamus untuk referensi di Section 2
+const REFERENCE_DICTIONARY = [
+  {
+    kategori: "Silogisme (Diagram Venn)",
+    keys: ["semua_dalam", "sebagian_irisan", "tidak_ada_terpisah"]
+  },
+  {
+    kategori: "Analogi Gambar",
+    keys: ["persegi_lingkaran_kiri", "persegi_lingkaran_kiri_kanan", "segitiga_bintang_puncak", "panah_utara_tebal", "panah_selatan_tipis_dua", "bujur_sangkar_putih_ganda"]
+  },
+  {
+    kategori: "Analogi Matriks",
+    keys: ["titik_dalam_segitiga", "titik_luar_segitiga", "garis_dalam_lingkaran", "garis_singgung_luar_lingkaran"]
+  },
+  {
+    kategori: "Ketidaksamaan (Huruf & Bentuk)",
+    keys: ["huruf_e", "huruf_f", "huruf_h", "huruf_z", "huruf_l", "potong_simetris_segienam", "potong_simetris_bujursangkar", "potong_simetris_trapesium", "potong_simetris_belahketupat", "potong_mercy_lingkaran", "2d_segitiga_bujursangkar"]
+  },
+  {
+    kategori: "Ketidaksamaan 3D",
+    keys: ["3d_prisma_kubus", "3d_tabung_kerucut", "3d_piramida_limas", "3d_bola_elipsoid"]
+  },
+  {
+    kategori: "Pencerminan",
+    keys: ["asli", "cermin_h", "cermin_v", "cermin_hv"]
+  }
+];
 
 export default function AdminFiguralPage() {
   // --- STATE UNTUK PLAYGROUND ---
@@ -24,6 +53,13 @@ export default function AdminFiguralPage() {
     toast.success("Konfigurasi berhasil disalin!");
   };
 
+  // Helper untuk menentukan placeholder input
+  const getPlaceholder = () => {
+    if (tipe === "silogisme") return "misal: semua_dalam, sebagian_irisan";
+    if (tipe === "pencerminan") return "misal: cermin_h, cermin_v";
+    return "Ketik nama pola (misal: huruf_e)";
+  };
+
   return (
     <div className="container mx-auto space-y-8 p-6 pb-20">
       {/* ── HEADER ── */}
@@ -32,7 +68,7 @@ export default function AdminFiguralPage() {
           <h1 className="text-3xl font-extrabold tracking-tight text-purple-950">
             Studio Figural <Sparkles className="inline-block h-6 w-6 text-purple-500" />
           </h1>
-          <p className="text-muted-foreground">Rancang dan uji pola visual soal TIU Figural secara instan.</p>
+          <p className="text-muted-foreground">Rancang dan uji pola visual soal TIU Figural & Silogisme secara instan.</p>
         </div>
       </div>
 
@@ -43,19 +79,30 @@ export default function AdminFiguralPage() {
             <RefreshCw className="h-5 w-5 text-purple-600" />
             <CardTitle className="text-xl text-purple-900">Live Playground</CardTitle>
           </div>
-          <CardDescription>Sesuaikan parameter di bawah untuk melihat hasil render SVG.</CardDescription>
+          <CardDescription>Sesuaikan parameter di bawah untuk melihat hasil render SVG secara real-time.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-8 p-8 lg:grid-cols-2">
           
           {/* Panel Kontrol */}
           <div className="flex flex-col gap-6">
             <div className="space-y-2">
-              <Label htmlFor="tipe" className="text-sm font-bold text-purple-900">Tipe Figural</Label>
-              <Select value={tipe} onValueChange={(v) => setTipe(v as FiguralTipe)}>
+              <Label htmlFor="tipe" className="text-sm font-bold text-purple-900">Tipe Visualisasi</Label>
+              <Select value={tipe} onValueChange={(v) => {
+                setTipe(v as FiguralTipe);
+                // Reset angle default sesuai tipe (agar tidak error / aneh saat switch)
+                if (["deret_rotasi", "matriks", "deret_bangun", "tumpukan_balok"].includes(v)) {
+                  setAngle(v === "deret_rotasi" ? 45 : 3);
+                } else if (v === "silogisme") {
+                  setAngle("sebagian_irisan");
+                } else {
+                  setAngle("");
+                }
+              }}>
                 <SelectTrigger id="tipe" className="border-purple-200 focus:ring-purple-500">
                   <SelectValue placeholder="Pilih Tipe" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="silogisme">Silogisme (Diagram Venn)</SelectItem>
                   <SelectItem value="deret_rotasi">Deret Rotasi (Trigonometri)</SelectItem>
                   <SelectItem value="matriks">Matriks (Grid 3x3)</SelectItem>
                   <SelectItem value="pencerminan">Pencerminan (Refleksi)</SelectItem>
@@ -72,7 +119,7 @@ export default function AdminFiguralPage() {
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-bold text-purple-900">Value (Angle / Key)</Label>
                 <span className="rounded-md bg-purple-100 px-2 py-0.5 font-mono text-xs text-purple-700">
-                  {typeof angle === "number" ? `${angle}° / unit` : angle}
+                  {typeof angle === "number" ? `${angle}° / unit` : (angle || "kosong")}
                 </span>
               </div>
               
@@ -89,7 +136,7 @@ export default function AdminFiguralPage() {
                 <Input 
                   value={angle} 
                   onChange={(e) => setAngle(e.target.value)}
-                  placeholder="Ketik nama pola (misal: huruf_e)"
+                  placeholder={getPlaceholder()}
                   className="border-purple-200"
                 />
               )}
@@ -119,14 +166,48 @@ export default function AdminFiguralPage() {
       </Card>
 
       {/* ── SECTION 2: KATALOG LENGKAP (REFERENCE) ── */}
-      <div className="space-y-6">
+      <div className="space-y-6 pt-4">
         <div className="flex items-center gap-2">
-          <Eye className="h-5 w-5 text-purple-600" />
-          <h2 className="text-xl font-bold text-purple-900">Kamus Referensi Pola</h2>
+          <BookOpen className="h-6 w-6 text-purple-600" />
+          <h2 className="text-2xl font-bold text-purple-950">Kamus Referensi Pola Teks (Dictionary)</h2>
         </div>
-        
-        {/* Konten Katalog yang sudah dibuat sebelumnya di sini... */}
-        {/* Admin bisa melihat daftar nama pola di bawah ini dan mencobanya di Playground di atas */}
+        <p className="text-muted-foreground text-sm">
+          Gunakan teks / <i>key</i> di bawah ini untuk mengisi input <b>Value</b> pada tipe gambar yang berbasis kamus teks. Anda dapat mengkliknya untuk otomatis menguji di <i>playground</i>.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {REFERENCE_DICTIONARY.map((section, idx) => (
+            <Card key={idx} className="border border-purple-100 shadow-sm">
+              <CardHeader className="bg-purple-50/50 pb-3">
+                <CardTitle className="text-sm font-bold text-purple-800">{section.kategori}</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="flex flex-wrap gap-2">
+                  {section.keys.map((k) => (
+                    <Badge 
+                      key={k} 
+                      variant="secondary" 
+                      className="cursor-pointer hover:bg-purple-200 hover:text-purple-900 transition-colors"
+                      onClick={() => {
+                        // Fitur Auto-Set ketika badge diklik
+                        if (section.kategori.includes("Silogisme")) setTipe("silogisme");
+                        else if (section.kategori.includes("Analogi Gambar")) setTipe("analogi_gambar");
+                        else if (section.kategori.includes("Analogi Matriks")) setTipe("analogi_matriks");
+                        else if (section.kategori.includes("Pencerminan")) setTipe("pencerminan");
+                        else setTipe("ketidaksamaan");
+                        
+                        setAngle(k);
+                        window.scrollTo({ top: 0, behavior: 'smooth' }); // Scroll ke atas saat di-klik
+                      }}
+                    >
+                      {k}
+                    </Badge>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     </div>
   );

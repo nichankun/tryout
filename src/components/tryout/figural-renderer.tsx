@@ -6,15 +6,16 @@
  * Komponen Client generik untuk merender soal TIU Figural secara prosedural (SVG).
  * Sangat ringan, cepat, dan otomatis beradaptasi dengan Dark/Light mode sistem.
  *
- * Mendukung 8 tipe figural + string key dictionary untuk semua soal JSON:
- *  1. deret_rotasi     — angle: number (derajat)
- *  2. matriks          — angle: number (jumlah sel terisi 0-9)
- *  3. pencerminan      — angle: number|"asli"|"cermin_h"|"cermin_v"|"cermin_hv"
- *  4. analogi_gambar   — angle: string key (persegi_lingkaran_kiri, dll.) | number
- *  5. analogi_matriks  — angle: string key (titik_dalam_segitiga, dll.) | number
- *  6. ketidaksamaan    — angle: string key (huruf_e, potong_simetris_*, 3d_*, dll.) | number
- *  7. deret_bangun     — angle: number (jumlah sisi 3-8)
- *  8. tumpukan_balok   — angle: number (jumlah balok 1-6)
+ * Mendukung 9 tipe figural + string key dictionary untuk semua soal JSON:
+ * 1. deret_rotasi     — angle: number (derajat)
+ * 2. matriks          — angle: number (jumlah sel terisi 0-9)
+ * 3. pencerminan      — angle: number|"asli"|"cermin_h"|"cermin_v"|"cermin_hv"
+ * 4. analogi_gambar   — angle: string key (persegi_lingkaran_kiri, dll.) | number
+ * 5. analogi_matriks  — angle: string key (titik_dalam_segitiga, dll.) | number
+ * 6. ketidaksamaan    — angle: string key (huruf_e, potong_simetris_*, 3d_*, dll.) | number
+ * 7. deret_bangun     — angle: number (jumlah sisi 3-8)
+ * 8. tumpukan_balok   — angle: number (jumlah balok 1-6)
+ * 9. silogisme        — angle: string key (semua_dalam, sebagian_irisan, tidak_ada_terpisah)
  */
 
 import * as React from "react";
@@ -30,7 +31,8 @@ export type FiguralTipe =
   | "analogi_matriks"
   | "ketidaksamaan"
   | "deret_bangun"
-  | "tumpukan_balok";
+  | "tumpukan_balok"
+  | "silogisme"; // <-- Tambahan untuk Silogisme
 
 interface FiguralRendererProps {
   tipe: FiguralTipe;
@@ -360,6 +362,44 @@ const KETIDAKSAMAAN_DICT: Record<string, RenderFn> = {
 };
 
 // ==========================================
+// DICTIONARY: SILOGISME (DIAGRAM VENN)
+// ==========================================
+const SILOGISME_DICT: Record<string, RenderFn> = {
+  // Semua A adalah B (Lingkaran kecil di dalam lingkaran besar)
+  semua_dalam: () => (
+    <>
+      <circle cx="50" cy="50" r="35" fill="none" stroke={C} strokeWidth="3" className="text-primary" />
+      <circle cx="50" cy="50" r="15" fill={C} className="text-primary" opacity="0.8" />
+      <text x="50" y="25" textAnchor="middle" fontSize="10" fill={C}>B</text>
+      {/* Warna teks A dinamis agar terlihat kontras dengan latar belakang */}
+      <text x="50" y="53" textAnchor="middle" fontSize="10" fill="var(--background, #fff)" className="text-background">A</text>
+    </>
+  ),
+
+  // Sebagian A adalah B (Dua lingkaran beririsan)
+  sebagian_irisan: () => (
+    <>
+      <circle cx="35" cy="50" r="25" fill="none" stroke={C} strokeWidth="3" className="text-primary" />
+      <circle cx="65" cy="50" r="25" fill="none" stroke={C} strokeWidth="3" className="text-primary" />
+      {/* Area irisan diberi arsir/warna opacity */}
+      <path d="M 50,30.5 A 25 25 0 0 0 50,69.5 A 25 25 0 0 0 50,30.5 Z" fill={C} className="text-primary" opacity="0.5" />
+      <text x="25" y="54" textAnchor="middle" fontSize="12" fill={C}>A</text>
+      <text x="75" y="54" textAnchor="middle" fontSize="12" fill={C}>B</text>
+    </>
+  ),
+
+  // Tidak ada A yang B (Dua lingkaran terpisah)
+  tidak_ada_terpisah: () => (
+    <>
+      <circle cx="25" cy="50" r="18" fill="none" stroke={C} strokeWidth="3" className="text-primary" />
+      <circle cx="75" cy="50" r="18" fill="none" stroke={C} strokeWidth="3" className="text-primary" />
+      <text x="25" y="54" textAnchor="middle" fontSize="12" fill={C}>A</text>
+      <text x="75" y="54" textAnchor="middle" fontSize="12" fill={C}>B</text>
+    </>
+  )
+};
+
+// ==========================================
 // LOOKUP HELPER: cari di dictionary, fallback ke angka
 // ==========================================
 function lookupDict(
@@ -558,6 +598,21 @@ function TumpukanBalok({ angle }: { angle: string | number }) {
   );
 }
 
+// Sub-komponen baru untuk Silogisme (Diagram Venn)
+function Silogisme({ angle }: { angle: string | number }) {
+  return (
+    <>
+      <Frame />
+      {lookupDict(SILOGISME_DICT, angle, () => (
+        // Fallback jika string key tidak ditemukan (misal: typo)
+        <text x="50" y="55" textAnchor="middle" fontSize="10" fill={C} className="text-muted-foreground">
+          Diagram
+        </text>
+      ))}
+    </>
+  );
+}
+
 // ==========================================
 // KOMPONEN UTAMA
 // ==========================================
@@ -573,6 +628,7 @@ export const FiguralRenderer = React.memo(
         case "ketidaksamaan":   return <Ketidaksamaan  angle={angle} />;
         case "deret_bangun":    return <DeretBangun    angle={angle} />;
         case "tumpukan_balok":  return <TumpukanBalok  angle={angle} />;
+        case "silogisme":       return <Silogisme      angle={angle} />; // <-- Panggilan komponen ditambahkan ke Switch Case
         default:
           return (
             <>

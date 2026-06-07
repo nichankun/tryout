@@ -5,7 +5,7 @@
 
 import { notFound, redirect } from "next/navigation";
 import { eq, and, asc } from "drizzle-orm";
-
+import type { FiguralTipe } from "@/types/tryout";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { questions, tryoutPackages, userAccess } from "@/db/database/schema";
@@ -18,12 +18,13 @@ interface TryoutPageProps {
   params: Promise<{ id: string }>;
 }
 
-// Sanitized type untuk client agar terjamin keamanannya
 type SanitizedQuestion = {
   id: number;
   kategori: "TWK" | "TIU" | "TKP";
   pertanyaan: string;
-  pilihan: { opsi: string; teks: string }[];
+  isFigural: boolean | null;
+  figuralConfig: { tipe: FiguralTipe; deretSoal: (string | number)[] } | null;
+  pilihan: { opsi: string; teks: string; figuralAngle?: string | number | null }[];
 };
 
 export const dynamic = "force-dynamic";
@@ -68,6 +69,8 @@ export default async function TryoutPage({ params }: TryoutPageProps) {
         kategori: true,
         pertanyaan: true,
         pilihan: true,
+        isFigural: true,
+        figuralConfig: true,
       },
       orderBy: [asc(questions.id)],
     }),
@@ -78,17 +81,23 @@ export default async function TryoutPage({ params }: TryoutPageProps) {
   }
 
   // 4. Data Sanitization (Security Layer)
-  const formattedQuestions: SanitizedQuestion[] = rawQuestions.map((q) => ({
-    id: q.id,
-    kategori: q.kategori as "TWK" | "TIU" | "TKP",
-    pertanyaan: q.pertanyaan,
-    pilihan: q.pilihan.map((p) => ({
-      opsi: p.opsi,
-      teks: p.teks,
-      // 'poin' explicitly omitted for security
-    })),
-  }));
-
+const formattedQuestions: SanitizedQuestion[] = rawQuestions.map((q) => ({
+  id: q.id,
+  kategori: q.kategori as "TWK" | "TIU" | "TKP",
+  pertanyaan: q.pertanyaan,
+  isFigural: q.isFigural ?? null,
+  figuralConfig: q.figuralConfig
+    ? {
+        tipe: q.figuralConfig.tipe as FiguralTipe,
+        deretSoal: q.figuralConfig.deretSoal,
+      }
+    : null,
+  pilihan: q.pilihan.map((p) => ({
+    opsi: p.opsi,
+    teks: p.teks,
+    figuralAngle: p.figuralAngle ?? null,
+  })),
+}));
   // 5. Render
   return (
     <TryoutClient
