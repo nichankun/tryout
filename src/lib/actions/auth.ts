@@ -8,6 +8,7 @@ import bcrypt from "bcryptjs";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { authServer } from "@/auth";
+import { appUrl } from "@/lib/app-url";
 import { db } from "@/db";
 import {
   authAccounts,
@@ -15,12 +16,6 @@ import {
   passwordResetTokens,
   users,
 } from "@/db/database/schema";
-
-const baseUrl =
-  process.env.BETTER_AUTH_URL?.trim() ||
-  process.env.AUTH_URL?.trim() ||
-  process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-  "http://localhost:3000";
 
 const LoginSchema = z.object({
   email: z.string().trim().email().toLowerCase(),
@@ -55,7 +50,7 @@ function getSafeCallbackUrl(value: string | undefined) {
   if (!value) return "/dashboard";
 
   try {
-    const base = new URL(baseUrl);
+    const base = new URL(appUrl);
     const candidate = new URL(value, base);
     if (candidate.origin !== base.origin) return "/dashboard";
     return `${candidate.pathname}${candidate.search}${candidate.hash}`;
@@ -168,7 +163,7 @@ export async function registerAction(formData: FormData): Promise<ActionError | 
         name: parsed.data.name,
         email: parsed.data.email,
         password: parsed.data.password,
-        callbackURL: new URL("/verify-email?status=verified", baseUrl).toString(),
+        callbackURL: new URL("/verify-email?status=verified", appUrl).toString(),
       },
       headers: await headers(),
     });
@@ -192,7 +187,7 @@ export async function forgotPasswordAction(formData: FormData): Promise<ActionEr
     await authServer.api.requestPasswordReset({
       body: {
         email: parsed.data.email,
-        redirectTo: new URL("/reset-password", baseUrl).toString(),
+        redirectTo: new URL("/reset-password", appUrl).toString(),
       },
       headers: await headers(),
     });

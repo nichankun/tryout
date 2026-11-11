@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LoginForm } from "@/components/auth/login-form";
 import { OAuthButtons } from "@/components/auth/oauth-buttons";
 import { AuthSidePanel } from "@/components/auth/auth-side-panel";
+import { appOrigin } from "@/lib/app-url";
 
 // ==========================================
 // KONSTANTA & KONFIGURASI
@@ -61,9 +62,6 @@ interface LoginPageProps {
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const { callbackUrl, error } = await searchParams;
 
-  const appOrigin = new URL(
-    process.env.BETTER_AUTH_URL?.trim() || process.env.AUTH_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim() || "http://localhost:3000",
-  ).origin;
   let safeCallbackUrl: string = ROUTES.dashboard;
   if (callbackUrl) {
     try {

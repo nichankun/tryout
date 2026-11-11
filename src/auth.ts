@@ -11,6 +11,7 @@ import { nextCookies } from "better-auth/next-js";
 import { Resend } from "resend";
 import bcrypt from "bcryptjs";
 import { db } from "@/db";
+import { appOrigin, appUrl } from "@/lib/app-url";
 import {
   authAccounts,
   authRateLimits,
@@ -19,22 +20,6 @@ import {
   users,
 } from "@/db/database/schema";
 import { consumeAccountRateLimit } from "@/lib/security/rate-limit";
-
-const configuredAppUrl =
-  process.env.BETTER_AUTH_URL?.trim() ||
-  process.env.AUTH_URL?.trim() ||
-  process.env.NEXT_PUBLIC_APP_URL?.trim();
-const appUrl = configuredAppUrl || (process.env.NODE_ENV === "production" ? null : "http://localhost:3000");
-
-if (!appUrl) {
-  throw new Error("BETTER_AUTH_URL must be configured in production.");
-}
-
-const appUrlObject = new URL(appUrl);
-const isLocalhost = ["localhost", "127.0.0.1", "[::1]"].includes(appUrlObject.hostname);
-if (process.env.NODE_ENV === "production" && (appUrlObject.protocol !== "https:" || isLocalhost)) {
-  throw new Error("BETTER_AUTH_URL must be the public HTTPS URL in production, not localhost.");
-}
 
 const secret = process.env.BETTER_AUTH_SECRET?.trim() || process.env.AUTH_SECRET?.trim();
 
@@ -46,11 +31,7 @@ if (secret && Buffer.byteLength(secret, "utf8") < 32) {
   throw new Error("Better Auth secret must contain at least 32 bytes.");
 }
 
-const baseOrigin = appUrlObject.origin;
-const trustedOrigins = [baseOrigin];
-if (process.env.NODE_ENV !== "production") {
-  trustedOrigins.push("http://localhost:3000", "http://127.0.0.1:3000");
-}
+const trustedOrigins = [appOrigin];
 
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
