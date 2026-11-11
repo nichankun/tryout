@@ -6,6 +6,7 @@
 import { getSessionCookie } from "better-auth/cookies";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { appUrl } from "@/lib/app-url";
 
 const protectedRoutes = ["/tryout", "/dashboard", "/checkout", "/riwayat", "/admin"] as const;
 
@@ -20,7 +21,7 @@ export function proxy(request: NextRequest) {
   const sessionCookie = getSessionCookie(request, { cookiePrefix: "asnpedia" });
   if (sessionCookie) return NextResponse.next();
 
-  const loginUrl = new URL("/login", request.url);
+  const loginUrl = new URL("/login", appUrl);
   loginUrl.searchParams.set("callbackUrl", `${pathname}${search}`);
   return NextResponse.redirect(loginUrl);
 }
