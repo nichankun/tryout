@@ -1,161 +1,289 @@
-/**
- * auth.ts — Konfigurasi Tunggal NextAuth v5 (Terpusat & Optimized)
- */
+import "server-only";
 
-import NextAuth from "next-auth";
-import Google from "next-auth/providers/google";
-import Credentials from "next-auth/providers/credentials";
-import { DrizzleAdapter } from "@auth/drizzle-adapter";
-import { db } from "@/db";
-import { users } from "@/db/database/schema";
-import { eq } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import { after } from "next/server";
+import { headers } from "next/headers";
+import { betterAuth } from "better-auth";
+import { drizzleAdapter } from "@better-auth/drizzle-adapter";
+import { createAuthMiddleware, APIError } from "better-auth/api";
+import { hashPassword, verifyPassword } from "better-auth/crypto";
+import { nextCookies } from "better-auth/next-js";
+import { Resend } from "resend";
 import bcrypt from "bcryptjs";
+import { db } from "@/db";
+import {
+  authAccounts,
+  authRateLimits,
+  authSessions,
+  authVerifications,
+  users,
+} from "@/db/database/schema";
+import { consumeAccountRateLimit } from "@/lib/security/rate-limit";
 
-// ==========================================
-// KONSTANTA & KONFIGURASI
-// ==========================================
-const AUTH_ROUTES = {
-  signIn: "/login",
-  error: "/login",
-  newUser: "/dashboard",
-} as const;
+const appUrl =
+  process.env.BETTER_AUTH_URL?.trim() ||
+  process.env.AUTH_URL?.trim() ||
+  process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+  "http://localhost:3000";
 
-const AUTH_ERRORS = {
-  notVerified: "email_not_verified",
-  invalidCredentials: "invalid_credentials",
-} as const;
+const secret = process.env.BETTER_AUTH_SECRET?.trim() || process.env.AUTH_SECRET?.trim();
 
-const DEFAULT_ROLES = {
-  admin: "ADMIN",
-  user: "USER",
-} as const;
+if (process.env.NODE_ENV === "production" && !secret) {
+  throw new Error("BETTER_AUTH_SECRET must be configured in production.");
+}
 
-// ==========================================
-// NEXTAUTH CONFIG
-// ==========================================
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: DrizzleAdapter(db),
-  session: { strategy: "jwt" },
+if (secret && Buffer.byteLength(secret, "utf8") < 32) {
+  throw new Error("Better Auth secret must contain at least 32 bytes.");
+}
 
-  pages: {
-    signIn: AUTH_ROUTES.signIn,
-    error: AUTH_ROUTES.error,
-    newUser: AUTH_ROUTES.newUser, 
+const baseOrigin = new URL(appUrl).origin;
+const trustedOrigins = [baseOrigin];
+if (process.env.NODE_ENV !== "production") {
+  trustedOrigins.push("http://localhost:3000", "http://127.0.0.1:3000");
+}
+
+const resend = process.env.RESEND_API_KEY
+  ? new Resend(process.env.RESEND_API_KEY)
+  : null;
+const emailSender = process.env.RESEND_FROM_EMAIL;
+const supportEmail = process.env.SUPPORT_EMAIL?.trim();
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character] ?? character);
+}
+
+function scheduleAuthEmail(input: {
+  to: string;
+  subject: string;
+  title: string;
+  message: string;
+  actionLabel?: string;
+  actionUrl?: string;
+}) {
+  after(async () => {
+    if (!resend || !emailSender) {
+      console.error("[auth-email] Delivery is not configured.");
+      return;
+    }
+
+    const safeTitle = escapeHtml(input.title);
+    const safeMessage = escapeHtml(input.message);
+    const action = input.actionUrl && input.actionLabel
+      ? `<p style="margin:28px 0"><a href="${escapeHtml(input.actionUrl)}" style="background:#5946d2;color:#fff;padding:13px 22px;border-radius:10px;text-decoration:none;font-weight:700">${escapeHtml(input.actionLabel)}</a></p>`
+      : "";
+
+    try {
+      const result = await resend.emails.send({
+        from: emailSender,
+        ...(supportEmail ? { replyTo: supportEmail } : {}),
+        to: input.to,
+        subject: input.subject,
+        text: `${input.title}\n\n${input.message}${input.actionUrl ? `\n\n${input.actionUrl}` : ""}`,
+        html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:32px auto;padding:28px;border:1px solid #e8e4f5;border-radius:18px;color:#24163a"><h1 style="font-size:22px">${safeTitle}</h1><p style="line-height:1.65;color:#665d75">${safeMessage}</p>${action}<p style="font-size:12px;color:#8b8497">Jika kamu tidak meminta pesan ini, abaikan email ini.</p></div>`,
+      });
+
+      if (result.error) {
+        console.error("[auth-email] Provider rejected an authentication email.");
+      }
+    } catch {
+      // Never log message URLs or recipient data: reset/verification URLs contain one-time tokens.
+      console.error("[auth-email] Authentication email delivery failed.");
+    }
+  });
+}
+
+const accountRateRules: Record<
+  string,
+  { limit: number; windowMs: number }
+> = {
+  "/sign-in/email": { limit: 10, windowMs: 15 * 60 * 1000 },
+  "/sign-up/email": { limit: 3, windowMs: 60 * 60 * 1000 },
+  "/request-password-reset": { limit: 3, windowMs: 60 * 60 * 1000 },
+  "/send-verification-email": { limit: 3, windowMs: 60 * 60 * 1000 },
+  "/reset-password": { limit: 10, windowMs: 60 * 60 * 1000 },
+};
+
+const betterAuthInstance = betterAuth({
+  appName: "ASNPedia",
+  baseURL: appUrl,
+  secret,
+  trustedOrigins,
+  database: drizzleAdapter(db, {
+    provider: "pg",
+    schema: {
+      user: users,
+      session: authSessions,
+      account: authAccounts,
+      verification: authVerifications,
+      rateLimit: authRateLimits,
+    },
+    transaction: true,
+  }),
+  advanced: {
+    database: { generateId: () => randomUUID() },
+    ipAddress: {
+      ipAddressHeaders: process.env.AUTH_CLIENT_IP_HEADER
+        ? [process.env.AUTH_CLIENT_IP_HEADER]
+        : [],
+    },
+    cookiePrefix: "asnpedia",
+    useSecureCookies: process.env.NODE_ENV === "production",
   },
-
-  providers: [
-    // ── 1. GOOGLE OAUTH PROVIDER ──
-    Google({
-      // Auth.js v5 secara otomatis mendeteksi AUTH_GOOGLE_ID & AUTH_GOOGLE_SECRET dari .env,
-      // tapi mendefinisikannya secara eksplisit tetap aman sebagai dokumentasi.
-      clientId: process.env.AUTH_GOOGLE_ID,
-      clientSecret: process.env.AUTH_GOOGLE_SECRET,
-      authorization: {
-        params: {
-          prompt: "consent",
-          access_type: "offline",
-          response_type: "code",
-        },
+  session: {
+    expiresIn: 60 * 60 * 24 * 14,
+    updateAge: 60 * 60 * 12,
+  },
+  user: {
+    additionalFields: {
+      role: {
+        type: "string",
+        required: false,
+        defaultValue: "USER",
+        input: false,
       },
-    }),
-
-    // ── 2. EMAIL & PASSWORD CREDENTIALS PROVIDER ──
-    Credentials({
-      name: "credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Kata Sandi", type: "password" },
-      },
-
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
-
-        const email = credentials.email as string;
-        const password = credentials.password as string;
-
-        // OPTIMASI: Hanya ambil kolom yang benar-benar dibutuhkan untuk login
-        const user = await db.query.users.findFirst({
-          where: eq(users.email, email),
-          columns: {
-            id: true,
-            name: true,
-            email: true,
-            image: true,
-            role: true,
-            passwordHash: true,
-            emailVerified: true,
+    },
+  },
+  emailAndPassword: {
+    enabled: true,
+    requireEmailVerification: true,
+    autoSignIn: false,
+    minPasswordLength: 8,
+    maxPasswordLength: 128,
+    resetPasswordTokenExpiresIn: 60 * 60,
+    revokeSessionsOnPasswordReset: true,
+    password: {
+      hash: hashPassword,
+      verify: async ({ hash, password }) => {
+        if (/^\$2[aby]\$/.test(hash)) {
+          try {
+            return await bcrypt.compare(password, hash);
+          } catch {
+            return false;
           }
-        });
-
-        if (!user?.passwordHash) return null;
-
-        if (!user.emailVerified) {
-          throw new Error(AUTH_ERRORS.notVerified);
         }
 
-        const isValid = await bcrypt.compare(password, user.passwordHash);
-        if (!isValid) throw new Error(AUTH_ERRORS.invalidCredentials);
-
-        return {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          image: user.image,
-          role: user.role || DEFAULT_ROLES.user, // Pastikan selalu ada role
-        };
+        return verifyPassword({ hash, password });
       },
-    }),
-  ],
-
-  callbacks: {
-    // ── JWT CALLBACK (Sangat Berpengaruh pada Performa) ──
-    async jwt({ token, user, trigger, session }) {
-      // 1. Saat pertama kali login, objek `user` tersedia.
-      // Kita tanamkan data ke dalam token di sini agar tersimpan di cookies (stateless).
-      if (user) {
-        token.userId = user.id;
-        token.role = user.role;
+    },
+    onExistingUserSignUp: async ({ user }) => {
+      scheduleAuthEmail({
+        to: user.email,
+        subject: "Percobaan pendaftaran ASNPedia",
+        title: "Ada percobaan pendaftaran dengan emailmu",
+        message: "Jika ini bukan kamu, tidak ada tindakan yang perlu dilakukan. Akunmu tetap aman.",
+      });
+    },
+    sendResetPassword: async ({ user, url }) => {
+      scheduleAuthEmail({
+        to: user.email,
+        subject: "Atur ulang kata sandi ASNPedia",
+        title: "Permintaan atur ulang kata sandi",
+        message: "Gunakan tautan satu kali ini dalam 1 jam untuk membuat kata sandi baru.",
+        actionLabel: "Atur ulang kata sandi",
+        actionUrl: url,
+      });
+    },
+    onPasswordReset: async ({ user }) => {
+      scheduleAuthEmail({
+        to: user.email,
+        subject: "Kata sandi ASNPedia berhasil diubah",
+        title: "Kata sandi berhasil diubah",
+        message: "Kata sandi akunmu baru saja diatur ulang. Semua sesi aktif lainnya sudah dikeluarkan. Jika ini bukan kamu, segera hubungi bantuan pelanggan.",
+      });
+    },
+  },
+  emailVerification: {
+    sendOnSignUp: true,
+    sendOnSignIn: true,
+    expiresIn: 60 * 60,
+    autoSignInAfterVerification: false,
+    sendVerificationEmail: async ({ user, url }) => {
+      scheduleAuthEmail({
+        to: user.email,
+        subject: "Verifikasi email ASNPedia",
+        title: `Halo ${user.name}, verifikasi emailmu`,
+        message: "Konfirmasi alamat email untuk mengaktifkan akun ASNPedia. Tautan ini berlaku selama 1 jam.",
+        actionLabel: "Verifikasi email",
+        actionUrl: url,
+      });
+    },
+  },
+  socialProviders: process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET
+    ? {
+        google: {
+          clientId: process.env.AUTH_GOOGLE_ID,
+          clientSecret: process.env.AUTH_GOOGLE_SECRET,
+          requireEmailVerification: true,
+        },
       }
+    : {},
+  account: {
+    accountLinking: {
+      trustedProviders: ["google"],
+    },
+  },
+  rateLimit: {
+    enabled: true,
+    storage: "database",
+    window: 10,
+    max: 100,
+    customRules: {
+      "/sign-in/email": { window: 15 * 60, max: 10 },
+      "/sign-up/email": { window: 60 * 60, max: 6 },
+      "/request-password-reset": { window: 60 * 60, max: 6 },
+      "/send-verification-email": { window: 60 * 60, max: 6 },
+      "/reset-password": { window: 60 * 60, max: 10 },
+      "/sign-in/social": { window: 15 * 60, max: 20 },
+    },
+  },
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      const rule = accountRateRules[ctx.path];
+      if (!rule) return;
 
-      // 2. Jika ada pembaruan sesi secara manual dari client (misal: user di-upgrade ke admin)
-      if (trigger === "update" && session?.role) {
-        token.role = session.role;
-      }
+      const body = ctx.body as { email?: unknown; token?: unknown } | undefined;
+      const identifier = typeof body?.email === "string"
+        ? body.email
+        : typeof body?.token === "string" ? body.token : null;
+      if (!identifier) return;
 
-      // 3. FALLBACK: Hanya hit database JIKA token.role tidak ada (sangat jarang terjadi).
-      // Menghindari query DB pada setiap request halaman!
-      if (token.userId && !token.role) {
-        const dbUser = await db.query.users.findFirst({
-          where: eq(users.id, token.userId as string),
-          columns: { role: true }, // OPTIMASI: Hanya ambil kolom 'role', hemat memori & bandwidth
+      const result = await consumeAccountRateLimit({
+        namespace: `better-auth:${ctx.path}`,
+        headers: ctx.headers ?? new Headers(),
+        identifier,
+        limit: rule.limit,
+        windowMs: rule.windowMs,
+      });
+
+      if (result.storageUnavailable) {
+        throw new APIError("INTERNAL_SERVER_ERROR", {
+          message: "Authentication is temporarily unavailable.",
         });
-        token.role = dbUser?.role || DEFAULT_ROLES.user;
       }
 
-      return token;
-    },
-
-    // ── SESSION CALLBACK ──
-    async session({ session, token }) {
-      if (token.userId && session.user) {
-        session.user.id = token.userId as string;
-        session.user.role = (token.role as "ADMIN" | "USER") || DEFAULT_ROLES.user;
+      if (!result.allowed) {
+        throw new APIError("TOO_MANY_REQUESTS", {
+          message: "Too many attempts. Try again later.",
+        });
       }
-      return session;
-    },
-
-    async authorized({ auth }) {
-      return !!auth;
-    },
+    }),
   },
-
-  events: {
-    async createUser({ user }) {
-      // Menggunakan logger produksi jika ada, fallback ke console.log
-      console.info(`[Auth] Registrasi baru berhasil: ${user.email} (Provider: Google)`);
-    },
-  },
-
-  // Matikan debug di production agar log tidak bocor
-  debug: process.env.NODE_ENV === "development",
+  plugins: [
+    // Required for Next.js Server Actions that sign in or sign out.
+    nextCookies(),
+  ],
+  telemetry: { enabled: false },
 });
+
+export const authServer = betterAuthInstance;
+
+/** Server-side session reader used by pages, actions, route handlers and proxy. */
+export async function auth() {
+  return betterAuthInstance.api.getSession({ headers: await headers() });
+}

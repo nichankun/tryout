@@ -8,20 +8,20 @@
  * dan penambahan fungsi CRUD lengkap untuk mendukung integrasi Panel Admin.
  */
 
-import { auth } from "@/auth";
+import { requireAdminAccess } from "@/lib/authz";
 import { db } from "@/db";
-import { tryoutPackages } from "@/db/database/schema";
+import { adminAuditLogs, tryoutPackages } from "@/db/database/schema";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
+import { createAdminAuditEntry } from "@/lib/security/admin-audit";
 
 // ==========================================
 // KONSTANTA & KONFIGURASI UMUM
 // ==========================================
-const ADMIN_ROLE = "ADMIN" as const;
-
 const ERROR_MESSAGES = {
-  unauthorized:  "Akses ditolak. Otorisasi Admin diperlukan.",
+  unauthorized:  "Akses ditolak. Silakan login kembali.",
+  forbidden:     "Akses ditolak. Otorisasi Admin diperlukan.",
   invalidFormat: "Format data paket tidak valid.",
   internalError: "Terjadi kegagalan sistem pada server database.",
 } as const;
@@ -48,13 +48,6 @@ export type UpdatePackageInput = z.infer<typeof UpdatePackageSchema>;
 // ==========================================
 // HELPER: VALIDASI OTORISASI TERPUSAT
 // ==========================================
-async function checkAdminAuth() {
-  const session = await auth();
-  if (session?.user?.role !== ADMIN_ROLE) {
-    throw new Error(ERROR_MESSAGES.unauthorized);
-  }
-}
-
 // ==========================================
 // HELPER: HANDLE ERROR TERPUSAT
 // ==========================================
@@ -63,9 +56,11 @@ function handleActionError(error: unknown) {
   const msg = error instanceof Error ? error.message : "";
   return {
     success: false as const,
-    error: msg === ERROR_MESSAGES.unauthorized
-      ? msg
-      : ERROR_MESSAGES.internalError,
+    error: msg === "UNAUTHORIZED"
+      ? ERROR_MESSAGES.unauthorized
+      : msg === "FORBIDDEN"
+        ? ERROR_MESSAGES.forbidden
+        : ERROR_MESSAGES.internalError,
   };
 }
 
@@ -74,7 +69,7 @@ function handleActionError(error: unknown) {
 // ==========================================
 export async function createPackageAction(input: CreatePackageInput) {
   try {
-    await checkAdminAuth();
+    const actor = await requireAdminAccess();
 
     const parsed = CreatePackageSchema.safeParse(input);
     if (!parsed.success) {
@@ -85,15 +80,26 @@ export async function createPackageAction(input: CreatePackageInput) {
       };
     }
 
-    await db.insert(tryoutPackages).values({
-      title:       parsed.data.title,
-      description: parsed.data.description ?? null,
-      price:       parsed.data.price,
-      isActive:    true, // Default aktif saat pertama kali dibuat
+    const packageId = await db.transaction(async (tx) => {
+      const [createdPackage] = await tx.insert(tryoutPackages).values({
+        title: parsed.data.title,
+        description: parsed.data.description ?? null,
+        price: parsed.data.price,
+        isActive: true,
+      }).returning({ id: tryoutPackages.id });
+
+      await tx.insert(adminAuditLogs).values(createAdminAuditEntry(actor, {
+        action: "package.created",
+        targetType: "package",
+        targetId: String(createdPackage.id),
+        metadata: { title: parsed.data.title, price: parsed.data.price },
+      }));
+
+      return createdPackage.id;
     });
 
     revalidatePath("/admin/packages");
-    return { success: true as const };
+    return { success: true as const, packageId };
   } catch (error: unknown) {
     return handleActionError(error);
   }
@@ -104,7 +110,7 @@ export async function createPackageAction(input: CreatePackageInput) {
 // ==========================================
 export async function updatePackageAction(input: UpdatePackageInput) {
   try {
-    await checkAdminAuth();
+    const actor = await requireAdminAccess();
 
     const parsed = UpdatePackageSchema.safeParse(input);
     if (!parsed.success) {
@@ -117,10 +123,26 @@ export async function updatePackageAction(input: UpdatePackageInput) {
 
     const { id, ...updatePayload } = parsed.data;
 
-    await db
-      .update(tryoutPackages)
-      .set(updatePayload)
-      .where(eq(tryoutPackages.id, id));
+    await db.transaction(async (tx) => {
+      const [updatedPackage] = await tx
+        .update(tryoutPackages)
+        .set(updatePayload)
+        .where(eq(tryoutPackages.id, id))
+        .returning({ id: tryoutPackages.id });
+
+      if (updatedPackage) {
+        await tx.insert(adminAuditLogs).values(createAdminAuditEntry(actor, {
+          action: "package.updated",
+          targetType: "package",
+          targetId: String(id),
+          metadata: {
+            title: parsed.data.title,
+            price: parsed.data.price,
+            isActive: parsed.data.isActive ?? null,
+          },
+        }));
+      }
+    });
 
     revalidatePath("/admin/packages");
     revalidatePath(`/admin/packages/${id}`);
@@ -135,11 +157,25 @@ export async function updatePackageAction(input: UpdatePackageInput) {
 // ==========================================
 export async function deletePackageAction(packageId: number) {
   try {
-    await checkAdminAuth();
+    const actor = await requireAdminAccess();
 
     // Cascade delete otomatis untuk Soal & Histori
     // karena onDelete: "cascade" sudah diset di schema.ts
-    await db.delete(tryoutPackages).where(eq(tryoutPackages.id, packageId));
+    await db.transaction(async (tx) => {
+      const [deletedPackage] = await tx
+        .delete(tryoutPackages)
+        .where(eq(tryoutPackages.id, packageId))
+        .returning({ id: tryoutPackages.id, title: tryoutPackages.title });
+
+      if (deletedPackage) {
+        await tx.insert(adminAuditLogs).values(createAdminAuditEntry(actor, {
+          action: "package.deleted",
+          targetType: "package",
+          targetId: String(packageId),
+          metadata: { title: deletedPackage.title },
+        }));
+      }
+    });
 
     revalidatePath("/admin/packages");
     return { success: true as const };

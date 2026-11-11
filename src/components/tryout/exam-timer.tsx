@@ -1,64 +1,56 @@
 "use client";
 
 import * as React from "react";
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Clock } from "lucide-react";
 import { TIMER_CONFIG } from "@/types/tryout";
 
 interface ExamTimerProps {
   initialTimeLeft: number;
-  isPaused: boolean;
+  isDisabled: boolean;
   onExpire: () => void;
-  timeLeftRef: React.RefObject<number | null>; // <-- Standar baru React 19
 }
 
-export const ExamTimer = React.memo(({ 
-  initialTimeLeft, 
-  isPaused, 
-  onExpire,
-  timeLeftRef 
-}: ExamTimerProps) => {
+export const ExamTimer = React.memo(({ initialTimeLeft, isDisabled, onExpire }: ExamTimerProps) => {
   const [timeLeft, setTimeLeft] = useState(initialTimeLeft);
+  const deadline = useRef(performance.now() + initialTimeLeft * 1000);
+  const didExpire = useRef(false);
 
   useEffect(() => {
-    timeLeftRef.current = timeLeft;
-    if (isPaused) return;
+    if (isDisabled) return;
 
-    if (timeLeft <= 0) {
-      onExpire();
-      return;
-    }
-
-    const targetTime = Date.now() + (timeLeft * 1000);
-    const interval = setInterval(() => {
-      const newTimeLeft = Math.max(0, Math.floor((targetTime - Date.now()) / 1000));
-      setTimeLeft(newTimeLeft);
-      timeLeftRef.current = newTimeLeft;
-
-      if (newTimeLeft <= 0) {
-        clearInterval(interval);
+    const updateTime = () => {
+      const remaining = Math.max(0, Math.ceil((deadline.current - performance.now()) / 1000));
+      setTimeLeft(remaining);
+      if (remaining === 0 && !didExpire.current) {
+        didExpire.current = true;
         onExpire();
       }
-    }, 1000);
+    };
 
-    return () => clearInterval(interval);
-  }, [isPaused, onExpire, timeLeftRef]); 
+    updateTime();
+    const interval = window.setInterval(updateTime, 1000);
+    return () => window.clearInterval(interval);
+  }, [isDisabled, onExpire]);
 
   const isWarning = timeLeft < TIMER_CONFIG.warningThresholdSeconds;
-  const m = Math.floor(timeLeft / 60).toString().padStart(2, "0");
-  const s = (timeLeft % 60).toString().padStart(2, "0");
+  const minutes = Math.floor(timeLeft / 60).toString().padStart(2, "0");
+  const seconds = (timeLeft % 60).toString().padStart(2, "0");
 
   return (
-    <div 
-      className={`flex items-center gap-2.5 px-4 py-1.5 rounded-lg border-2 font-mono font-bold text-base tracking-wider transition-all shadow-sm
-        ${isWarning 
-          ? "bg-destructive/10 border-destructive text-destructive animate-pulse shadow-destructive/20" 
-          : "bg-primary/10 border-primary/40 text-primary"
-        }`}
+    <div
+      role="timer"
+      aria-label={`Sisa waktu ${minutes} menit ${seconds} detik`}
+      className={`flex items-center gap-2.5 rounded-lg border-2 px-4 py-1.5 font-mono text-base font-bold tracking-wider shadow-sm transition-all ${
+        isWarning
+          ? "animate-pulse border-destructive bg-destructive/10 text-destructive shadow-destructive/20"
+          : "border-primary/40 bg-primary/10 text-primary"
+      }`}
     >
-      <Clock className={`h-4 w-4 ${isWarning ? "animate-bounce" : ""}`} />
-      <span>{m}:{s}</span>
+      <Clock className={`h-4 w-4 ${isWarning ? "animate-bounce" : ""}`} aria-hidden />
+      <span>{minutes}:{seconds}</span>
     </div>
   );
 });
+
 ExamTimer.displayName = "ExamTimer";

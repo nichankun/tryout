@@ -1,8 +1,10 @@
 import "./globals.css";
-import { Inter } from "next/font/google";
-import { cn } from "@/lib/utils";
-import { Providers } from "@/components/providers";
-const inter = Inter({subsets:['latin'],variable:'--font-sans'});
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: { default: "ASNPedia — Latihan SKD CPNS", template: "%s | ASNPedia" },
+  description: "Platform latihan tryout SKD CPNS dengan hasil skor dan pembahasan.",
+};
 
 export default function RootLayout({
   children,
@@ -12,14 +14,12 @@ export default function RootLayout({
   return (
     // 2. Tambahkan suppressHydrationWarning agar tidak error saat transisi tema
     <html
-      lang="en"
-      className={cn("font-sans", inter.variable)}
+      lang="id"
+      className="font-sans"
       suppressHydrationWarning
     >
       <body className="antialiased">
-        {/* 3. Bungkus seluruh aplikasi dengan ThemeProvider */}
-
-        <Providers>{children}</Providers>
+        {children}
       </body>
     </html>
   );

@@ -10,6 +10,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { questions, userAccess } from "@/db/database/schema";
 import { eq, and } from "drizzle-orm";
+import { consumeAccountRateLimit } from "@/lib/security/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -27,9 +28,11 @@ const API_ERRORS = {
 // Skema untuk sanitasi JSONB
 const PilihanSchema = z.array(
   z.object({
-    opsi: z.string(),
-    teks: z.string(),
-    poin: z.number(),
+    opsi:     z.string(),
+    teks:     z.string(),
+    poin:     z.number(),
+    imageUrl: z.string().nullable().optional(),
+    imageAlt: z.string().nullable().optional(),
   })
 );
 
@@ -51,6 +54,20 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: API_ERRORS.invalidParam }, { status: 400 });
   }
 
+  const rateLimit = await consumeAccountRateLimit({
+    namespace: "question-fetch",
+    headers: request.headers,
+    identifier: session.user.id,
+    limit: 30,
+    windowMs: 60 * 1000,
+  });
+  if (rateLimit.storageUnavailable) {
+    return NextResponse.json({ error: "SERVICE_UNAVAILABLE" }, { status: 503, headers: { "Retry-After": "60" } });
+  }
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: "TOO_MANY_ATTEMPTS" }, { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } });
+  }
+
   try {
     // 3. PARALLEL FETCHING: Cek Akses & Tarik Soal
     const [access, dataSoal] = await Promise.all([
@@ -64,6 +81,8 @@ export async function GET(request: Request) {
           id: true,
           kategori: true,
           pertanyaan: true,
+          imageUrl: true,
+          imageAlt: true,
           pilihan: true,
         }
       })
@@ -87,9 +106,13 @@ export async function GET(request: Request) {
         id: soal.id,
         kategori: soal.kategori,
         pertanyaan: soal.pertanyaan,
+        imageUrl: soal.imageUrl,
+        imageAlt: soal.imageAlt,
         pilihan: daftarPilihan.map((p) => ({
           opsi: p.opsi,
           teks: p.teks,
+          imageUrl: p.imageUrl ?? null,
+          imageAlt: p.imageAlt ?? null,
         })),
       };
     });

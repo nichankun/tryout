@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   CheckCircle2, XCircle, BarChart3,
   Clock, ChevronRight, FileText,
-  Trophy, TrendingUp, Star, BookOpen,
+  Trophy, TrendingUp, BookOpen,
 } from "lucide-react";
 import {
   Table, TableBody, TableCell, TableHead,
@@ -306,7 +306,7 @@ export default async function RiwayatPage() {
                       {/* Status badge */}
                       <TableCell className="text-center px-4">
                         {item.isLolos ? (
-                          <span className="inline-flex items-center justify-center gap-1 rounded-md bg-teal-400 px-2.5 py-0.5 text-[11px] font-bold text-white whitespace-nowrap">
+                          <span className="inline-flex items-center justify-center gap-1 rounded-md bg-teal-600 px-2.5 py-0.5 text-[11px] font-bold text-white whitespace-nowrap">
                             <CheckCircle2 className="h-3 w-3" />
                             {TEXT_CONTENT.badgePassed}
                           </span>

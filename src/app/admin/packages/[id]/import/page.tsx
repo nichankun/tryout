@@ -201,29 +201,15 @@ export default function ImportQuestionsPage() {
   {
     "kategori": "TWK",
     "pertanyaan": "Lambang Negara Indonesia adalah...",
-    "isFigural": false,
-    "figuralConfig": null,
+    "imageUrl": null,
+    "imageAlt": null,
     "pembahasan": "Diatur dalam UU No. 24 Tahun 2009.",
     "pilihan": [
-      { "opsi": "A", "teks": "UU No. 24 Tahun 2009", "poin": 5 },
-      { "opsi": "B", "teks": "UU No. 12 Tahun 2011", "poin": 0 },
-      { "opsi": "C", "teks": "UU No. 17 Tahun 2014", "poin": 0 },
-      { "opsi": "D", "teks": "UU No. 23 Tahun 2014", "poin": 0 },
-      { "opsi": "E", "teks": "UU No. 30 Tahun 2014", "poin": 0 }
-    ]
-  },
-  {
-    "kategori": "TIU",
-    "pertanyaan": "Perhatikan deret gambar berikut!",
-    "isFigural": true,
-    "figuralConfig": { "tipe": "deret_rotasi", "deretSoal": [0, 90, 180] },
-    "pembahasan": "Objek berputar 90° searah jarum jam.",
-    "pilihan": [
-      { "opsi": "A", "teks": "", "poin": 5, "figuralAngle": 270 },
-      { "opsi": "B", "teks": "", "poin": 0, "figuralAngle": 315 },
-      { "opsi": "C", "teks": "", "poin": 0, "figuralAngle": 45  },
-      { "opsi": "D", "teks": "", "poin": 0, "figuralAngle": 135 },
-      { "opsi": "E", "teks": "", "poin": 0, "figuralAngle": 0   }
+      { "opsi": "A", "teks": "UU No. 24 Tahun 2009", "poin": 5, "imageUrl": null, "imageAlt": null },
+      { "opsi": "B", "teks": "UU No. 12 Tahun 2011", "poin": 0, "imageUrl": null, "imageAlt": null },
+      { "opsi": "C", "teks": "UU No. 17 Tahun 2014", "poin": 0, "imageUrl": null, "imageAlt": null },
+      { "opsi": "D", "teks": "UU No. 23 Tahun 2014", "poin": 0, "imageUrl": null, "imageAlt": null },
+      { "opsi": "E", "teks": "UU No. 30 Tahun 2014", "poin": 0, "imageUrl": null, "imageAlt": null }
     ]
   }
 ]`}

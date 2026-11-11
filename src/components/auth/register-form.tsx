@@ -43,6 +43,7 @@ const MESSAGES = {
     weak_password: "Kata sandi terlalu lemah. Gunakan kombinasi huruf dan angka.",
     invalid_email: "Format email tidak valid.",
     too_many_attempts: "Terlalu banyak percobaan. Tunggu beberapa menit.",
+    temporarily_unavailable: "Layanan sedang sibuk. Coba lagi beberapa saat nanti.",
     connection: "Koneksi bermasalah. Periksa internet kamu dan coba lagi.",
     default: "Terjadi kesalahan. Silakan coba lagi.",
   },

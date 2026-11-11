@@ -1,28 +1,28 @@
-/**
- * app/api/payment/route.ts
- * * Route Handler Khusus Pembuatan Transaksi (POST).
- * Dioptimalkan dengan Atomic Transaction dan Partial Query.
- */
-
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { and, count, eq } from "drizzle-orm";
 import { z } from "zod";
 import midtransClient from "midtrans-client";
+import { auth } from "@/auth";
 import { db } from "@/db";
-import { orders, tryoutPackages, userAccess } from "@/db/database/schema";
-import { eq, and } from "drizzle-orm";
+import { orders, questions, tryoutPackages, userAccess } from "@/db/database/schema";
+import { SERVICE_FEE } from "@/lib/constants/billing";
 
 export const dynamic = "force-dynamic";
 
-const APP_CONFIG = { adminFee: 1000 } as const;
-
 const PaymentBodySchema = z.object({
-  volumeId: z.number().int().min(1),
+  volumeId: z.number().int().positive(),
   paymentMethod: z.enum(["qris", "transfer", "ewallet"]),
-  name: z.string().min(2),
-  email: z.string().email(),
-  phone: z.string().optional(),
+  name: z.string().trim().min(2).max(100),
+  email: z.string().trim().email().max(254),
+  phone: z.string().trim().max(20).optional(),
 });
+
+const PAYMENT_CHANNELS = {
+  qris: ["gopay", "qris"],
+  transfer: ["bca_va", "bni_va", "bri_va", "mandiri_bill"],
+  ewallet: ["gopay", "shopeepay", "dana"],
+} as const;
 
 const snapGateway = new midtransClient.Snap({
   isProduction: process.env.MIDTRANS_IS_PRODUCTION === "true",
@@ -35,59 +35,77 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 
-  const body = PaymentBodySchema.safeParse(await request.json());
+  let rawBody: unknown;
+  try {
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json({ error: "INVALID_INPUT" }, { status: 400 });
+  }
+
+  const body = PaymentBodySchema.safeParse(rawBody);
   if (!body.success) {
     return NextResponse.json({ error: "INVALID_INPUT", details: body.error.flatten() }, { status: 400 });
   }
 
-  const { volumeId, paymentMethod, name, email, phone } = body.data;
+  if (!process.env.MIDTRANS_SERVER_KEY || !process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY) {
+    return NextResponse.json({ error: "PAYMENT_UNAVAILABLE" }, { status: 503 });
+  }
 
+  const { volumeId, paymentMethod, name, email, phone } = body.data;
   try {
-    // ── PARALLEL FETCHING: Paket & Cek Kepemilikan ──
-    const [pkg, existingAccess] = await Promise.all([
+    const [pkg, existingAccess, questionCountResult] = await Promise.all([
       db.query.tryoutPackages.findFirst({
         where: and(eq(tryoutPackages.id, volumeId), eq(tryoutPackages.isActive, true)),
-        columns: { title: true, price: true }
+        columns: { title: true, price: true },
       }),
       db.query.userAccess.findFirst({
         where: and(eq(userAccess.userId, session.user.id), eq(userAccess.packageId, volumeId)),
-        columns: { id: true }
-      })
+        columns: { id: true },
+      }),
+      db.select({ total: count() }).from(questions).where(eq(questions.packageId, volumeId)),
     ]);
 
     if (!pkg) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
     if (existingAccess) return NextResponse.json({ error: "ALREADY_OWNED" }, { status: 409 });
+    if ((questionCountResult[0]?.total ?? 0) === 0) {
+      return NextResponse.json({ error: "PACKAGE_UNAVAILABLE" }, { status: 409 });
+    }
+    if (pkg.price <= 0) return NextResponse.json({ error: "FREE_PACKAGE" }, { status: 409 });
 
-    // ── GENERATE ORDER & SNAP TOKEN ──
-    const orderId = `ASN-${volumeId}-${Date.now()}`;
-    const grossTotal = pkg.price + APP_CONFIG.adminFee;
+    const amount = pkg.price + SERVICE_FEE;
+    if (!Number.isSafeInteger(amount)) {
+      return NextResponse.json({ error: "INVALID_AMOUNT" }, { status: 400 });
+    }
 
-    const snapToken = await snapGateway.createTransactionToken({
-      transaction_details: { order_id: orderId, gross_amount: grossTotal },
-      customer_details: { first_name: name, email, phone },
-      item_details: [
-        { id: String(volumeId), price: pkg.price, quantity: 1, name: pkg.title },
-        { id: "service-fee", price: APP_CONFIG.adminFee, quantity: 1, name: "Biaya Layanan" }
-      ],
-      enabled_payments: paymentMethod === "qris" ? ["gopay", "qris"] : 
-                        paymentMethod === "ewallet" ? ["gopay", "shopeepay", "dana"] : 
-                        ["bca_va", "bni_va", "bri_va", "mandiri_bill"]
-    });
-
-    // ── ATOMIC LOG ORDER ──
+    const orderId = `ASN-${volumeId}-${randomUUID()}`;
     await db.insert(orders).values({
       id: orderId,
       userId: session.user.id,
       packageId: volumeId,
-      amount: grossTotal,
+      amount,
       status: "pending",
-      snapToken: snapToken,
+      paymentMethod,
     });
 
-    return NextResponse.json({ success: true, snapToken, orderId });
+    try {
+      const snapToken = await snapGateway.createTransactionToken({
+        transaction_details: { order_id: orderId, gross_amount: amount },
+        customer_details: { first_name: name, email, phone },
+        item_details: [
+          { id: String(volumeId), price: pkg.price, quantity: 1, name: pkg.title },
+          { id: "service-fee", price: SERVICE_FEE, quantity: 1, name: "Biaya Layanan" },
+        ],
+        enabled_payments: PAYMENT_CHANNELS[paymentMethod],
+      });
 
-  } catch (err) {
-    console.error("[POST /api/payment] Error:", err);
-    return NextResponse.json({ error: "INTERNAL_ERROR" }, { status: 500 });
+      await db.update(orders).set({ snapToken }).where(eq(orders.id, orderId));
+      return NextResponse.json({ success: true, snapToken, orderId });
+    } catch (error) {
+      await db.update(orders).set({ status: "failed" }).where(eq(orders.id, orderId));
+      throw error;
+    }
+  } catch (error) {
+    console.error("[POST /api/payment] Error:", error);
+    return NextResponse.json({ error: "PAYMENT_FAILED" }, { status: 502 });
   }
 }

@@ -38,8 +38,7 @@ interface ErrorPageProps {
 // ==========================================
 export default function ErrorPage({ error, reset }: ErrorPageProps) {
   useEffect(() => {
-    // Ruang integrasi layanan visualisasi monitoring eksternal (Sentry / Datadog / LogSnag)
-    console.error("[CRASH LOG][App Error Boundary]:", error);
+    console.error("[CRASH LOG][App Error Boundary] Error ID:", error.digest ?? "unavailable");
   }, [error]);
 
   return (
@@ -62,10 +61,9 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
             {TEXT_CONTENT.description}
           </p>
 
-          {/* Dump Tampilan Detail Informasi Teknis (Hanya Aktif di Mode Development) */}
-          {process.env.NODE_ENV === "development" && error.message && (
-            <p className="mt-3 text-xs font-mono bg-destructive/10 text-destructive px-3 py-2 rounded-lg text-left break-all border border-destructive/20 select-all">
-              {error.message}
+          {process.env.NODE_ENV === "development" && (
+            <p className="mt-3 rounded-lg border border-border bg-muted/50 px-3 py-2 text-left text-xs text-muted-foreground">
+              Detail teknis tersedia di terminal development.
             </p>
           )}
 

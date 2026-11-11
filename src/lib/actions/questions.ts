@@ -6,73 +6,70 @@
  * Server Action Produksi untuk Manajemen Bank Soal (Admin Only).
  * Dioptimalkan dengan Zod Schema Composition (DRY), Centralized Auth,
  * dan Native Bulk Insert Drizzle ORM.
- * * * UPDATE: Sudah ditambahkan dukungan "silogisme" dan figuralAngle tipe string.
  */
 
-import { auth } from "@/auth";
+import { requireAdminAccess } from "@/lib/authz";
 import { db } from "@/db";
-import { questions } from "@/db/database/schema";
+import { adminAuditLogs, questions } from "@/db/database/schema";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
+import { createAdminAuditEntry } from "@/lib/security/admin-audit";
 
 // ==========================================
 // KONSTANTA & KONFIGURASI UMUM
 // ==========================================
-const ADMIN_ROLE     = "ADMIN" as const;
 const KATEGORI_SOAL  = ["TWK", "TIU", "TKP"] as const;
 const OPSI_PILIHAN   = ["A", "B", "C", "D", "E"] as const;
 
-// PERBAIKAN 1: Tambahkan 'silogisme' pada array konstanta
-const FIGURAL_TIPE   = [
-  "deret_rotasi", "matriks", "pencerminan",
-  "analogi_gambar", "analogi_matriks", "ketidaksamaan",
-  "deret_bangun", "tumpukan_balok", "silogisme"
-] as const;
-
 const ERROR_MESSAGES = {
-  unauthorized:  "Akses ditolak. Otorisasi Admin diperlukan.",
+  unauthorized:  "Akses ditolak. Silakan login kembali.",
+  forbidden:     "Akses ditolak. Otorisasi Admin diperlukan.",
   invalidFormat: "Format data soal tidak valid.",
   internalError: "Terjadi kegagalan sistem pada server database.",
   emptyImport:   "File JSON kosong, tidak ada soal untuk di-import.",
+  invalidImage:  "Gambar harus diunggah ke paket yang sama dengan soal.",
 } as const;
 
 // ==========================================
 // ZOD SCHEMAS (Komposisi DRY)
 // ==========================================
+const ImageUrlSchema = z
+  .string()
+  .max(256)
+  .regex(/^\/api\/question-images\/\d+\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(?:png|jpg|webp)$/i)
+  .nullable()
+  .optional();
 
 // 1. Skema opsi pilihan
 const PilihanSchema = z.array(
   z.object({
-    opsi:         z.enum(OPSI_PILIHAN),
-    teks:         z.string().min(1, "Teks opsi tidak boleh kosong"),
-    poin:         z.number().int().min(0).max(5),
-    // PERBAIKAN 2: Gunakan z.union agar bisa menerima angka (rotasi) ATAU string (key pola spt 'huruf_e')
-    figuralAngle: z.union([z.number(), z.string()]).nullable().optional(),
+    opsi:     z.enum(OPSI_PILIHAN),
+    teks:     z.string().trim().max(500).optional().default(""),
+    poin:     z.number().int().min(0).max(5),
+    imageUrl: ImageUrlSchema,
+    imageAlt: z.string().trim().max(300).nullable().optional(),
   })
-).length(5, "Soal harus memiliki tepat 5 pilihan opsi (A-E)");
+).length(5, "Soal harus memiliki tepat 5 pilihan opsi (A-E)").superRefine((choices, context) => {
+  choices.forEach((choice, index) => {
+    if (!choice.teks?.trim() && !choice.imageUrl) {
+      context.addIssue({
+        code: "custom",
+        path: [index, "teks"],
+        message: "Isi teks atau unggah gambar untuk pilihan ini.",
+      });
+    }
+  });
+});
 
 // 2. Skema dasar (dipakai oleh Create, Update, dan Bulk)
 const BaseQuestionSchema = z.object({
   kategori:    z.enum(KATEGORI_SOAL),
   pertanyaan:  z.string().min(10, "Pertanyaan terlalu singkat"),
+  imageUrl:    ImageUrlSchema,
+  imageAlt:    z.string().trim().max(300).nullable().optional(),
   pilihan:     PilihanSchema,
   pembahasan:  z.string().min(10, "Pembahasan terlalu singkat"),
-
-  // preprocess: ubah null → false agar default bisa bekerja
-  isFigural: z.preprocess(
-    (val) => (val === null ? false : val),
-    z.boolean().optional().default(false)
-  ),
-
-  // preprocess: ubah null → undefined agar .optional() bekerja
-  figuralConfig: z.preprocess(
-    (val) => (val === null ? undefined : val),
-    z.object({
-      tipe:      z.enum(FIGURAL_TIPE),
-      deretSoal: z.array(z.union([z.string(), z.number()])),
-    }).optional()
-  ),
 });
 
 // 3. Turunan untuk kebutuhan spesifik
@@ -104,18 +101,27 @@ export type UpdateQuestionInput = z.infer<typeof UpdateQuestionSchema>;
  */
 type BaseValidated = z.infer<typeof BaseQuestionSchema>;
 
+function imagesBelongToPackage(packageId: number, question: BaseValidated) {
+  const packagePrefix = `/api/question-images/${packageId}/`;
+  return [question.imageUrl, ...question.pilihan.map((choice) => choice.imageUrl)]
+    .every((imageUrl) => !imageUrl || imageUrl.startsWith(packagePrefix));
+}
+
 function normalizeQuestionPayload(q: BaseValidated) {
   return {
     kategori:      q.kategori,
     pertanyaan:    q.pertanyaan,
+    imageUrl:      q.imageUrl ?? null,
+    imageAlt:      q.imageAlt ?? null,
     pembahasan:    q.pembahasan,
-    isFigural:     q.isFigural ?? false,
-    figuralConfig: q.figuralConfig ?? null,
+    isFigural:     false,
+    figuralConfig: null,
     pilihan: q.pilihan.map((p) => ({
-      opsi:  p.opsi,
-      teks:  p.teks,
-      poin:  p.poin,
-      figuralAngle: p.figuralAngle ?? null,
+      opsi:     p.opsi,
+      teks:     p.teks ?? "",
+      poin:     p.poin,
+      imageUrl: p.imageUrl ?? null,
+      imageAlt: p.imageAlt ?? null,
     })),
   };
 }
@@ -123,13 +129,6 @@ function normalizeQuestionPayload(q: BaseValidated) {
 // ==========================================
 // HELPER: VALIDASI OTORISASI TERPUSAT
 // ==========================================
-async function checkAdminAuth() {
-  const session = await auth();
-  if (session?.user?.role !== ADMIN_ROLE) {
-    throw new Error(ERROR_MESSAGES.unauthorized);
-  }
-}
-
 // ==========================================
 // HELPER: HANDLE ERROR TERPUSAT
 // ==========================================
@@ -138,9 +137,11 @@ function handleActionError(error: unknown) {
   const msg = error instanceof Error ? error.message : "";
   return {
     success: false as const,
-    error: msg === ERROR_MESSAGES.unauthorized
-      ? msg
-      : ERROR_MESSAGES.internalError,
+    error: msg === "UNAUTHORIZED"
+      ? ERROR_MESSAGES.unauthorized
+      : msg === "FORBIDDEN"
+        ? ERROR_MESSAGES.forbidden
+        : ERROR_MESSAGES.internalError,
   };
 }
 
@@ -149,17 +150,30 @@ function handleActionError(error: unknown) {
 // ==========================================
 export async function createQuestionAction(input: CreateQuestionInput) {
   try {
-    await checkAdminAuth();
+    const actor = await requireAdminAccess();
 
     const parsed = CreateQuestionSchema.safeParse(input);
     if (!parsed.success) {
       return { success: false as const, error: ERROR_MESSAGES.invalidFormat, details: parsed.error.flatten() };
     }
 
+    if (!imagesBelongToPackage(parsed.data.packageId, parsed.data)) {
+      return { success: false as const, error: ERROR_MESSAGES.invalidImage };
+    }
+
     const { packageId, ...baseData } = parsed.data;
-    await db.insert(questions).values({
-      packageId,
-      ...normalizeQuestionPayload(baseData),
+    await db.transaction(async (tx) => {
+      const [createdQuestion] = await tx.insert(questions).values({
+        packageId,
+        ...normalizeQuestionPayload(baseData),
+      }).returning({ id: questions.id });
+
+      await tx.insert(adminAuditLogs).values(createAdminAuditEntry(actor, {
+        action: "question.created",
+        targetType: "question",
+        targetId: String(createdQuestion.id),
+        metadata: { packageId, category: parsed.data.kategori },
+      }));
     });
 
     revalidatePath(`/admin/packages/${packageId}`);
@@ -177,7 +191,7 @@ export async function importBulkQuestionsAction(
   rawQuestions: unknown
 ) {
   try {
-    await checkAdminAuth();
+    const actor = await requireAdminAccess();
 
     const parsed = BulkQuestionsSchema.safeParse(rawQuestions);
     if (!parsed.success) {
@@ -193,12 +207,24 @@ export async function importBulkQuestionsAction(
       return { success: false as const, error: ERROR_MESSAGES.emptyImport };
     }
 
+    if (parsed.data.some((question) => !imagesBelongToPackage(packageId, question))) {
+      return { success: false as const, error: ERROR_MESSAGES.invalidImage };
+    }
+
     const insertPayload = parsed.data.map((q) => ({
       packageId,
       ...normalizeQuestionPayload(q),
     }));
 
-    await db.insert(questions).values(insertPayload);
+    await db.transaction(async (tx) => {
+      await tx.insert(questions).values(insertPayload);
+      await tx.insert(adminAuditLogs).values(createAdminAuditEntry(actor, {
+        action: "question.imported",
+        targetType: "package",
+        targetId: String(packageId),
+        metadata: { packageId, count: parsed.data.length },
+      }));
+    });
 
     revalidatePath(`/admin/packages/${packageId}`);
     return { success: true as const, totalImported: parsed.data.length };
@@ -212,19 +238,35 @@ export async function importBulkQuestionsAction(
 // ==========================================
 export async function updateQuestionAction(input: UpdateQuestionInput) {
   try {
-    await checkAdminAuth();
+    const actor = await requireAdminAccess();
 
     const parsed = UpdateQuestionSchema.safeParse(input);
     if (!parsed.success) {
       return { success: false as const, error: ERROR_MESSAGES.invalidFormat, details: parsed.error.flatten() };
     }
 
+    if (!imagesBelongToPackage(parsed.data.packageId, parsed.data)) {
+      return { success: false as const, error: ERROR_MESSAGES.invalidImage };
+    }
+
     const { id, packageId, ...baseData } = parsed.data;
 
-    await db
-      .update(questions)
-      .set(normalizeQuestionPayload(baseData))
-      .where(eq(questions.id, id));
+    await db.transaction(async (tx) => {
+      const [updatedQuestion] = await tx
+        .update(questions)
+        .set(normalizeQuestionPayload(baseData))
+        .where(eq(questions.id, id))
+        .returning({ id: questions.id });
+
+      if (updatedQuestion) {
+        await tx.insert(adminAuditLogs).values(createAdminAuditEntry(actor, {
+          action: "question.updated",
+          targetType: "question",
+          targetId: String(id),
+          metadata: { packageId, category: parsed.data.kategori },
+        }));
+      }
+    });
 
     revalidatePath(`/admin/packages/${packageId}`);
     return { success: true as const };
@@ -238,8 +280,22 @@ export async function updateQuestionAction(input: UpdateQuestionInput) {
 // ==========================================
 export async function deleteQuestionAction(questionId: number, packageId: number) {
   try {
-    await checkAdminAuth();
-    await db.delete(questions).where(eq(questions.id, questionId));
+    const actor = await requireAdminAccess();
+    await db.transaction(async (tx) => {
+      const [deletedQuestion] = await tx
+        .delete(questions)
+        .where(eq(questions.id, questionId))
+        .returning({ id: questions.id });
+
+      if (deletedQuestion) {
+        await tx.insert(adminAuditLogs).values(createAdminAuditEntry(actor, {
+          action: "question.deleted",
+          targetType: "question",
+          targetId: String(questionId),
+          metadata: { packageId },
+        }));
+      }
+    });
     revalidatePath(`/admin/packages/${packageId}`);
     return { success: true as const };
   } catch (error: unknown) {

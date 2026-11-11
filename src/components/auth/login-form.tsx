@@ -27,10 +27,6 @@ const ROUTES = {
   forgotPassword: "/lupa-password",
 } as const;
 
-const API_ENDPOINTS = {
-  session: "/api/auth/session",
-} as const;
-
 const FORM_TEXT = {
   emailLabel: "Email",
   emailPlaceholder: "nama@email.com",
@@ -48,8 +44,8 @@ const MESSAGES = {
   },
   errors: {
     invalid_credentials: "Email atau kata sandi salah. Coba lagi.",
-    user_not_found: "Akun dengan email ini tidak ditemukan.",
     too_many_attempts: "Terlalu banyak percobaan. Tunggu beberapa menit.",
+    temporarily_unavailable: "Layanan sedang sibuk. Coba lagi beberapa saat nanti.",
     account_disabled: "Akun kamu telah dinonaktifkan. Hubungi dukungan.",
     email_not_verified: "Email kamu belum diverifikasi. Silakan periksa kotak masuk atau folder spam email kamu.",
     connection: "Koneksi bermasalah. Periksa internet kamu dan coba lagi.",
@@ -104,32 +100,20 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
     const formData = new FormData();
     formData.append("email", values.email);
     formData.append("password", values.password);
+    formData.append("callbackUrl", callbackUrl);
 
     try {
       const result = await loginAction(formData);
 
-      if (result?.error) {
+      if ("error" in result) {
         setGlobalError(MESSAGES.errors[result.error as keyof typeof MESSAGES.errors] ?? MESSAGES.errors.default);
         return;
       }
 
-      // ── DETEKSI ROLE SECARA DINAMIS ──
-      if (callbackUrl === ROUTES.dashboard) {
-        try {
-          const res = await fetch(API_ENDPOINTS.session);
-          const session = await res.json();
-
-          if (session?.user?.role === "ADMIN") {
-            router.push(ROUTES.admin);
-            router.refresh();
-            return;
-          }
-        } catch (e) {
-          console.error("Gagal memverifikasi role session:", e);
-        }
-      }
-
-      router.push(callbackUrl);
+      const destination = result.role === "ADMIN"
+        ? callbackUrl === ROUTES.dashboard ? ROUTES.admin : callbackUrl
+        : callbackUrl === ROUTES.admin ? ROUTES.dashboard : callbackUrl;
+      router.replace(destination);
       router.refresh();
 
     } catch {
@@ -148,6 +132,14 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
           <AlertDescription className="text-xs opacity-90">
             {MESSAGES.success.verificationDesc}
           </AlertDescription>
+        </Alert>
+      )}
+
+      {status === "password_reset_success" && !globalError && (
+        <Alert className="border-teal-200 bg-teal-50 text-teal-900">
+          <CheckCircle2 className="h-4 w-4 stroke-teal-600" />
+          <AlertTitle>Kata sandi berhasil diperbarui</AlertTitle>
+          <AlertDescription className="text-xs opacity-90">Silakan masuk menggunakan kata sandi barumu.</AlertDescription>
         </Alert>
       )}
 

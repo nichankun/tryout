@@ -11,13 +11,16 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { tryoutPackages, userAccess } from "@/db/database/schema";
-import { eq, and } from "drizzle-orm";
+import { questions, tryoutPackages, userAccess } from "@/db/database/schema";
+import { eq, and, count } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle2, ChevronLeft } from "lucide-react";
 import { CheckoutForm } from "@/components/checkout/checkout-form";
 import { Separator } from "@/components/ui/separator";
+import { SERVICE_FEE } from "@/lib/constants/billing";
+import { TIMER_CONFIG } from "@/types/tryout";
+import Script from "next/script";
 
 // ==========================================
 // KONSTANTA & KONFIGURASI
@@ -26,16 +29,7 @@ const APP_CONFIG = {
   name: "ASNPedia",
   locale: "id-ID",
   currency: "IDR",
-  adminFee: 1000,
 } as const;
-
-const BENEFITS_LIST = [
-  "110 Soal SKD (TWK, TIU, TKP) standar BKN terbaru",
-  "Simulasi CAT persis dengan aslinya (Anti-Cheat & Timer)",
-  "Pembahasan teks dan trik cepat menjawab",
-  "Analisis statistik nilai dan peluang lolos passing grade",
-  "Akses seumur hidup untuk volume ini",
-] as const;
 
 const ROUTES = {
   loginRedirect: (id: number) => `/login?callbackUrl=/checkout/${id}`,
@@ -113,7 +107,7 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
 
   // ── 3. PARALLEL DATA FETCHING (Kunci Performa Utama) ──
   // Menarik Data Paket sekaligus memeriksa Kepemilikan Akses secara bersamaan
-  const [pkg, ownedAccess] = await Promise.all([
+  const [pkg, ownedAccess, questionCountResult] = await Promise.all([
     // Ambil Data Paket Tryout
     db.query.tryoutPackages.findFirst({
       where: and(
@@ -130,11 +124,14 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
         eq(userAccess.packageId, volumeId)
       ),
       columns: { id: true }, // Cukup ambil ID untuk cek eksistensi
-    })
+    }),
+    db.select({ total: count() }).from(questions).where(eq(questions.packageId, volumeId)),
   ]);
 
   // Jika paket tidak ada atau tidak aktif
   if (!pkg) notFound();
+  const questionCount = questionCountResult[0]?.total ?? 0;
+  if (questionCount === 0) notFound();
 
   // ── 4. PENCEGAHAN PEMBELIAN GANDA ──
   // Jika sudah punya akses, lewati checkout dan langsung ke ruang ujian
@@ -155,9 +152,25 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
   }
 
   // ── 6. KALKULASI TOTAL BIAYA ──
-  const totalPembayaran = pkg.price + APP_CONFIG.adminFee;
+  const totalPembayaran = pkg.price + SERVICE_FEE;
+  const benefits = [
+    `${questionCount} soal latihan SKD (TWK, TIU, TKP)`,
+    `Sesi latihan dengan batas waktu ${Math.round(TIMER_CONFIG.durationSeconds / 60)} menit`,
+    "Nilai dihitung otomatis berdasarkan jawaban yang tersimpan",
+    "Pembahasan untuk meninjau jawaban setelah sesi selesai",
+  ];
 
   return (
+    <>
+    {process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY && (
+      <Script
+        src={process.env.MIDTRANS_IS_PRODUCTION === "true"
+          ? "https://app.midtrans.com/snap/snap.js"
+          : "https://app.sandbox.midtrans.com/snap/snap.js"}
+        data-client-key={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY}
+        strategy="afterInteractive"
+      />
+    )}
     <div className="min-h-screen bg-background text-foreground py-10 px-4 md:px-8">
       <div className="max-w-4xl mx-auto space-y-8">
 
@@ -209,7 +222,7 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
                     {TEXT_CONTENT.sectionBenefits}
                   </h3>
                   <ul className="space-y-2">
-                    {BENEFITS_LIST.map((benefit) => (
+                    {benefits.map((benefit) => (
                       <li
                         key={benefit}
                         className="flex items-start gap-3 text-sm text-muted-foreground"
@@ -224,7 +237,12 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
             </Card>
 
             {/* Komponen Client untuk Penanganan SDK Gateway Pembayaran */}
-            <CheckoutForm volumeId={volumeId} total={totalPembayaran} />
+            <CheckoutForm
+              volumeId={volumeId}
+              total={totalPembayaran}
+              customerName={session.user.name ?? ""}
+              customerEmail={session.user.email ?? ""}
+            />
           </div>
 
           {/* SISI KANAN: RINGKASAN REKAPITULASI BIAYA BELANJA */}
@@ -241,7 +259,7 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
                   </div>
                   <div className="flex justify-between text-muted-foreground">
                     <span>{TEXT_CONTENT.labelAdminFee}</span>
-                    <span>{formatMataUang(APP_CONFIG.adminFee)}</span>
+                    <span>{formatMataUang(SERVICE_FEE)}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between font-bold text-base text-foreground">
@@ -261,5 +279,6 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
         </div>
       </div>
     </div>
+    </>
   );
 }

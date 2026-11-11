@@ -4,7 +4,7 @@
 
 import { db } from "@/db";
 import { tryoutPackages, questions } from "@/db/database/schema";
-import { eq, sql } from "drizzle-orm";
+import { count } from "drizzle-orm";
 import { columns } from "./columns";
 import { DataTable } from "@/components/admin/data-table";
 import { Plus } from "lucide-react"; // ✅ Menambahkan import ikon
@@ -14,22 +14,15 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminPackagesPage() {
   // Ambil seluruh daftar volume paket simulasi
-  const packagesData = await db.select().from(tryoutPackages).orderBy(tryoutPackages.id);
-
-  // Mengintegrasikan kalkulasi perhitungan jumlah soal yang terikat di tiap paket secara paralel
-  const enrichedPackages = await Promise.all(
-    packagesData.map(async (pkg) => {
-      const [questionCount] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(questions)
-        .where(eq(questions.packageId, pkg.id));
-
-      return {
-        ...pkg,
-        totalQuestions: questionCount?.count ?? 0,
-      };
-    })
-  );
+  const [packagesData, questionCounts] = await Promise.all([
+    db.select().from(tryoutPackages).orderBy(tryoutPackages.id),
+    db.select({ packageId: questions.packageId, total: count() }).from(questions).groupBy(questions.packageId),
+  ]);
+  const countByPackage = new Map(questionCounts.map((item) => [item.packageId, item.total]));
+  const enrichedPackages = packagesData.map((pkg) => ({
+    ...pkg,
+    totalQuestions: countByPackage.get(pkg.id) ?? 0,
+  }));
 
   return (
     <div className="space-y-6 text-foreground">

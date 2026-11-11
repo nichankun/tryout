@@ -32,7 +32,13 @@ export default async function EditQuestionPage({ params }: EditQuestionPageProps
   }
 
   // Definisikan tipe aman untuk struktur JSONB pilihan jawaban
-  type PilihanStruktur = { opsi: "A" | "B" | "C" | "D" | "E"; teks: string; poin: number }[];
+  type PilihanStruktur = {
+    opsi: "A" | "B" | "C" | "D" | "E";
+    teks: string;
+    poin: number;
+    imageUrl?: string | null;
+    imageAlt?: string | null;
+  }[];
 
   // Lempar data lama ke sisi Client Form Component sebagai initial values
   const initialData = {
@@ -40,8 +46,11 @@ export default async function EditQuestionPage({ params }: EditQuestionPageProps
     packageId: questionData.packageId,
     kategori: questionData.kategori as "TWK" | "TIU" | "TKP",
     pertanyaan: questionData.pertanyaan,
+    imageUrl: questionData.imageUrl,
+    imageAlt: questionData.imageAlt,
     pembahasan: questionData.pembahasan,
     pilihan: questionData.pilihan as PilihanStruktur,
+    hasLegacyGeneratorData: questionData.isFigural === true && !questionData.imageUrl,
   };
 
   return <EditQuestionFormClient initialData={initialData} />;

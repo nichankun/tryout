@@ -23,14 +23,15 @@ export default async function AdminOrdersPage() {
     .from(orders)
     .innerJoin(users, eq(orders.userId, users.id))
     .innerJoin(tryoutPackages, eq(orders.packageId, tryoutPackages.id))
-    .orderBy(desc(orders.id));
+    .orderBy(desc(orders.createdAt))
+    .limit(100);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Daftar Transaksi</h1>
         <p className="text-sm text-muted-foreground">
-          Log audit monitoring rekonsiliasi data pembayaran pintu gerbang Midtrans.
+          Menampilkan 100 transaksi terbaru untuk rekonsiliasi pembayaran Midtrans.
         </p>
       </div>
 

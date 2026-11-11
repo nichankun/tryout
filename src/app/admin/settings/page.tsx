@@ -8,6 +8,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, XCircle } from "lucide-react";
+import { SKD_TRAINING_THRESHOLDS } from "@/lib/constants/scoring";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ const SETTINGS_CONFIG = {
     title: "Integrasi Payment Gateway",
     description: "Status sinkronisasi kredensial API Midtrans Core.",
     serverKeyText: "MIDTRANS_SERVER_KEY",
-    clientKeyText: "MIDTRANS_CLIENT_KEY",
+    clientKeyText: "NEXT_PUBLIC_MIDTRANS_CLIENT_KEY",
     envModeText: "Mode Lingkungan Midtrans",
     configured: "TERKONFIGURASI",
     missing: "KOSONG",
@@ -31,12 +32,12 @@ const SETTINGS_CONFIG = {
     sandboxMode: "SANDBOX (STAGING)",
   },
   passingGrade: {
-    title: "Passing Grade SKD Resmi (BKN)",
-    description: "Ambang kriteria penilaian kelulusan passing grade ujian CAT.",
+    title: "Target Nilai Latihan SKD",
+    description: "Target latihan ini bukan penetapan resmi BKN dan perlu disesuaikan bila ketentuan seleksi berubah.",
     categories: [
-      { name: "Tes Wawasan Kebangsaan (TWK)", minScore: 65 },
-      { name: "Tes Inteligensia Umum (TIU)", minScore: 80 },
-      { name: "Tes Karakteristik Pribadi (TKP)", minScore: 166 },
+      { name: "Tes Wawasan Kebangsaan (TWK)", minScore: SKD_TRAINING_THRESHOLDS.twk },
+      { name: "Tes Inteligensia Umum (TIU)", minScore: SKD_TRAINING_THRESHOLDS.tiu },
+      { name: "Tes Karakteristik Pribadi (TKP)", minScore: SKD_TRAINING_THRESHOLDS.tkp },
     ],
   },
 } as const;
@@ -48,7 +49,7 @@ export default async function AdminSettingsPage() {
   // Melakukan pengecekan kesiapan kunci Environment Kredensial sistem secara berkala
   const midtransStatus = {
     serverKeyExist: !!process.env.MIDTRANS_SERVER_KEY,
-    clientKeyExist: !!process.env.MIDTRANS_CLIENT_KEY,
+    clientKeyExist: !!process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY,
     isProduction: process.env.MIDTRANS_IS_PRODUCTION === "true",
   };
 

@@ -36,6 +36,8 @@ const MESSAGES = {
   successDesc: "Silakan periksa kotak masuk atau folder spam email kamu dalam beberapa menit ke depan.",
   errorFormat: "Terjadi kesalahan. Pastikan format email sudah benar.",
   errorConnection: "Koneksi bermasalah. Silakan periksa internet kamu dan coba lagi.",
+  errorRateLimited: "Terlalu banyak permintaan. Tunggu beberapa menit lalu coba lagi.",
+  errorUnavailable: "Layanan sedang sibuk. Coba lagi beberapa saat nanti.",
 } as const;
 
 // ==========================================
@@ -72,7 +74,11 @@ export default function LupaPasswordPage() {
     try {
       const result = await forgotPasswordAction(formData);
       if (result?.error) {
-        setGlobalError(MESSAGES.errorFormat);
+        setGlobalError(result.error === "too_many_attempts"
+          ? MESSAGES.errorRateLimited
+          : result.error === "temporarily_unavailable"
+            ? MESSAGES.errorUnavailable
+            : MESSAGES.errorFormat);
         return;
       }
       setIsSubmitted(true);

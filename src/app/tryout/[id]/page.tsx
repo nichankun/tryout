@@ -5,7 +5,6 @@
 
 import { notFound, redirect } from "next/navigation";
 import { eq, and, asc } from "drizzle-orm";
-import type { FiguralTipe } from "@/types/tryout";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { questions, tryoutPackages, userAccess } from "@/db/database/schema";
@@ -22,9 +21,10 @@ type SanitizedQuestion = {
   id: number;
   kategori: "TWK" | "TIU" | "TKP";
   pertanyaan: string;
-  isFigural: boolean | null;
-  figuralConfig: { tipe: FiguralTipe; deretSoal: (string | number)[] } | null;
-  pilihan: { opsi: string; teks: string; figuralAngle?: string | number | null }[];
+  imageUrl: string | null;
+  imageAlt: string | null;
+  legacyImageMissing: boolean;
+  pilihan: { opsi: string; teks: string; imageUrl?: string | null; imageAlt?: string | null }[];
 };
 
 export const dynamic = "force-dynamic";
@@ -68,9 +68,10 @@ export default async function TryoutPage({ params }: TryoutPageProps) {
         id: true,
         kategori: true,
         pertanyaan: true,
+        imageUrl: true,
+        imageAlt: true,
         pilihan: true,
         isFigural: true,
-        figuralConfig: true,
       },
       orderBy: [asc(questions.id)],
     }),
@@ -85,17 +86,14 @@ const formattedQuestions: SanitizedQuestion[] = rawQuestions.map((q) => ({
   id: q.id,
   kategori: q.kategori as "TWK" | "TIU" | "TKP",
   pertanyaan: q.pertanyaan,
-  isFigural: q.isFigural ?? null,
-  figuralConfig: q.figuralConfig
-    ? {
-        tipe: q.figuralConfig.tipe as FiguralTipe,
-        deretSoal: q.figuralConfig.deretSoal,
-      }
-    : null,
+  imageUrl: q.imageUrl,
+  imageAlt: q.imageAlt,
+  legacyImageMissing: q.isFigural === true && !q.imageUrl,
   pilihan: q.pilihan.map((p) => ({
     opsi: p.opsi,
     teks: p.teks,
-    figuralAngle: p.figuralAngle ?? null,
+    imageUrl: p.imageUrl ?? null,
+    imageAlt: p.imageAlt ?? null,
   })),
 }));
   // 5. Render

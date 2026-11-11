@@ -10,7 +10,7 @@ import { columns } from "./columns";
 import { DataTable } from "@/components/admin/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, BookOpen, Coins, UploadCloud } from "lucide-react";
+import { Plus, BookOpen, Coins, UploadCloud, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 
 interface AdminPackageDetailPageProps {
@@ -42,10 +42,13 @@ export default async function AdminPackageDetailPage({ params }: AdminPackageDet
       kategori: questions.kategori,
       pertanyaan: questions.pertanyaan,
       pembahasan: questions.pembahasan,
+      isFigural: questions.isFigural,
+      imageUrl: questions.imageUrl,
     })
     .from(questions)
     .where(eq(questions.packageId, packageId))
     .orderBy(desc(questions.id));
+  const legacyGeneratorCount = questionsData.filter((question) => question.isFigural && !question.imageUrl).length;
 
   return (
     <div className="space-y-8 text-foreground antialiased">
@@ -86,6 +89,16 @@ export default async function AdminPackageDetailPage({ params }: AdminPackageDet
         </div>
       </div>
 
+      {legacyGeneratorCount > 0 && (
+        <div role="alert" className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <div className="space-y-1">
+            <p className="text-sm font-semibold">{legacyGeneratorCount} soal masih menggunakan generator lama.</p>
+            <p className="text-sm">Buka dan edit soal tersebut untuk mengunggah gambar soal serta pilihan sebelum paket dikerjakan peserta.</p>
+          </div>
+        </div>
+      )}
+
       {/* MINI OVERVIEW METRIK CARD */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Card className="bg-card border-border shadow-sm">
@@ -95,7 +108,7 @@ export default async function AdminPackageDetailPage({ params }: AdminPackageDet
             </div>
             <div>
               <p className="text-xs text-muted-foreground font-medium">Total Soal Terinput</p>
-              <p className="text-xl font-bold">{questionsData.length} / 110 Butir</p>
+              <p className="text-xl font-bold">{questionsData.length} Butir Soal</p>
             </div>
           </CardContent>
         </Card>

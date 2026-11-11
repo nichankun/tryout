@@ -3,18 +3,18 @@
 /**
  * app/admin/packages/[id]/add-question/page.tsx
  * * Client Component Formulir Manual Pembuatan Soal Baru.
- * * SUDAH MENDUKUNG SOAL TEKS, FIGURAL, & SILOGISME (Diagram Venn).
- * * Bebas dari Error Typescript (Payload Mismatch Fixed).
+ * Form soal teks dan gambar yang diunggah admin.
  */
 
 import * as React from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { createQuestionAction } from "@/lib/actions/questions";
-import { ArrowLeft, Save, AlertCircle, CheckCircle2, Loader2, Image as ImageIcon } from "lucide-react";
+import { createQuestionAction, type CreateQuestionInput } from "@/lib/actions/questions";
+import { ArrowLeft, Save, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { QuestionImageUpload } from "@/components/admin/question-image-upload";
 
 // ==========================================
 // SCHEMAS VALIDASI FORM (SISI CLIENT)
@@ -26,46 +26,51 @@ const FormQuestionSchema = z.object({
   pertanyaan: z.string().min(10, "Pertanyaan minimal berisi 10 karakter"),
   pembahasan: z.string().min(10, "Pembahasan jawaban minimal berisi 10 karakter"),
   
-  // Penambahan Skema untuk Figural & Silogisme
-  isFigural: z.boolean().default(false),
-  figuralTipe: z.enum([
-    "deret_rotasi", "matriks", "pencerminan", "analogi_gambar",
-    "analogi_matriks", "ketidaksamaan", "deret_bangun", "tumpukan_balok", "silogisme"
-  ]).optional().nullable(),
+  imageUrl: z.string().nullable().optional(),
+  imageAlt: z.string().max(300, "Deskripsi gambar maksimal 300 karakter").nullable().optional(),
 
   pilihan: z.array(
     z.object({
       opsi: z.enum(["A", "B", "C", "D", "E"]),
-      // Teks diubah jadi opsional karena soal gambar mungkin tidak ada teksnya
-      teks: z.string().optional(), 
+      teks: z.string().trim().max(500, "Teks opsi maksimal 500 karakter").optional(),
       poin: z.number({ invalid_type_error: "Poin harus berupa angka" })
         .int()
         .min(0, "Poin minimal 0")
         .max(5, "Poin maksimal 5"),
-      // Parameter input angle/key untuk memanggil gambar SVG
-      figuralAngle: z.union([z.string(), z.number()]).optional().nullable(),
+      imageUrl: z.string().nullable().optional(),
+      imageAlt: z.string().max(300, "Deskripsi gambar maksimal 300 karakter").nullable().optional(),
     })
-  ).length(5),
+  ).length(5).superRefine((choices, context) => {
+    choices.forEach((choice, index) => {
+      if (!choice.teks?.trim() && !choice.imageUrl) {
+        context.addIssue({
+          code: "custom",
+          path: [index, "teks"],
+          message: "Isi teks atau unggah gambar untuk pilihan ini.",
+        });
+      }
+    });
+  }),
 });
 
 type FormValues = z.infer<typeof FormQuestionSchema>;
+type FormChoice = FormValues["pilihan"][number];
 
-// Opsi A-E ditambahkan properti figuralAngle kosong sebagai default
-const DEFAULT_OPTIONS = [
-  { opsi: "A", teks: "", poin: 0, figuralAngle: "" },
-  { opsi: "B", teks: "", poin: 0, figuralAngle: "" },
-  { opsi: "C", teks: "", poin: 0, figuralAngle: "" },
-  { opsi: "D", teks: "", poin: 0, figuralAngle: "" },
-  { opsi: "E", teks: "", poin: 0, figuralAngle: "" },
-] as const;
+const DEFAULT_OPTIONS: FormChoice[] = [
+  { opsi: "A", teks: "", poin: 0, imageUrl: null, imageAlt: null },
+  { opsi: "B", teks: "", poin: 0, imageUrl: null, imageAlt: null },
+  { opsi: "C", teks: "", poin: 0, imageUrl: null, imageAlt: null },
+  { opsi: "D", teks: "", poin: 0, imageUrl: null, imageAlt: null },
+  { opsi: "E", teks: "", poin: 0, imageUrl: null, imageAlt: null },
+];
 
 // ==========================================
 // KOMPONEN UTAMA
 // ==========================================
 export default function AddQuestionPage() {
   const params = useParams();
-  const router = useRouter();
   const [isPending, setIsPending] = React.useTransition();
+  const [pendingUploads, setPendingUploads] = React.useState(0);
   const [statusMessage, setStatusMessage] = React.useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const packageId = parseInt(params.id as string, 10);
@@ -75,16 +80,17 @@ export default function AddQuestionPage() {
     control,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(FormQuestionSchema),
     defaultValues: {
       kategori: "TWK",
       pertanyaan: "",
+      imageUrl: null,
+      imageAlt: null,
       pembahasan: "",
-      isFigural: false,
-      figuralTipe: null,
-      pilihan: [...DEFAULT_OPTIONS] as any,
+      pilihan: [...DEFAULT_OPTIONS],
     },
   });
 
@@ -93,44 +99,33 @@ export default function AddQuestionPage() {
     name: "pilihan",
   });
 
-  // Pantau apakah mode figural sedang diaktifkan user untuk mengubah UI
-  const isFiguralActive = useWatch({
-    control,
-    name: "isFigural",
-  });
+  const imageUrl = useWatch({ control, name: "imageUrl" });
+  const imageAlt = useWatch({ control, name: "imageAlt" });
+  const watchedChoices = useWatch({ control, name: "pilihan" });
 
   const onSubmit = (values: FormValues) => {
     setStatusMessage(null);
 
     setIsPending(async () => {
-      // 1. Format array pilihan agar Typescript backend tidak komplain
-      // Jika teks kosong, kita paksa jadi string "" (bukan undefined)
+      // 1. Normalisasi teks dan metadata gambar opsi.
       const formattedPilihan = values.pilihan.map((p) => ({
         opsi: p.opsi,
-        teks: p.teks || "", 
+        teks: p.teks?.trim() || "",
         poin: p.poin,
-        figuralAngle: p.figuralAngle || null,
+        imageUrl: p.imageUrl || null,
+        imageAlt: p.imageAlt?.trim() || null,
       }));
 
-      // 2. Susun Payload sesuai dengan Zod Schema di actions/questions.ts
-      const payload: any = {
+      const payload: CreateQuestionInput = {
         packageId,
         kategori: values.kategori,
         pertanyaan: values.pertanyaan,
+        imageUrl: values.imageUrl || null,
+        imageAlt: values.imageAlt?.trim() || null,
         pembahasan: values.pembahasan,
-        isFigural: values.isFigural,
         pilihan: formattedPilihan,
       };
 
-      // 3. Masukkan figuralConfig jika mode figural diaktifkan
-      if (values.isFigural && values.figuralTipe) {
-        payload.figuralConfig = {
-          tipe: values.figuralTipe,
-          deretSoal: [], // Dikosongkan sesuai interface Drizzle
-        };
-      }
-
-      // Kirim ke server action
       const result = await createQuestionAction(payload);
 
       if (!result.success) {
@@ -149,10 +144,10 @@ export default function AddQuestionPage() {
       reset({
         kategori: values.kategori,
         pertanyaan: "",
+        imageUrl: null,
+        imageAlt: null,
         pembahasan: "",
-        isFigural: false,
-        figuralTipe: null,
-        pilihan: [...DEFAULT_OPTIONS] as any,
+        pilihan: [...DEFAULT_OPTIONS],
       });
       
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -217,43 +212,31 @@ export default function AddQuestionPage() {
             {errors.pertanyaan && <p className="text-xs text-destructive font-medium">{errors.pertanyaan.message}</p>}
           </div>
 
-          {/* TOGGLE MODE FIGURAL / GAMBAR */}
-          <div className="pt-4 mt-2 border-t border-border flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input 
-                type="checkbox" 
-                {...register("isFigural")}
-                className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary"
+          <div className="grid gap-4 border-t border-border pt-4 md:grid-cols-[minmax(0,1.25fr)_minmax(240px,0.75fr)]">
+            <div>
+              <input type="hidden" {...register("imageUrl")} />
+              <QuestionImageUpload
+                packageId={packageId}
+                label="Gambar soal (opsional)"
+                value={imageUrl}
+                altText={imageAlt}
+                onChange={(value) => setValue("imageUrl", value, { shouldDirty: true })}
+                onUploadingChange={(uploading) => setPendingUploads((count) => Math.max(0, count + (uploading ? 1 : -1)))}
               />
-              <div className="flex flex-col">
-                <span className="text-sm font-bold flex items-center gap-2">
-                  <ImageIcon className="w-4 h-4 text-purple-600" /> Mode Gambar (Figural / Silogisme)
-                </span>
-                <span className="text-xs text-muted-foreground">Aktifkan untuk menyisipkan gambar prosedural di opsi A-E</span>
-              </div>
-            </label>
-
-            {/* MUNCUL JIKA TOGGLE DICENTANG */}
-            {isFiguralActive && (
-              <div className="w-full sm:w-1/2">
-                <select 
-                  {...register("figuralTipe")}
-                  className="w-full h-10 px-3 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-purple-500 cursor-pointer"
-                >
-                  <option value="">-- Pilih Tipe Gambar --</option>
-                  <option value="silogisme">Silogisme (Diagram Venn)</option>
-                  <option value="deret_rotasi">Deret Rotasi</option>
-                  <option value="matriks">Matriks Gambar</option>
-                  <option value="pencerminan">Pencerminan</option>
-                  <option value="analogi_gambar">Analogi Gambar</option>
-                  <option value="analogi_matriks">Analogi Matriks</option>
-                  <option value="ketidaksamaan">Ketidaksamaan</option>
-                  <option value="deret_bangun">Deret Bangun</option>
-                  <option value="tumpukan_balok">Tumpukan Balok 3D</option>
-                </select>
-                {errors.figuralTipe && <p className="text-xs text-destructive mt-1">{errors.figuralTipe.message}</p>}
-              </div>
-            )}
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="question-image-alt" className="text-xs font-medium text-muted-foreground">
+                Deskripsi gambar untuk aksesibilitas
+              </label>
+              <input
+                id="question-image-alt"
+                {...register("imageAlt")}
+                maxLength={300}
+                placeholder="Contoh: Deret lima bentuk yang berputar searah jarum jam"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              {errors.imageAlt && <p className="text-xs text-destructive">{errors.imageAlt.message}</p>}
+            </div>
           </div>
         </div>
 
@@ -274,18 +257,28 @@ export default function AddQuestionPage() {
                 <div className="flex-1 w-full space-y-2">
                   <input 
                     {...register(`pilihan.${index}.teks` as const)}
-                    placeholder={`Teks pilihan jawaban untuk opsi ${field.opsi} (Opsional jika figural)...`}
+                    placeholder={`Teks pilihan ${field.opsi} (opsional jika memakai gambar)...`}
                     className="w-full h-9 px-3 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                   />
-                  
-                  {/* INPUT KHUSUS MUNCUL JIKA MODE FIGURAL AKTIF */}
-                  {isFiguralActive && (
-                    <input 
-                      {...register(`pilihan.${index}.figuralAngle` as const)}
-                      placeholder="Key Pola (misal: semua_dalam, huruf_e) atau Nilai Angka"
-                      className="w-full h-9 px-3 bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/50 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-purple-500 placeholder:text-purple-300"
+                  <input type="hidden" {...register(`pilihan.${index}.imageUrl` as const)} />
+                  <QuestionImageUpload
+                    packageId={packageId}
+                    label={`Gambar opsi ${field.opsi} (opsional)`}
+                    value={watchedChoices?.[index]?.imageUrl}
+                    altText={watchedChoices?.[index]?.imageAlt}
+                    aspect="square"
+                    onChange={(value) => setValue(`pilihan.${index}.imageUrl`, value, { shouldDirty: true, shouldValidate: true })}
+                    onUploadingChange={(uploading) => setPendingUploads((count) => Math.max(0, count + (uploading ? 1 : -1)))}
+                  />
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-muted-foreground">Deskripsi gambar opsi untuk aksesibilitas</span>
+                    <input
+                      {...register(`pilihan.${index}.imageAlt` as const)}
+                      maxLength={300}
+                      placeholder="Jelaskan isi gambar secara singkat"
+                      className="w-full h-9 px-3 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                     />
-                  )}
+                  </label>
 
                   {errors.pilihan?.[index]?.teks && (
                     <p className="text-none text-[11px] text-destructive font-medium">{errors.pilihan[index]?.teks?.message}</p>
@@ -326,13 +319,13 @@ export default function AddQuestionPage() {
         <div className="flex justify-end">
           <button
             type="submit"
-            disabled={isPending}
+            disabled={isPending || pendingUploads > 0}
             className="h-11 px-6 bg-primary text-primary-foreground font-semibold rounded-xl text-sm shadow-sm hover:opacity-90 flex items-center justify-center gap-2 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isPending ? (
+            {isPending || pendingUploads > 0 ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Menyimpan...
+                {pendingUploads > 0 ? "Menunggu unggahan gambar..." : "Menyimpan..."}
               </>
             ) : (
               <>

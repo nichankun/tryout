@@ -10,7 +10,7 @@ import { Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { resetPasswordAction } from "@/lib/actions/auth";
 
 // ==========================================
@@ -37,6 +37,8 @@ const MESSAGES = {
   errors: {
     token_expired: "Tautan telah kedaluwarsa. Silakan minta tautan baru.",
     invalid_token: "Gagal mengubah kata sandi. Tautan tidak valid atau sudah kedaluwarsa.",
+    too_many_attempts: "Terlalu banyak percobaan. Tunggu beberapa menit lalu coba lagi.",
+    temporarily_unavailable: "Layanan sedang sibuk. Coba lagi beberapa saat nanti.",
     connection: "Terjadi gangguan koneksi. Silakan coba lagi.",
     default: "Terjadi kesalahan yang tidak terduga.",
   },
@@ -61,7 +63,7 @@ type ResetValues = z.infer<typeof resetSchema>;
 // TIPE PROPS
 // ==========================================
 interface ResetProps {
-  searchParams: Promise<{ token?: string; email?: string }>;
+  searchParams: Promise<{ token?: string; email?: string; error?: string }>;
 }
 
 // ==========================================
@@ -69,7 +71,7 @@ interface ResetProps {
 // ==========================================
 export default function ResetPasswordPage({ searchParams }: ResetProps) {
   const router = useRouter();
-  const { token, email } = use(searchParams);
+  const { token, email, error: tokenError } = use(searchParams);
 
   const [showPassword, setShowPassword] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
@@ -84,7 +86,7 @@ export default function ResetPasswordPage({ searchParams }: ResetProps) {
   });
 
   // Proteksi Awal
-  if (!token || !email) {
+  if (!token || tokenError) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="bg-card p-8 rounded-2xl shadow-md text-center max-w-md w-full border border-destructive/20">
@@ -101,7 +103,7 @@ export default function ResetPasswordPage({ searchParams }: ResetProps) {
     const formData = new FormData();
     formData.append("password", values.password);
     formData.append("token", token!);
-    formData.append("email", email!);
+    if (email) formData.append("email", email);
 
     try {
       const result = await resetPasswordAction(formData);
@@ -109,6 +111,8 @@ export default function ResetPasswordPage({ searchParams }: ResetProps) {
       if (result?.error) {
         if (result.error === "token_expired") {
           setGlobalError(MESSAGES.errors.token_expired);
+        } else if (result.error === "too_many_attempts" || result.error === "temporarily_unavailable") {
+          setGlobalError(MESSAGES.errors[result.error]);
         } else {
           setGlobalError(MESSAGES.errors.invalid_token);
         }

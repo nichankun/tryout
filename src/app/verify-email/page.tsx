@@ -2,6 +2,7 @@
  * app/verify-email/page.tsx
  */
 
+import type { Metadata } from "next";
 import { db } from "@/db";
 import { users, verificationTokens } from "@/db/database/schema";
 import { and, eq } from "drizzle-orm";
@@ -27,7 +28,7 @@ const VERIFY_CONTENT = {
   },
   expired: {
     title: "Tautan Kedaluwarsa",
-    message: "Tautan verifikasi ini telah kedaluwarsa karena sudah melewati batas waktu 1 jam. Silakan lakukan registrasi ulang.",
+    message: "Tautan verifikasi ini telah kedaluwarsa. Coba masuk untuk meminta tautan verifikasi baru.",
   },
   success: {
     title: "Verifikasi Berhasil",
@@ -40,11 +41,17 @@ const VERIFY_CONTENT = {
   btnText: "Kembali ke Halaman Login",
 } as const;
 
+export const metadata: Metadata = {
+  title: "Verifikasi email",
+  referrer: "no-referrer",
+  robots: { index: false, follow: false },
+};
+
 // ==========================================
 // TIPE PROPS
 // ==========================================
 interface VerifyPageProps {
-  searchParams: Promise<{ token?: string; email?: string }>;
+  searchParams: Promise<{ token?: string; email?: string; status?: string; error?: string }>;
 }
 
 // ==========================================
@@ -52,7 +59,11 @@ interface VerifyPageProps {
 // ==========================================
 export default async function VerifyEmailPage({ searchParams }: VerifyPageProps) {
   // Menangani searchParams secara asinkron (Standar Next.js > 15)
-  const { token, email } = await searchParams;
+  const { token, email, status, error } = await searchParams;
+
+  if (status === "verified" && !error) {
+    return <VerifyResult success title={VERIFY_CONTENT.success.title} message={VERIFY_CONTENT.success.message} />;
+  }
 
   if (!token || !email) {
     return (
@@ -64,70 +75,51 @@ export default async function VerifyEmailPage({ searchParams }: VerifyPageProps)
     );
   }
 
+  let outcome: keyof typeof VERIFY_CONTENT;
   try {
-    // 1. Cari token verifikasi yang cocok di database
-    const existingToken = await db.query.verificationTokens.findFirst({
-      where: and(
-        eq(verificationTokens.identifier, email),
-        eq(verificationTokens.token, token)
-      ),
-    });
+    outcome = await db.transaction(async (tx) => {
+      const [existingToken] = await tx
+        .select()
+        .from(verificationTokens)
+        .where(and(
+          eq(verificationTokens.identifier, email),
+          eq(verificationTokens.token, token),
+        ))
+        .for("update");
 
-    if (!existingToken) {
-      return (
-        <VerifyResult
-          success={false}
-          title={VERIFY_CONTENT.notFound.title}
-          message={VERIFY_CONTENT.notFound.message}
-        />
-      );
-    }
+      if (!existingToken) return "notFound";
 
-    // 2. Periksa apakah token sudah kedaluwarsa
-    const hasExpired = new Date(existingToken.expires) < new Date();
-    if (hasExpired) {
-      // Bersihkan token kedaluwarsa
-      await db
+      if (new Date(existingToken.expires) < new Date()) {
+        await tx
+          .delete(verificationTokens)
+          .where(and(
+            eq(verificationTokens.identifier, email),
+            eq(verificationTokens.token, token),
+          ));
+        return "expired";
+      }
+
+      await tx
+        .update(users)
+        .set({ emailVerified: true, emailVerifiedAt: new Date(), updatedAt: new Date() })
+        .where(eq(users.email, email));
+
+      await tx
         .delete(verificationTokens)
-        .where(eq(verificationTokens.token, token));
+        .where(and(
+          eq(verificationTokens.identifier, email),
+          eq(verificationTokens.token, token),
+        ));
 
-      return (
-        <VerifyResult
-          success={false}
-          title={VERIFY_CONTENT.expired.title}
-          message={VERIFY_CONTENT.expired.message}
-        />
-      );
-    }
-
-    // 3. Update status emailVerified pada user
-    await db
-      .update(users)
-      .set({ emailVerified: new Date() })
-      .where(eq(users.email, email));
-
-    // 4. Hapus token dari database karena sudah selesai
-    await db
-      .delete(verificationTokens)
-      .where(eq(verificationTokens.token, token));
-
-    return (
-      <VerifyResult
-        success={true}
-        title={VERIFY_CONTENT.success.title}
-        message={VERIFY_CONTENT.success.message}
-      />
-    );
+      return "success";
+    });
   } catch (error) {
     console.error("[Auth] Error pada verifikasi email:", error);
-    return (
-      <VerifyResult
-        success={false}
-        title={VERIFY_CONTENT.error.title}
-        message={VERIFY_CONTENT.error.message}
-      />
-    );
+    outcome = "error";
   }
+
+  const content = VERIFY_CONTENT[outcome];
+  return <VerifyResult success={outcome === "success"} title={content.title} message={content.message} />;
 }
 
 // ──────────────────────────────────────────────────────────────────────────

@@ -1,32 +1,25 @@
 "use client";
 
-import { useState, useDeferredValue, useMemo, memo } from "react";
+import { memo, useDeferredValue, useMemo, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import {
-  Clock,
-  FileText,
-  Search,
-  RotateCcw,
-  Lock,
-  Play,
+  ArrowRight,
+  BookOpenCheck,
   CheckCircle2,
+  Clock3,
+  ClipboardList,
+  Play,
+  Package,
+  RotateCcw,
+  Search,
 } from "lucide-react";
-
 import { cn } from "@/lib/utils";
+import { getPackageCover } from "@/lib/constants/package-covers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardTitle } from "@/components/ui/card";
 
-// ==========================================
-// KONFIGURASI
-// ==========================================
-const INT_CONFIG = { locale: "id-ID", currency: "IDR" } as const;
 const ROUTES = { tryout: "/tryout", checkout: "/checkout" } as const;
 
 export interface TryoutVolume {
@@ -35,157 +28,140 @@ export interface TryoutVolume {
   totalSoal: number;
   durasiMenit: number;
   harga: number;
-  hargaAsli: number;
   isUnlocked: boolean;
   isAvailable: boolean;
   lastHistory?: { totalSkor: number; isLolos: boolean } | null;
-  totalPengerjaan?: number;
 }
 
-const currencyFormatter = new Intl.NumberFormat(INT_CONFIG.locale, {
+const currencyFormatter = new Intl.NumberFormat("id-ID", {
   style: "currency",
-  currency: INT_CONFIG.currency,
-  minimumFractionDigits: 0,
+  currency: "IDR",
+  maximumFractionDigits: 0,
 });
 
-function formatRupiah(n: number): string {
-  return currencyFormatter.format(n);
-}
-
-// ==========================================
-// SUB-KOMPONEN: KARTU VOLUME (UI Diperbarui)
-// ==========================================
-const VolumeCard = memo(function VolumeCard({ vol }: { vol: TryoutVolume }) {
+const VolumeCard = memo(function VolumeCard({
+  vol,
+  coverIndex,
+}: {
+  vol: TryoutVolume;
+  coverIndex: number;
+}) {
+  const cover = getPackageCover(null, coverIndex, vol.title);
   const paddedId = vol.id.toString().padStart(2, "0");
-  const isFinished = (vol.totalPengerjaan ?? 0) > 0;
+  const isFinished = Boolean(vol.lastHistory);
   const isLocked = !vol.isUnlocked;
+  const isUnavailable = !vol.isAvailable;
+
+  const description = isUnavailable
+    ? "Paket ini sedang disiapkan dan akan tersedia setelah soal ditambahkan."
+    : isFinished
+      ? "Tinjau kembali hasil dan pembahasan, atau ulangi simulasi untuk meningkatkan skor."
+      : isLocked
+        ? "Buka akses untuk mengerjakan simulasi dan mempelajari pembahasan soal."
+        : "Paket sudah terbuka. Mulai simulasi dan tinjau hasil latihanmu.";
 
   return (
-    <Card className="h-full flex flex-col overflow-hidden border border-border bg-card shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md">
-      
-      {/* ── HEADER: Highlight Produk (Meniru Desain Referensi) ── */}
-      <div className="bg-primary p-6 flex flex-col items-start justify-center gap-3">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-primary-foreground/80">
-          Paket Tryout
-        </span>
-        <CardTitle className="text-2xl font-bold leading-tight text-primary-foreground">
-          {vol.title}
-        </CardTitle>
-        <span className="inline-block rounded-full bg-primary-foreground px-3 py-1 font-mono text-[11px] font-bold uppercase tracking-widest text-primary shadow-sm">
-          Vol. {paddedId}
-        </span>
+    <Card className="group flex h-full flex-col gap-0 overflow-hidden rounded-[1.4rem] border border-purple-100 bg-white p-0 shadow-[0_12px_34px_-24px_rgba(46,23,77,0.34)] ring-0 transition-all duration-300 hover:-translate-y-1 hover:border-purple-200 hover:shadow-[0_20px_42px_-24px_rgba(46,23,77,0.42)] motion-reduce:transform-none motion-reduce:transition-none">
+      <div className="relative aspect-[1.95/1] overflow-hidden bg-purple-950">
+        <Image
+          src={cover.image}
+          alt={cover.alt}
+          fill
+          sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+        <div className="pointer-events-none absolute inset-0" style={{ backgroundImage: cover.tone }} aria-hidden="true" />
+        <div className="absolute inset-0 bg-gradient-to-t from-purple-950/90 via-purple-950/20 to-purple-950/10" aria-hidden="true" />
+
+        <div className="absolute inset-x-4 top-4 flex items-center justify-between gap-2 sm:inset-x-5 sm:top-5">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/35 bg-purple-950/35 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.14em] text-white backdrop-blur-md">
+            <BookOpenCheck className="size-3.5" aria-hidden="true" />
+            Tryout SKD
+          </span>
+          <span className="rounded-full border border-white/50 bg-white/90 px-3 py-1.5 text-[10px] font-bold text-purple-950 shadow-sm backdrop-blur-md">
+            {isUnavailable ? "Segera hadir" : isFinished ? "Hasil tersedia" : isLocked ? "Paket latihan" : "Akses aktif"}
+          </span>
+        </div>
+
+        <div className="absolute inset-x-4 bottom-4 text-white sm:inset-x-5 sm:bottom-5">
+          <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-white/75">Volume {paddedId}</p>
+          <CardTitle className="mt-1 line-clamp-1 text-xl font-extrabold leading-tight text-white drop-shadow-sm sm:text-2xl">
+            {vol.title}
+          </CardTitle>
+        </div>
       </div>
 
-      {/* ── BODY: Detail Harga, Deskripsi & Fitur ── */}
-      <CardContent className="flex-1 p-6 space-y-6">
-        
-        {/* Sesi Harga / Status Panel */}
-        {isFinished && vol.lastHistory ? (
-          /* Panel skor untuk paket yang sudah dikerjakan */
-          <div className="rounded-xl border border-teal-200 bg-teal-50 p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-teal-800 font-medium">Skor terakhir</span>
-              <span className="font-mono text-2xl font-black text-teal-900">
-                {vol.lastHistory.totalSkor}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-teal-800 font-medium">Status</span>
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold text-white",
-                  vol.lastHistory.isLolos ? "bg-teal-600" : "bg-red-600"
-                )}
-              >
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                {vol.lastHistory.isLolos ? "Lolos" : "Belum Lolos"}
-              </span>
-            </div>
-          </div>
-        ) : isLocked ? (
-          /* Panel Harga untuk paket terkunci (Meniru Referensi) */
-          <div className="space-y-2">
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-foreground">
-                {formatRupiah(vol.harga)}
-              </span>
-              <span className="text-sm font-medium text-muted-foreground">
-                / selamanya
-              </span>
-            </div>
-            {vol.hargaAsli > vol.harga && (
-              <span className="text-sm text-muted-foreground line-through">
-                {formatRupiah(vol.hargaAsli)}
-              </span>
-            )}
-            <p className="text-sm leading-relaxed text-muted-foreground pt-1">
-              Beli paket ini untuk membuka akses penuh simulasi CAT CPNS. Bisa dikerjakan berulang dan aktif seumur hidup.
+      <CardContent className="flex flex-1 flex-col gap-4 p-4 sm:p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+              {isUnavailable ? "Status paket" : isFinished ? "Skor terakhir" : isLocked ? "Harga paket" : "Status akses"}
+            </p>
+            <p className="mt-1 truncate text-2xl font-extrabold tracking-tight text-purple-950">
+              {isUnavailable
+                ? "Segera hadir"
+                : isFinished && vol.lastHistory
+                  ? vol.lastHistory.totalSkor
+                  : isLocked
+                    ? vol.harga === 0 ? "Gratis" : currencyFormatter.format(vol.harga)
+                    : "Siap latihan"}
             </p>
           </div>
-        ) : (
-          /* Panel Unlocked untuk paket siap kerjakan */
-          <div className="space-y-2">
-            <span className="text-xl font-bold text-primary">Siap Dikerjakan</span>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              Paket ini sudah terbuka. Uji kemampuanmu sekarang dengan simulasi CAT dan soal HOTS terkini.
-            </p>
+          {!isUnavailable && isFinished && vol.lastHistory ? (
+            <span
+              className={cn(
+                "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold",
+                vol.lastHistory.isLolos ? "bg-teal-50 text-teal-800" : "bg-amber-50 text-amber-800",
+              )}
+            >
+              <CheckCircle2 className="size-3.5" aria-hidden="true" />
+              {vol.lastHistory.isLolos ? "Target tercapai" : "Terus berlatih"}
+            </span>
+          ) : (
+            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-purple-50 px-3 py-1.5 text-[11px] font-bold text-purple-700">
+              <BookOpenCheck className="size-3.5" aria-hidden="true" />
+              {isUnavailable ? "Disiapkan" : isLocked ? vol.harga === 0 ? "Paket gratis" : "Satu kali beli" : "Akses aktif"}
+            </span>
+          )}
+        </div>
+
+        <p className="line-clamp-2 min-h-10 text-sm leading-5 text-muted-foreground">{description}</p>
+
+        <div className="mt-auto grid grid-cols-2 gap-2 border-t border-border/80 pt-3">
+          <div className="flex items-center gap-2 rounded-xl bg-muted/70 px-3 py-2.5 text-xs font-semibold text-foreground">
+            <ClipboardList className="size-4 shrink-0 text-primary" aria-hidden="true" />
+            <span>{vol.totalSoal} soal</span>
           </div>
-        )}
-
-        {/* Garis Pemisah (Divider) */}
-        <div className="h-px w-full bg-border" />
-
-        {/* Checklist Fitur Terintegrasi */}
-        <ul className="space-y-3.5">
-          <li className="flex items-start gap-3 text-sm text-foreground/90">
-            <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
-            <span className="leading-snug">Berisi {vol.totalSoal} soal SKD (TWK, TIU, TKP) sesuai kisi-kisi terbaru</span>
-          </li>
-          <li className="flex items-start gap-3 text-sm text-foreground/90">
-            <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
-            <span className="leading-snug">Simulasi sistem CAT BKN real test ({vol.durasiMenit} menit)</span>
-          </li>
-          <li className="flex items-start gap-3 text-sm text-foreground/90">
-            <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
-            <span className="leading-snug">Nilai keluar otomatis + pembahasan lengkap</span>
-          </li>
-        </ul>
-
+          <div className="flex items-center gap-2 rounded-xl bg-muted/70 px-3 py-2.5 text-xs font-semibold text-foreground">
+            <Clock3 className="size-4 shrink-0 text-primary" aria-hidden="true" />
+            <span>{vol.durasiMenit} menit</span>
+          </div>
+        </div>
       </CardContent>
 
-      {/* ── FOOTER: Call To Action ── */}
-      <CardFooter className="p-6 pt-0 mt-auto">
-        {isLocked ? (
-          /* Locked: Tombol Outline/Solid meniru gambar */
-          <Button
-            asChild
-            variant="outline"
-            className="w-full h-11 rounded-xl font-bold border-border text-foreground hover:bg-muted active:scale-[0.98] transition-transform"
-          >
+      <CardFooter className="mt-auto p-4 pt-0 sm:p-5 sm:pt-0">
+        {isUnavailable ? (
+          <Button disabled className="h-11 w-full rounded-xl">Belum tersedia</Button>
+        ) : isLocked ? (
+          <Button asChild className="h-11 w-full rounded-xl font-bold shadow-sm transition-transform hover:shadow-md active:scale-[0.98]">
             <Link href={`${ROUTES.checkout}/${vol.id}`}>
-              Beli sekarang
+              {vol.harga === 0 ? "Ambil paket gratis" : "Lihat paket"}
+              <ArrowRight className="ml-2 size-4" aria-hidden="true" />
             </Link>
           </Button>
         ) : isFinished ? (
-          /* Selesai: Tombol hijau evaluasi ulang */
-          <Button
-            asChild
-            className="w-full h-11 rounded-xl font-bold bg-teal-600 hover:bg-teal-700 text-white active:scale-[0.98] transition-transform"
-          >
+          <Button asChild className="h-11 w-full rounded-xl bg-teal-700 font-bold text-white transition-transform hover:bg-teal-800 active:scale-[0.98]">
             <Link href={`${ROUTES.tryout}/${vol.id}`}>
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Evaluasi Ulang
+              <RotateCcw className="mr-2 size-4" aria-hidden="true" />
+              Ulangi simulasi
             </Link>
           </Button>
         ) : (
-          /* Unlocked: Tombol utama mulai kerjakan */
-          <Button
-            asChild
-            className="w-full h-11 rounded-xl font-bold bg-primary hover:bg-purple-800 text-primary-foreground active:scale-[0.98] transition-transform"
-          >
+          <Button asChild className="h-11 w-full rounded-xl font-bold shadow-sm transition-transform hover:shadow-md active:scale-[0.98]">
             <Link href={`${ROUTES.tryout}/${vol.id}`}>
-              <Play className="mr-2 h-4 w-4 fill-current" />
-              Mulai Kerjakan
+              <Play className="mr-2 size-4 fill-current" aria-hidden="true" />
+              Mulai paket
+              <ArrowRight className="ml-2 size-4" aria-hidden="true" />
             </Link>
           </Button>
         )}
@@ -194,59 +170,59 @@ const VolumeCard = memo(function VolumeCard({ vol }: { vol: TryoutVolume }) {
   );
 });
 
-// ==========================================
-// KOMPONEN UTAMA GRID
-// ==========================================
 export function TryoutGrid({ volumes }: { volumes: TryoutVolume[] }) {
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
 
   const filtered = useMemo(() => {
-    const lowerQuery = deferredQuery.toLowerCase();
+    const lowerQuery = deferredQuery.trim().toLocaleLowerCase("id-ID");
     return volumes.filter(
-      (v) =>
-        v.title.toLowerCase().includes(lowerQuery) ||
-        v.id.toString().includes(lowerQuery)
+      (volume) =>
+        volume.title.toLocaleLowerCase("id-ID").includes(lowerQuery) ||
+        volume.id.toString().includes(lowerQuery),
     );
   }, [deferredQuery, volumes]);
+  const coverOrder = useMemo(
+    () => new Map(volumes.map((volume, index) => [volume.id, index] as const)),
+    [volumes],
+  );
+  const EmptyIcon = volumes.length > 0 ? Search : Package;
+  const emptyTitle = volumes.length > 0 ? "Paket tidak ditemukan" : "Belum ada paket tryout";
+  const emptyDescription = volumes.length > 0
+    ? `Tidak ada paket yang cocok dengan pencarian “${query}”.`
+    : "Paket tryout yang siap dikerjakan akan muncul di halaman ini.";
 
   return (
-    <div className="space-y-8">
-
-      {/* Search Bar */}
-      <div className="relative w-full md:max-w-md">
-        <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+    <div className="space-y-4">
+      <div className="relative w-full sm:max-w-[300px]">
+        <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
         <Input
           type="search"
-          placeholder="Cari berdasarkan volume atau nama paket..."
+          placeholder="Cari paket latihan..."
+          aria-label="Cari paket latihan"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="h-11 rounded-xl pl-10 text-sm shadow-sm"
+          onChange={(event) => setQuery(event.target.value)}
+          className="h-10 rounded-xl border-purple-100 bg-white pl-10 text-xs shadow-sm placeholder:text-muted-foreground/80"
         />
       </div>
 
-      {/* Grid */}
-      <div className="grid grid-cols-1 gap-5 items-stretch md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {filtered.map((vol) => (
-          <VolumeCard key={vol.id} vol={vol} />
-        ))}
-      </div>
-
-      {/* Empty State */}
-      {filtered.length === 0 && (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed py-20 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-purple-50">
-            <Search className="h-7 w-7 text-primary" />
-          </div>
-          <h3 className="mt-5 text-lg font-semibold text-foreground">
-            Paket Tidak Ditemukan
-          </h3>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            Tidak ada paket yang cocok dengan pencarian &ldquo;{query}&rdquo;.
+      {filtered.length > 0 ? (
+        <div className="grid grid-cols-1 items-stretch gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {filtered.map((volume) => (
+            <VolumeCard key={volume.id} vol={volume} coverIndex={coverOrder.get(volume.id) ?? 0} />
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-purple-200 bg-white/70 py-12 text-center">
+          <span className="flex size-12 items-center justify-center rounded-2xl bg-purple-50 text-primary">
+            <EmptyIcon className="size-5" aria-hidden="true" />
+          </span>
+          <h3 className="mt-4 text-base font-bold text-purple-950">{emptyTitle}</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {emptyDescription}
           </p>
         </div>
       )}
-
     </div>
   );
 }

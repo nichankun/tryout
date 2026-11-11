@@ -26,11 +26,12 @@ import {
   CreditCard, 
   Settings, 
   ShieldCheck,
+  ScrollText,
   LogOut // 👈 Ditambahkan untuk ikon keluar
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut } from "next-auth/react"; // 👈 Helper NextAuth untuk memproses logout
+import { logoutAction } from "@/lib/actions/auth";
 
 // ==========================================
 // KONSTANTA & KONFIGURASI (Bebas Hardcode)
@@ -48,7 +49,7 @@ const ADMIN_MENUS = [
   { title: "Manajemen User", url: "/admin/users", icon: Users },
   { title: "Bank Soal & Paket", url: "/admin/packages", icon: BookOpen },
   { title: "Transaksi", url: "/admin/orders", icon: CreditCard },
-  { title: "Figural", url: "/admin/figural", icon: CreditCard },
+  { title: "Log aktivitas", url: "/admin/activity", icon: ScrollText },
   { title: "Pengaturan", url: "/admin/settings", icon: Settings },
 ] as const;
 
@@ -58,10 +59,7 @@ const ADMIN_MENUS = [
 export function AppSidebar() {
   const pathname = usePathname();
 
-  // Handler fungsi logout untuk membersihkan session cookie di server & client
-  const handleLogout = async () => {
-    await signOut({ callbackUrl: "/login" });
-  };
+  const handleLogout = async () => logoutAction();
 
   return (
     <Sidebar variant="inset" collapsible="icon">
@@ -100,7 +98,9 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {ADMIN_MENUS.map((item) => {
-                const isCurrentRouteActive = pathname === item.url;
+                const isCurrentRouteActive =
+                  pathname === item.url ||
+                  (item.url !== "/admin" && pathname.startsWith(`${item.url}/`));
 
                 return (
                   <SidebarMenuItem key={item.title}>

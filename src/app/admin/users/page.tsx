@@ -11,15 +11,25 @@ import { DataTable } from "@/components/admin/data-table";
 export const dynamic = "force-dynamic";
 
 export default async function AdminUsersPage() {
-  // Mengambil daftar seluruh pengguna terurut dari yang terbaru didaftarkan
-  const allUsers = await db.select().from(users).orderBy(desc(users.createdAt));
+  // Batasi halaman admin pada 100 akun terbaru.
+  const allUsers = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      role: users.role,
+      createdAt: users.createdAt,
+    })
+    .from(users)
+    .orderBy(desc(users.createdAt))
+    .limit(100);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Manajemen User</h1>
         <p className="text-sm text-muted-foreground">
-          Daftar otorisasi kontrol akun pengguna dan administrator.
+          Menampilkan 100 akun terbaru. Data autentikasi tidak dikirim ke browser.
         </p>
       </div>
 

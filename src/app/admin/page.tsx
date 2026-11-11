@@ -8,7 +8,9 @@ import { eq, desc, sql } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { LayoutDashboard, Users, CreditCard, ShoppingBag } from "lucide-react";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +18,12 @@ export default async function AdminDashboardPage() {
   // ── 1. AGREGASI DATA STATISTIK ──
   const [userCount] = await db.select({ count: sql<number>`count(*)` }).from(users);
   const [orderCount] = await db.select({ count: sql<number>`count(*)` }).from(orders);
-  const [packageCount] = await db.select({ count: sql<number>`count(*)` }).from(tryoutPackages);
+  const [packageCount] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(tryoutPackages)
+    .where(eq(tryoutPackages.isActive, true));
   
-  // Menghitung total omset pendapatan bersih (status lunas)
+  // Jumlah nominal transaksi berstatus lunas (termasuk biaya layanan).
   const [revenueResult] = await db
     .select({ total: sql<number>`sum(${orders.amount})` })
     .from(orders)
@@ -42,7 +47,7 @@ export default async function AdminDashboardPage() {
     .limit(5);
 
   const stats = [
-    { title: "Total Pendapatan", value: `Rp ${totalRevenue.toLocaleString("id-ID")}`, icon: CreditCard, color: "text-emerald-500" },
+    { title: "Nominal Transaksi Lunas", value: `Rp ${totalRevenue.toLocaleString("id-ID")}`, icon: CreditCard, color: "text-emerald-500" },
     { title: "Total Pengguna", value: userCount.count, icon: Users, color: "text-blue-500" },
     { title: "Transaksi Masuk", value: orderCount.count, icon: ShoppingBag, color: "text-amber-500" },
     { title: "Paket Tryout Aktif", value: packageCount.count, icon: LayoutDashboard, color: "text-violet-500" },
@@ -76,32 +81,44 @@ export default async function AdminDashboardPage() {
           <CardTitle className="text-base font-semibold">Transaksi Terbaru</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow className="border-border hover:bg-transparent">
-                <TableHead>Order ID</TableHead>
-                <TableHead>Pelanggan</TableHead>
-                <TableHead>Produk Paket</TableHead>
-                <TableHead>Nominal</TableHead>
-                <TableHead className="text-right">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {recentTransactions.map((tx) => (
-                <TableRow key={tx.id} className="border-border hover:bg-muted/40">
-                  <TableCell className="font-mono text-xs">{tx.id}</TableCell>
-                  <TableCell className="font-medium">{tx.customerName}</TableCell>
-                  <TableCell>{tx.packageName}</TableCell>
-                  <TableCell>Rp {tx.amount.toLocaleString("id-ID")}</TableCell>
-                  <TableCell className="text-right">
-                    <Badge variant={tx.status === "paid" ? "default" : tx.status === "pending" ? "secondary" : "destructive"}>
-                      {tx.status.toUpperCase()}
-                    </Badge>
-                  </TableCell>
+          {recentTransactions.length > 0 ? (
+            <Table className="min-w-[640px]">
+              <TableHeader>
+                <TableRow className="border-border hover:bg-transparent">
+                  <TableHead>Order ID</TableHead>
+                  <TableHead>Pelanggan</TableHead>
+                  <TableHead>Produk Paket</TableHead>
+                  <TableHead>Nominal</TableHead>
+                  <TableHead className="text-right">Status</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {recentTransactions.map((tx) => (
+                  <TableRow key={tx.id} className="border-border hover:bg-muted/40">
+                    <TableCell className="font-mono text-xs">{tx.id}</TableCell>
+                    <TableCell className="font-medium">{tx.customerName}</TableCell>
+                    <TableCell>{tx.packageName}</TableCell>
+                    <TableCell>Rp {tx.amount.toLocaleString("id-ID")}</TableCell>
+                    <TableCell className="text-right">
+                      <Badge variant={tx.status === "paid" ? "default" : tx.status === "pending" ? "secondary" : "destructive"}>
+                        {tx.status.toUpperCase()}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="rounded-lg border border-dashed border-border bg-muted/30 px-4 py-10 text-center">
+              <p className="font-medium">Belum ada transaksi</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Transaksi baru akan muncul di sini setelah pelanggan membeli paket.
+              </p>
+              <Button asChild variant="outline" size="sm" className="mt-4">
+                <Link href="/admin/packages">Kelola paket tryout</Link>
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

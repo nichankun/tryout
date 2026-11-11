@@ -2,8 +2,7 @@
  * types/tryout.ts
  *
  * Type definitions untuk halaman tryout.
- * FiguralTipe disimpan di sini sebagai single source of truth,
- * lalu di-re-export ke figural-renderer.tsx agar tidak duplikat.
+ * Soal bergambar menggunakan aset yang diunggah admin.
  */
 
 // ==========================================
@@ -20,7 +19,7 @@ export const TIMER_CONFIG = {
 export const TEXT_CONTENT = {
   headerBadge:      "CAT",
   headerTitle:      "Ujian Seleksi Kompetensi Dasar",
-  headerSubtitle:   "SKD CPNS 2026 · Vol.",
+  headerSubtitle:   "SKD CPNS ·",
   progressLabel:    "Progress Pengerjaan",
   questionNumberLabel: "Soal Nomor",
   actionPrev:       "Sebelumnya",
@@ -48,42 +47,14 @@ export type SubTest      = "TWK" | "TIU" | "TKP";
 export type AnswerStatus = "answered" | "flagged" | "unanswered";
 
 // ==========================================
-// FIGURAL — single source of truth
-// ==========================================
-/**
- * Semua tipe figural yang didukung oleh FiguralRenderer.
- * Dipakai di sini (Question) DAN di figural-renderer.tsx.
- * Jangan definisikan ulang di tempat lain.
- */
-export type FiguralTipe =
-  | "deret_rotasi"
-  | "matriks"
-  | "pencerminan"
-  | "analogi_gambar"
-  | "analogi_matriks"
-  | "ketidaksamaan"
-  | "deret_bangun"
-  | "tumpukan_balok"
-  | "silogisme";
-
-export interface FiguralConfig {
-  tipe: FiguralTipe;
-  /**
-   * Array nilai per frame/opsi deret.
-   * - number → sudut rotasi (deret_rotasi, deret_bangun, tumpukan_balok)
-   * - string → nama pola (pencerminan: "asli"|"cermin_h"|"cermin_v"|"cermin_hv")
-   */
-  deretSoal: (string | number)[];
-}
-
-// ==========================================
 // PILIHAN SOAL
 // ==========================================
 export interface QuestionChoice {
   opsi:  string;
   teks:  string;
   poin?: number;
-  figuralAngle?: number | string | null; // ← tambahkan string
+  imageUrl?: string | null;
+  imageAlt?: string | null;
 }
 
 
@@ -95,10 +66,9 @@ export interface Question {
   kategori:   SubTest;
   pertanyaan: string;
 
-  /** Apakah soal ini bergambar figural prosedural? */
-  isFigural?:     boolean | null;
-  /** Konfigurasi deret gambar figural (hanya ada jika isFigural = true) */
-  figuralConfig?: FiguralConfig | null;
+  imageUrl: string | null;
+  imageAlt: string | null;
+  legacyImageMissing?: boolean;
 
   pilihan: QuestionChoice[];
 }

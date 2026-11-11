@@ -1,6 +1,6 @@
 // src/components/dashboard/header.tsx
 import Link from "next/link";
-import { auth, signOut } from "@/auth";
+import { logoutAction } from "@/lib/actions/auth";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -11,14 +11,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { LogOut, History } from "lucide-react";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 
 const APP_CONFIG = { name: "ASNPedia", highlightName: "Pedia", shortName: "CP" };
 
-export async function DashboardHeader() {
-  const session = await auth();
-  const userName = session?.user?.name ?? "Pengguna";
-  const userEmail = session?.user?.email ?? "";
-  const userImage = session?.user?.image ?? undefined;
+interface DashboardHeaderProps {
+  userName: string;
+  userEmail: string;
+  userImage?: string | null;
+}
+
+export function DashboardHeader({ userName, userEmail, userImage }: DashboardHeaderProps) {
 
   const userInitials = userName
     .split(" ")
@@ -28,26 +31,32 @@ export async function DashboardHeader() {
     .toUpperCase();
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-purple-200 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
-      <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
+    <header className="sticky top-0 z-40 w-full shrink-0 border-b border-purple-200/70 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/75">
+      <div className="mx-auto flex h-16 items-center gap-2 px-3 sm:px-4">
+        <SidebarTrigger className="size-10 shrink-0 rounded-xl text-muted-foreground hover:bg-purple-50 hover:text-primary" aria-label="Tampilkan atau sembunyikan navigasi" title="Tampilkan atau sembunyikan navigasi" />
 
         {/* ── Brand Logo ── */}
         <Link
           href="/dashboard"
-          className="flex items-center gap-2.5 transition-opacity hover:opacity-80"
+          className="flex min-w-0 flex-1 items-center gap-2.5 transition-opacity hover:opacity-80 md:hidden"
         >
           {/* Badge logo — ungu solid */}
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-xs font-black text-primary-foreground shadow-sm">
             {APP_CONFIG.shortName}
           </div>
-          <span className="text-lg font-bold tracking-tight text-foreground">
+          <span className="truncate text-lg font-bold tracking-tight text-foreground">
             {APP_CONFIG.name.replace(APP_CONFIG.highlightName, "")}
             <span className="text-primary">{APP_CONFIG.highlightName}</span>
           </span>
         </Link>
 
+        <div className="hidden min-w-0 md:block">
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Ruang peserta</p>
+          <p className="truncate text-sm font-semibold text-foreground">Latihan SKD CPNS</p>
+        </div>
+
         {/* ── Kanan: Nama + Avatar ── */}
-        <div className="flex items-center gap-4">
+        <div className="ml-auto flex shrink-0 items-center gap-2.5 md:hidden">
 
           {/* Nama pengguna — desktop only */}
           <div className="hidden text-right sm:block">
@@ -63,7 +72,7 @@ export async function DashboardHeader() {
           <DropdownMenu>
             <DropdownMenuTrigger className="rounded-full outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
               <Avatar className="h-9 w-9 cursor-pointer border border-purple-200 transition-opacity hover:opacity-90">
-                <AvatarImage src={userImage} alt={`Profil ${userName}`} />
+                <AvatarImage src={userImage ?? undefined} alt={`Profil ${userName}`} />
                 <AvatarFallback className="bg-purple-50 text-xs font-bold text-primary">
                   {userInitials}
                 </AvatarFallback>
@@ -110,10 +119,7 @@ export async function DashboardHeader() {
                 asChild
               >
                 <form
-                  action={async () => {
-                    "use server";
-                    await signOut({ redirectTo: "/login" });
-                  }}
+                  action={logoutAction}
                   className="w-full"
                 >
                   <button

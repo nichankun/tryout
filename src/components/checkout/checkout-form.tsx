@@ -24,6 +24,8 @@ type PaymentMethod = "qris" | "transfer" | "ewallet";
 const API_ROUTES = {
   paymentEndpoint: "/api/payment",
   termsAndConditions: "/syarat-ketentuan",
+  privacyPolicy: "/kebijakan-privasi",
+  refundPolicy: "/kebijakan-refund",
   confirmationRedirect: (volId: number, orderId: string) => `/checkout/${volId}/konfirmasi?orderId=${orderId}`,
 } as const;
 
@@ -38,6 +40,8 @@ const SAFE_ERRORS: Record<string, string> = {
   ALREADY_OWNED:  "Kamu sudah memiliki volume ini.",
   INVALID_VOLUME: "Volume tidak valid.",
   PAYMENT_FAILED: "Pembayaran gagal. Coba lagi.",
+  FREE_PACKAGE: "Paket ini tidak memerlukan pembayaran.",
+  PACKAGE_UNAVAILABLE: "Paket ini belum memiliki soal yang dapat diakses.",
   INVALID_PHONE:  "Nomor HP tidak valid.",
 };
 
@@ -59,6 +63,7 @@ const TEXT_CONTENT = {
   fallbackError: "Terjadi kesalahan. Coba beberapa saat lagi.",
   networkError: "Terjadi kesalahan jaringan. Periksa koneksi kamu.",
   midtransError: "Pembayaran gagal. Coba lagi.",
+  paymentUnavailable: "Pembayaran belum dikonfigurasi. Silakan hubungi bantuan.",
   validationName: "Nama minimal 2 karakter.",
   validationEmail: "Format email tidak valid.",
   validationPhone: "Format nomor HP tidak valid. Contoh: 08123456789",
@@ -67,6 +72,8 @@ const TEXT_CONTENT = {
 interface CheckoutFormProps {
   volumeId: number;
   total: number;
+  customerName: string;
+  customerEmail: string;
 }
 
 // ==========================================
@@ -83,7 +90,7 @@ function validateFields(name: string, email: string, phone: string) {
 // ==========================================
 // KOMPONEN UTAMA
 // ==========================================
-export function CheckoutForm({ volumeId, total }: CheckoutFormProps) {
+export function CheckoutForm({ volumeId, total, customerName, customerEmail }: CheckoutFormProps) {
   const router = useRouter();
   const nameRef = useRef<HTMLInputElement>(null);
 
@@ -99,6 +106,11 @@ export function CheckoutForm({ volumeId, total }: CheckoutFormProps) {
   async function handleSubmit(formData: FormData) {
     setError(null);
     setFieldErrors({});
+
+    if (!window.snap) {
+      setError(TEXT_CONTENT.paymentUnavailable);
+      return;
+    }
 
     const name  = formData.get("name")  as string;
     const email = formData.get("email") as string;
@@ -128,6 +140,10 @@ export function CheckoutForm({ volumeId, total }: CheckoutFormProps) {
       const result = await res.json();
 
       if (!res.ok || result.error) {
+        if (result.error === "PAYMENT_UNAVAILABLE") {
+          setError(TEXT_CONTENT.paymentUnavailable);
+          return;
+        }
         setError(SAFE_ERRORS[result.error] ?? TEXT_CONTENT.fallbackError);
         return;
       }
@@ -143,9 +159,7 @@ export function CheckoutForm({ volumeId, total }: CheckoutFormProps) {
         return;
       }
 
-      // Fallback tanpa Snap SDK (Direct routing redirection)
-      router.push(API_ROUTES.confirmationRedirect(volumeId, result.orderId));
-      router.refresh();
+      setError(TEXT_CONTENT.paymentUnavailable);
     } catch {
       setError(TEXT_CONTENT.networkError);
     } finally {
@@ -208,6 +222,7 @@ export function CheckoutForm({ volumeId, total }: CheckoutFormProps) {
                 id="name"
                 name="name"
                 placeholder={TEXT_CONTENT.placeholderName}
+                defaultValue={customerName}
                 autoComplete="name"
                 required
                 disabled={isLoading}
@@ -227,6 +242,7 @@ export function CheckoutForm({ volumeId, total }: CheckoutFormProps) {
                 name="email"
                 type="email"
                 placeholder={TEXT_CONTENT.placeholderEmail}
+                defaultValue={customerEmail}
                 autoComplete="email"
                 required
                 disabled={isLoading}
@@ -300,6 +316,9 @@ export function CheckoutForm({ volumeId, total }: CheckoutFormProps) {
                 {TEXT_CONTENT.termsLinkText}
               </Link>{" "}
               {TEXT_CONTENT.termsAgreementSuffix}
+            </p>
+            <p className="text-center text-xs text-muted-foreground">
+              Baca juga <Link href={API_ROUTES.privacyPolicy} className="underline underline-offset-2">Kebijakan Privasi</Link> dan <Link href={API_ROUTES.refundPolicy} className="underline underline-offset-2">Kebijakan Refund</Link>.
             </p>
           </form>
         </CardContent>

@@ -5,8 +5,8 @@
  */
 
 import { useState } from "react";
-import { signIn } from "next-auth/react";
 import { Loader2, AlertCircle } from "lucide-react";
+import { authClient } from "@/lib/auth-client";
 
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -37,8 +37,8 @@ const TEXT_CONTENT = {
 // ==========================================
 interface OAuthButtonsProps {
   mode: "login" | "register";
-  // Terima callbackUrl dari parent agar konsisten dengan LoginForm
   callbackUrl?: string;
+  enabled?: boolean;
 }
 
 // ==========================================
@@ -47,9 +47,12 @@ interface OAuthButtonsProps {
 export function OAuthButtons({
   mode,
   callbackUrl = OAUTH_CONFIG.defaultCallbackUrl,
+  enabled = true,
 }: OAuthButtonsProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  if (!enabled) return null;
 
   const buttonText =
     mode === "login" ? TEXT_CONTENT.google.login : TEXT_CONTENT.google.register;
@@ -58,7 +61,14 @@ export function OAuthButtons({
     try {
       setIsLoading(true);
       setError(null);
-      await signIn(OAUTH_CONFIG.providers.google, { callbackUrl });
+      const result = await authClient.signIn.social({
+        provider: OAUTH_CONFIG.providers.google,
+        callbackURL: callbackUrl,
+      });
+      if (result.error) {
+        setError(TEXT_CONTENT.errors.connection);
+        setIsLoading(false);
+      }
     } catch {
       setError(TEXT_CONTENT.errors.connection);
       setIsLoading(false); // Pastikan loading dimatikan jika error
@@ -67,7 +77,7 @@ export function OAuthButtons({
 
   return (
     <div className="space-y-3">
-      
+
       {/* PESAN ERROR GLOBAL (Selaras dengan LoginForm) */}
       {error && (
         <Alert variant="destructive">
@@ -80,7 +90,7 @@ export function OAuthButtons({
       <Button
         variant="outline"
         type="button"
-        disabled={isLoading}
+        disabled={isLoading || !enabled}
         className="w-full font-semibold h-11 rounded-xl gap-2.5"
         onClick={handleGoogleSignIn}
       >

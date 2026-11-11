@@ -4,16 +4,25 @@
  * components/tryout/tryout-main.tsx
  *
  * Komponen utama area pengerjaan soal tryout.
- * Mendukung rendering otomatis soal figural (TIU Figural / Procedural SVG / Silogisme).
+ * Menampilkan gambar soal dan pilihan yang diunggah admin.
  */
 
 import * as React from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Progress } from "@/components/ui/progress";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,7 +41,6 @@ import {
 } from "lucide-react";
 
 import { TEXT_CONTENT, Question, UserAnswer } from "@/types/tryout";
-import { FiguralRenderer } from "./figural-renderer";
 
 // ==========================================
 // PROPS
@@ -54,6 +62,7 @@ interface TryoutMainProps {
   onFlag:          () => void;
   onSubmit:        () => void;
   getNavStyle:     (qId: number) => string;
+  getNavLabel:     (qId: number) => string;
 }
 
 // ==========================================
@@ -61,15 +70,10 @@ interface TryoutMainProps {
 // ==========================================
 export const TryoutMain = React.memo((props: TryoutMainProps) => {
   const {
-    isPaused, isPending, questions, currentQuestion, currentIdx,
-    activeId, setActiveId, currentAnswer, answeredCount, flaggedCount,
-    unansweredCount, progressPercent, onAnswer, onFlag, onSubmit, getNavStyle,
+    isPaused, isPending, questions, currentQuestion, currentIdx, activeId,
+    setActiveId, currentAnswer, answeredCount, flaggedCount,
+    unansweredCount, progressPercent, onAnswer, onFlag, onSubmit, getNavStyle, getNavLabel,
   } = props;
-
-  // ── Guard: soal figural lengkap? ──────────────────────────────────────
-  const isFiguralSoal =
-    currentQuestion?.isFigural === true &&
-    currentQuestion?.figuralConfig != null;
 
   return (
     <main
@@ -100,6 +104,67 @@ export const TryoutMain = React.memo((props: TryoutMainProps) => {
             </div>
           </div>
 
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className="sticky top-[4.5rem] z-30 flex h-11 w-full items-center justify-between border-purple-200 bg-card shadow-sm lg:hidden"
+                aria-label={`Buka navigasi soal. Soal ${currentIdx + 1} dari ${questions.length} sedang dibuka.`}
+              >
+                <span className="inline-flex items-center gap-2 font-bold text-purple-900">
+                  <LayoutGrid className="size-4 text-primary" aria-hidden="true" />
+                  Navigasi soal
+                </span>
+                <span className="rounded-full bg-purple-100 px-2.5 py-1 text-xs font-bold text-primary">
+                  {String(currentIdx + 1).padStart(2, "0")} / {questions.length}
+                </span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent
+              side="bottom"
+              showCloseButton={false}
+              className="h-[82dvh] max-h-[82dvh] gap-0 rounded-t-2xl border-purple-200 p-0 lg:hidden"
+            >
+              <SheetHeader className="shrink-0 border-b border-purple-100 pr-4">
+                <SheetTitle className="text-lg font-extrabold text-purple-950">Navigasi soal</SheetTitle>
+                <SheetDescription>
+                  {answeredCount} terjawab · {flaggedCount} ragu-ragu · {unansweredCount} belum dijawab
+                </SheetDescription>
+              </SheetHeader>
+              <ScrollArea className="min-h-0 flex-1 px-4 py-4">
+                <div className="grid grid-cols-5 gap-2 pb-2 sm:grid-cols-7">
+                  {questions.map((question, idx) => {
+                    return (
+                      <SheetClose asChild key={question.id}>
+                        <button
+                          type="button"
+                          aria-label={`Soal ${idx + 1}, ${getNavLabel(question.id)}`}
+                          aria-current={question.id === activeId ? "step" : undefined}
+                          onClick={() => setActiveId(question.id)}
+                          className={`h-11 w-full rounded-lg font-mono text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${getNavStyle(question.id)}`}
+                        >
+                          {String(idx + 1).padStart(2, "0")}
+                        </button>
+                      </SheetClose>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+              <div className="flex shrink-0 flex-wrap gap-x-4 gap-y-2 border-t border-purple-100 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] text-xs font-medium text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded bg-primary" />Sedang dibuka</span>
+                <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded bg-purple-200" />Terjawab</span>
+                <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded bg-amber-500" />Ragu-ragu</span>
+                <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded border border-border bg-card" />Belum</span>
+                <SheetClose asChild>
+                  <Button type="button" variant="outline" className="ml-auto h-8 rounded-lg px-3 text-xs">
+                    Tutup navigasi
+                  </Button>
+                </SheetClose>
+              </div>
+            </SheetContent>
+          </Sheet>
+
           {/* Card soal */}
           <Card className="overflow-hidden border-purple-200 bg-card shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-purple-200 bg-purple-50 px-5 py-3">
@@ -120,25 +185,22 @@ export const TryoutMain = React.memo((props: TryoutMainProps) => {
                 {currentQuestion?.pertanyaan}
               </p>
 
-              {/* ── BLOK DERET GAMBAR FIGURAL (hanya muncul jika isFigural=true) ── */}
-              {isFiguralSoal && currentQuestion.figuralConfig!.deretSoal && currentQuestion.figuralConfig!.deretSoal.length > 0 && (
-                <div className="flex flex-wrap items-center gap-4 rounded-xl border border-purple-200 bg-purple-50/50 p-4">
-                  {currentQuestion.figuralConfig!.deretSoal.map((val, idx) => (
-                    <div key={idx} className="flex items-center gap-4">
-                      <div className="rounded-lg border border-border bg-card p-2 shadow-sm">
-                        <FiguralRenderer
-                          tipe={currentQuestion.figuralConfig!.tipe}
-                          angle={val}
-                        />
-                      </div>
-                      {/* Panah pemisah antar frame, kecuali frame terakhir */}
-                      {idx < currentQuestion.figuralConfig!.deretSoal.length - 1 && (
-                        <span className="font-bold text-muted-foreground" aria-hidden>→</span>
-                      )}
-                    </div>
-                  ))}
-                  {/* Tanda tanya = jawaban yang dicari */}
-                  <span className="font-bold text-muted-foreground" aria-hidden>→ ?</span>
+              {currentQuestion.imageUrl && (
+                <div className="relative aspect-[16/9] w-full max-w-3xl overflow-hidden rounded-xl border border-border bg-white">
+                  <Image
+                    src={currentQuestion.imageUrl}
+                    alt={currentQuestion.imageAlt || "Gambar soal"}
+                    fill
+                    unoptimized
+                    sizes="(max-width: 768px) 100vw, 768px"
+                    className="object-contain p-3"
+                  />
+                </div>
+              )}
+
+              {currentQuestion.legacyImageMissing && (
+                <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100">
+                  Gambar soal ini belum diperbarui. Hubungi pengelola paket sebelum melanjutkan.
                 </div>
               )}
 
@@ -151,15 +213,7 @@ export const TryoutMain = React.memo((props: TryoutMainProps) => {
                 {currentQuestion?.pilihan.map((opt) => {
                   const isSelected = currentAnswer?.selectedKey === opt.opsi;
 
-                  /**
-                   * FIX: Perbaiki pengecekan hasFiguralOption. 
-                   * Sekarang bisa menerima string (untuk silogisme/kamus) ATAU number (untuk rotasi).
-                   */
-                 const hasFiguralOption =
-  isFiguralSoal &&
-  opt.figuralAngle !== null &&
-  opt.figuralAngle !== undefined &&
-  (typeof opt.figuralAngle === "number" || opt.figuralAngle !== "");
+                  const hasImageOption = Boolean(opt.imageUrl);
 
                   return (
                     <Label
@@ -181,14 +235,17 @@ export const TryoutMain = React.memo((props: TryoutMainProps) => {
                           {opt.opsi}. {opt.teks}
                         </span>
 
-                        {/* 👇 Render gambar opsi figural di bawah teks 👇 */}
-                        {hasFiguralOption && (
+                        {/* Gambar opsi yang diunggah admin */}
+                        {hasImageOption && (
                           <div className="mt-1 block">
-                            <div className="inline-block rounded-md border border-border bg-white dark:bg-zinc-950 p-2 shadow-sm">
-                              <FiguralRenderer
-                                tipe={currentQuestion.figuralConfig!.tipe}
-                                angle={opt.figuralAngle!}
-                                size={80} // Ukuran lebih pas untuk di dalam opsi
+                            <div className="relative aspect-square w-36 overflow-hidden rounded-md border border-border bg-white p-1 shadow-sm sm:w-44">
+                              <Image
+                                src={opt.imageUrl!}
+                                alt={opt.imageAlt || `Gambar pilihan ${opt.opsi}`}
+                                fill
+                                unoptimized
+                                sizes="176px"
+                                className="object-contain p-2"
                               />
                             </div>
                           </div>
@@ -290,6 +347,9 @@ export const TryoutMain = React.memo((props: TryoutMainProps) => {
                   {questions.map((q, idx) => (
                     <button
                       key={q.id}
+                      type="button"
+                      aria-label={`Soal ${idx + 1}, ${getNavLabel(q.id)}`}
+                      aria-current={q.id === activeId ? "step" : undefined}
                       onClick={() => setActiveId(q.id)}
                       className={`h-9 w-full rounded-lg font-mono text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${getNavStyle(q.id)}`}
                     >

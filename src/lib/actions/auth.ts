@@ -1,274 +1,293 @@
 "use server";
 
-/**
- * lib/actions/auth.ts — Production Version (Ultra-Optimized)
- * Dioptimalkan dengan Zod Validation, Drizzle Atomic Transactions, 
- * Token Garbage Collection, dan Partial Queries.
- */
-
-import { signIn } from "@/auth"; 
-import { AuthError } from "next-auth";
-import { db } from "@/db";
-import { users, verificationTokens, passwordResetTokens } from "@/db/database/schema";
-import { eq, and } from "drizzle-orm";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { APIError } from "better-auth/api";
+import { hashPassword } from "better-auth/crypto";
 import bcrypt from "bcryptjs";
-import { Resend } from "resend";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
+import { authServer } from "@/auth";
+import { db } from "@/db";
+import {
+  authAccounts,
+  authSessions,
+  passwordResetTokens,
+  users,
+} from "@/db/database/schema";
 
-// ==========================================
-// KONFIGURASI INTERNAL & SCHEMAS
-// ==========================================
-const resend = new Resend(process.env.RESEND_API_KEY);
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+const baseUrl =
+  process.env.BETTER_AUTH_URL?.trim() ||
+  process.env.AUTH_URL?.trim() ||
+  process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+  "http://localhost:3000";
 
-const AUTH_CONFIG = {
-  bcryptSaltRounds: 12,
-  tokenExpiryMs: 3600000, // 1 jam
-} as const;
-
-const EMAIL_CONFIG = {
-  sender: "ASNPedia <no-reply@asnpedia.bapendasultra.my.id>",
-  subjects: {
-    verify: "Verifikasi Akun ASNPedia Anda",
-    reset: "Atur Ulang Kata Sandi ASNPedia Anda",
-  },
-} as const;
-
-const AUTH_ERRORS = {
-  invalid_credentials: "invalid_credentials",
-  email_not_verified: "email_not_verified",
-  email_taken: "email_taken",
-  invalid_fields: "invalid_fields",
-  invalid_token: "invalid_token",
-  token_expired: "token_expired",
-  something_went_wrong: "something_went_wrong",
-} as const;
-
-type ActionResult = { error: string } | null;
-
-// ── ZOD SCHEMAS (Validasi Server-Side yang Kuat) ──
 const LoginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+  email: z.string().trim().email().toLowerCase(),
+  password: z.string().min(1).max(128),
+  callbackUrl: z.string().optional(),
 });
 
 const RegisterSchema = z.object({
-  name: z.string().min(2).trim(),
-  email: z.string().email().toLowerCase(),
-  password: z.string().min(8),
-});
+  name: z.string().trim().min(2).max(100),
+  email: z.string().trim().email().toLowerCase(),
+  password: z.string().min(8).max(128),
+  confirmPassword: z.string().optional(),
+}).refine(
+  ({ password, confirmPassword }) => !confirmPassword || password === confirmPassword,
+  { path: ["confirmPassword"], message: "Kata sandi dan konfirmasi tidak cocok." },
+);
 
 const ForgotPasswordSchema = z.object({
-  email: z.string().email().toLowerCase(),
+  email: z.string().trim().email().toLowerCase(),
 });
 
 const ResetPasswordSchema = z.object({
-  email: z.string().email().toLowerCase(),
-  token: z.string().uuid(), // Token harus berupa UUID valid
-  password: z.string().min(8),
+  email: z.string().trim().email().toLowerCase().optional(),
+  token: z.string().min(16).max(512),
+  password: z.string().min(8).max(128),
 });
 
-// ==========================================
-// HELPER: TEMPLATE EMAIL REUSABLE
-// ==========================================
-function generateEmailLayout(title: string, body: string, actionText: string, actionLink: string, description?: string) {
-  return `
-    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
-      <h2 style="color: #0f172a;">${title}</h2>
-      <p style="color: #475569; line-height: 1.6;">${body}</p>
-      <a href="${actionLink}" style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; margin: 20px 0;">${actionText}</a>
-      ${description ? `<p style="color: #475569; line-height: 1.6;">${description}</p>` : ""}
-      <p style="color: #94a3b8; font-size: 12px;">Tautan ini aman dan hanya berlaku selama 1 jam.</p>
-    </div>
-  `;
+type ActionError = { error: string };
+type LoginResult = ActionError | { role: "ADMIN" | "USER" };
+
+function getSafeCallbackUrl(value: string | undefined) {
+  if (!value) return "/dashboard";
+
+  try {
+    const base = new URL(baseUrl);
+    const candidate = new URL(value, base);
+    if (candidate.origin !== base.origin) return "/dashboard";
+    return `${candidate.pathname}${candidate.search}${candidate.hash}`;
+  } catch {
+    return "/dashboard";
+  }
 }
 
-// ─────────────────────────────────────────
-// 1. LOGIN ACTION
-// ─────────────────────────────────────────
-export async function loginAction(formData: FormData): Promise<ActionResult> {
+function getErrorText(error: unknown) {
+  if (error instanceof APIError) {
+    return `${error.status} ${error.message}`.toLowerCase();
+  }
+  if (error instanceof Error) return error.message.toLowerCase();
+
+  if (typeof error === "object" && error !== null) {
+    const value = error as Record<string, unknown>;
+    const body = typeof value.body === "object" && value.body !== null
+      ? value.body as Record<string, unknown>
+      : undefined;
+    return [value.message, value.status, body?.code, body?.message]
+      .filter((item): item is string | number => typeof item === "string" || typeof item === "number")
+      .join(" ")
+      .toLowerCase();
+  }
+
+  return "";
+}
+
+function mapAuthError(error: unknown): ActionError {
+  const detail = getErrorText(error);
+  if (detail.includes("email_not_verified") || detail.includes("email not verified")) {
+    return { error: "email_not_verified" };
+  }
+  if (detail.includes("too_many") || detail.includes("too many") || detail.includes("429")) {
+    return { error: "too_many_attempts" };
+  }
+  if (detail.includes("temporarily unavailable") || detail.includes("500")) {
+    return { error: "temporarily_unavailable" };
+  }
+  if (detail.includes("invalid token") || detail.includes("token expired")) {
+    return { error: detail.includes("expired") ? "token_expired" : "invalid_token" };
+  }
+  return { error: "something_went_wrong" };
+}
+
+export async function loginAction(formData: FormData): Promise<LoginResult> {
   const parsed = LoginSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: AUTH_ERRORS.invalid_credentials };
+  if (!parsed.success) return { error: "invalid_credentials" };
 
   try {
-    await signIn("credentials", {
-      email: parsed.data.email,
-      password: parsed.data.password,
-      redirect: false,
+    const result = await authServer.api.signInEmail({
+      body: {
+        email: parsed.data.email,
+        password: parsed.data.password,
+        callbackURL: getSafeCallbackUrl(parsed.data.callbackUrl),
+        rememberMe: true,
+      },
+      headers: await headers(),
     });
-    
-    return null;
-  } catch (error) {
-    if (error instanceof AuthError) {
-      if (error.cause?.err?.message === AUTH_ERRORS.email_not_verified) {
-        return { error: AUTH_ERRORS.email_not_verified };
+
+    // Migrate a valid legacy bcrypt password to Better Auth's scrypt hash at
+    // the first successful login. A failed opportunistic upgrade never blocks login.
+    try {
+      const legacyHash = await db.query.authAccounts.findFirst({
+        where: and(
+          eq(authAccounts.userId, result.user.id),
+          eq(authAccounts.providerId, "credential"),
+        ),
+        columns: { id: true, password: true },
+      });
+
+      if (legacyHash?.password && /^\$2[aby]\$/.test(legacyHash.password)) {
+        const upgradedHash = await hashPassword(parsed.data.password);
+        const now = new Date();
+        await db.transaction(async (tx) => {
+          await tx
+            .update(authAccounts)
+            .set({ password: upgradedHash, updatedAt: now })
+            .where(and(
+              eq(authAccounts.id, legacyHash.id),
+              eq(authAccounts.password, legacyHash.password!),
+            ));
+          await tx
+            .update(users)
+            .set({ passwordHash: null, updatedAt: now })
+            .where(eq(users.id, result.user.id));
+        });
       }
-      switch (error.type) {
-        case "CredentialsSignin":
-          return { error: AUTH_ERRORS.invalid_credentials };
-        default:
-          return { error: AUTH_ERRORS.something_went_wrong };
-      }
+    } catch {
+      console.error("[auth] Legacy password upgrade failed after a successful sign-in.");
     }
-    throw error; // Wajib di-throw agar Next.js bisa memproses redirect (jika ada)
+
+    return { role: result.user.role === "ADMIN" ? "ADMIN" : "USER" };
+  } catch (error) {
+    // Use one public response for unknown email, wrong password and unverified email.
+    const mapped = mapAuthError(error);
+    return mapped.error === "something_went_wrong"
+      ? { error: "invalid_credentials" }
+      : mapped;
   }
 }
 
-// ─────────────────────────────────────────
-// 2. REGISTER ACTION
-// ─────────────────────────────────────────
-export async function registerAction(formData: FormData): Promise<ActionResult> {
+export async function registerAction(formData: FormData): Promise<ActionError | null> {
   const parsed = RegisterSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: AUTH_ERRORS.invalid_fields };
-
-  const { name, email, password } = parsed.data;
+  if (!parsed.success) return { error: "invalid_fields" };
 
   try {
-    // OPTIMASI: Partial Query, hanya mengambil ID
-    const existingUser = await db.query.users.findFirst({
-      where: eq(users.email, email),
-      columns: { id: true } 
+    await authServer.api.signUpEmail({
+      body: {
+        name: parsed.data.name,
+        email: parsed.data.email,
+        password: parsed.data.password,
+        callbackURL: new URL("/verify-email?status=verified", baseUrl).toString(),
+      },
+      headers: await headers(),
     });
-
-    if (existingUser) return { error: AUTH_ERRORS.email_taken };
-
-    const hashedPassword = await bcrypt.hash(password, AUTH_CONFIG.bcryptSaltRounds);
-    const token = crypto.randomUUID();
-    const expires = new Date(Date.now() + AUTH_CONFIG.tokenExpiryMs);
-
-    // OPTIMASI: Transaksi Atomic. Insert User & Hapus Token Lama & Insert Token Baru
-    await db.transaction(async (tx) => {
-      await tx.insert(users).values({
-        name,
-        email,
-        passwordHash: hashedPassword,
-      });
-
-      // GARBAGE COLLECTION: Hapus token verifikasi lama jika user mencoba register ulang dengan email sama
-      await tx.delete(verificationTokens).where(eq(verificationTokens.identifier, email));
-
-      await tx.insert(verificationTokens).values({
-        identifier: email,
-        token,
-        expires,
-      });
-    });
-
-    // Jalankan email async (tidak nge-block proses database)
-    const verificationLink = `${APP_URL}/verify-email?token=${token}&email=${encodeURIComponent(email)}`;
-    await resend.emails.send({
-      from: EMAIL_CONFIG.sender,
-      to: email,
-      subject: EMAIL_CONFIG.subjects.verify,
-      html: generateEmailLayout(
-        `Halo ${name}, Terima kasih telah mendaftar!`,
-        "Langkah terakhir, silakan klik tombol di bawah ini untuk memverifikasi alamat email Anda agar bisa mengakses Dashboard ASNPedia:",
-        "Verifikasi Email",
-        verificationLink
-      ),
-    });
-
     return null;
   } catch (error) {
-    console.error("[Register Action Error]:", error);
-    return { error: AUTH_ERRORS.something_went_wrong };
-  }
-}
-
-// ─────────────────────────────────────────
-// 3. FORGOT PASSWORD ACTION
-// ─────────────────────────────────────────
-export async function forgotPasswordAction(formData: FormData): Promise<ActionResult> {
-  const parsed = ForgotPasswordSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: AUTH_ERRORS.invalid_fields };
-
-  const { email } = parsed.data;
-
-  try {
-    // OPTIMASI: Partial Query, hanya butuh passwordHash untuk tahu ini akun credentials atau OAuth
-    const user = await db.query.users.findFirst({
-      where: eq(users.email, email),
-      columns: { passwordHash: true }
-    });
-
-    if (!user || !user.passwordHash) return null; // Keamanan Anti-Enumeration
-
-    const token = crypto.randomUUID();
-    const expires = new Date(Date.now() + AUTH_CONFIG.tokenExpiryMs);
-
-    // GARBAGE COLLECTION: Hapus token reset lama agar tidak menumpuk di DB
-    await db.transaction(async (tx) => {
-      await tx.delete(passwordResetTokens).where(eq(passwordResetTokens.identifier, email));
-      await tx.insert(passwordResetTokens).values({
-        identifier: email,
-        token,
-        expires,
-      });
-    });
-
-    const resetLink = `${APP_URL}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
-    await resend.emails.send({
-      from: EMAIL_CONFIG.sender,
-      to: email,
-      subject: EMAIL_CONFIG.subjects.reset,
-      html: generateEmailLayout(
-        "Permintaan Atur Ulang Kata Sandi",
-        "Kami menerima permintaan untuk mengatur ulang kata sandi akun ASNPedia Anda. Silakan klik tombol di bawah ini untuk melanjutkan:",
-        "Atur Ulang Kata Sandi",
-        resetLink,
-        "Jika Anda tidak merasa melakukan permintaan ini, silakan abaikan email ini."
-      ),
-    });
-
-    return null;
-  } catch (error) {
-    console.error("[Forgot Password Error]:", error);
-    return { error: AUTH_ERRORS.something_went_wrong };
-  }
-}
-
-// ─────────────────────────────────────────
-// 4. RESET PASSWORD ACTION
-// ─────────────────────────────────────────
-export async function resetPasswordAction(formData: FormData): Promise<ActionResult> {
-  const parsed = ResetPasswordSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: AUTH_ERRORS.invalid_fields };
-
-  const { email, token, password } = parsed.data;
-
-  try {
-    // 1. Validasi kecocokan token
-    const existingToken = await db.query.passwordResetTokens.findFirst({
-      where: and(
-        eq(passwordResetTokens.identifier, email),
-        eq(passwordResetTokens.token, token)
-      ),
-      columns: { expires: true }
-    });
-
-    if (!existingToken) return { error: AUTH_ERRORS.invalid_token };
-
-    // 2. Periksa expiry
-    if (new Date(existingToken.expires) < new Date()) {
-      await db.delete(passwordResetTokens).where(eq(passwordResetTokens.token, token));
-      return { error: AUTH_ERRORS.token_expired };
+    const detail = getErrorText(error);
+    if (detail.includes("user_already_exists") || detail.includes("user already exists")) {
+      // Same response as an accepted registration; never disclose whether an
+      // address already has an account.
+      return null;
     }
+    return mapAuthError(error);
+  }
+}
 
-    const hashedPassword = await bcrypt.hash(password, AUTH_CONFIG.bcryptSaltRounds);
+export async function forgotPasswordAction(formData: FormData): Promise<ActionError | null> {
+  const parsed = ForgotPasswordSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: "invalid_fields" };
 
-    // 3. OPTIMASI: Atomic Transaction (Ganti Password sekaligus buang Token)
-    await db.transaction(async (tx) => {
-      await tx.update(users)
-        .set({ passwordHash: hashedPassword })
-        .where(eq(users.email, email));
-
-      await tx.delete(passwordResetTokens)
-        .where(eq(passwordResetTokens.token, token));
+  try {
+    await authServer.api.requestPasswordReset({
+      body: {
+        email: parsed.data.email,
+        redirectTo: new URL("/reset-password", baseUrl).toString(),
+      },
+      headers: await headers(),
     });
-
+    // Better Auth deliberately returns the same public response for known and
+    // unknown accounts, preventing email enumeration.
     return null;
   } catch (error) {
-    console.error("[Reset Password Error]:", error);
-    return { error: AUTH_ERRORS.something_went_wrong };
+    return mapAuthError(error);
   }
+}
+
+export async function resetPasswordAction(formData: FormData): Promise<ActionError | null> {
+  const parsed = ResetPasswordSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: "invalid_fields" };
+
+  try {
+    await authServer.api.resetPassword({
+      body: { token: parsed.data.token, newPassword: parsed.data.password },
+      headers: await headers(),
+    });
+    return null;
+  } catch (error) {
+    // Keep one-hour password reset links issued by the old system usable during
+    // deployment. Lock and consume each legacy token atomically to prevent reuse.
+    if (!parsed.data.email) return mapAuthError(error);
+
+    try {
+      const legacyResult = await db.transaction(async (tx) => {
+        const [resetToken] = await tx
+          .select({ expires: passwordResetTokens.expires })
+          .from(passwordResetTokens)
+          .where(and(
+            eq(passwordResetTokens.identifier, parsed.data.email!),
+            eq(passwordResetTokens.token, parsed.data.token),
+          ))
+          .for("update");
+
+        if (!resetToken) return "invalid" as const;
+        if (resetToken.expires.getTime() <= Date.now()) {
+          await tx.delete(passwordResetTokens).where(and(
+            eq(passwordResetTokens.identifier, parsed.data.email!),
+            eq(passwordResetTokens.token, parsed.data.token),
+          ));
+          return "expired" as const;
+        }
+
+        const [user] = await tx
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.email, parsed.data.email!))
+          .for("update");
+        if (!user) return "invalid" as const;
+
+        const credentialAccount = await tx.query.authAccounts.findFirst({
+          where: and(
+            eq(authAccounts.userId, user.id),
+            eq(authAccounts.providerId, "credential"),
+          ),
+          columns: { id: true },
+        });
+        if (!credentialAccount) return "invalid" as const;
+
+        const now = new Date();
+        const [password, legacyPassword] = await Promise.all([
+          hashPassword(parsed.data.password),
+          bcrypt.hash(parsed.data.password, 12),
+        ]);
+
+        await tx
+          .update(authAccounts)
+          .set({ password, updatedAt: now })
+          .where(eq(authAccounts.id, credentialAccount.id));
+        await tx
+          .update(users)
+          .set({ passwordHash: legacyPassword, updatedAt: now })
+          .where(eq(users.id, user.id));
+        await tx.delete(authSessions).where(eq(authSessions.userId, user.id));
+        await tx.delete(passwordResetTokens).where(and(
+          eq(passwordResetTokens.identifier, parsed.data.email!),
+          eq(passwordResetTokens.token, parsed.data.token),
+        ));
+
+        return "success" as const;
+      });
+
+      if (legacyResult === "success") return null;
+      return { error: legacyResult === "expired" ? "token_expired" : "invalid_token" };
+    } catch {
+      console.error("[auth] Legacy password reset failed.");
+      return { error: "temporarily_unavailable" };
+    }
+  }
+}
+
+export async function logoutAction() {
+  await authServer.api.signOut({ headers: await headers() });
+  redirect("/login");
 }

@@ -6,13 +6,13 @@
  */
 
 import type { Metadata } from "next";
+import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { questions, tryoutHistories } from "@/db/database/schema";
 import { eq, and, desc, asc, SQL } from "drizzle-orm";
 import { z } from "zod";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -71,7 +71,13 @@ const SUBTEST_CONFIG: Record<SubTest, { label: string; pill: string; header: str
 };
 
 const PilihanSchema = z.array(
-  z.object({ opsi: z.string(), teks: z.string().optional(), poin: z.number() })
+  z.object({
+    opsi: z.string(),
+    teks: z.string().optional(),
+    poin: z.number(),
+    imageUrl: z.string().nullable().optional(),
+    imageAlt: z.string().nullable().optional(),
+  })
 );
 
 interface PembahasanPageProps {
@@ -132,6 +138,8 @@ export default async function PembahasanPage({ params, searchParams }: Pembahasa
         id: true,
         kategori: true,
         pertanyaan: true,
+        imageUrl: true,
+        imageAlt: true,
         pembahasan: true,
         pilihan: true,
       },
@@ -159,6 +167,8 @@ export default async function PembahasanPage({ params, searchParams }: Pembahasa
       nomor: i + 1,
       subTest: soal.kategori as SubTest,
       pertanyaan: soal.pertanyaan,
+      imageUrl: soal.imageUrl,
+      imageAlt: soal.imageAlt,
       pembahasan: soal.pembahasan,
       pilihan: daftarPilihan,
       jawabanBenar,
@@ -311,6 +321,19 @@ export default async function PembahasanPage({ params, searchParams }: Pembahasa
                           {soal.pertanyaan}
                         </p>
 
+                        {soal.imageUrl && (
+                          <div className="relative aspect-[16/9] w-full max-w-3xl overflow-hidden rounded-xl border border-border bg-white">
+                            <Image
+                              src={soal.imageUrl}
+                              alt={soal.imageAlt || "Gambar soal"}
+                              fill
+                              unoptimized
+                              sizes="(max-width: 768px) 100vw, 768px"
+                              className="object-contain p-3"
+                            />
+                          </div>
+                        )}
+
                         {/* Daftar pilihan */}
                         <div className="space-y-2">
                           {soal.pilihan.map((p) => {
@@ -330,6 +353,18 @@ export default async function PembahasanPage({ params, searchParams }: Pembahasa
                               >
                                 <span className="shrink-0 font-bold">{p.opsi}.</span>
                                 <span className="flex-1">{p.teks}</span>
+                                {p.imageUrl && (
+                                  <span className="relative aspect-square w-24 shrink-0 overflow-hidden rounded-md border border-border bg-white">
+                                    <Image
+                                      src={p.imageUrl}
+                                      alt={p.imageAlt || `Gambar pilihan ${p.opsi}`}
+                                      fill
+                                      unoptimized
+                                      sizes="96px"
+                                      className="object-contain p-1"
+                                    />
+                                  </span>
+                                )}
 
                                 {/* Bobot poin */}
                                 <span

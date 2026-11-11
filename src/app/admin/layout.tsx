@@ -8,6 +8,7 @@
 
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { getDatabaseRole } from "@/lib/authz";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -33,7 +34,7 @@ interface AdminLayoutProps {
 // ==========================================
 export default async function AdminLayout({ children }: AdminLayoutProps) {
   
-  // ── 1. PROTEKSI SEKURIOTAS SERVER-SIDE (NextAuth v5 Gate) ──
+  // ── 1. Server-side Better Auth session check ──
   const session = await auth();
 
   // A. Hadang jika token sesi tidak ditemukan
@@ -42,7 +43,7 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
   }
 
   // B. Hadang jika pengguna bukan entitas Administrator Resmi
-  if (session.user.role !== ACCESS_CONTROL.requiredRole) {
+  if ((await getDatabaseRole(session.user.id)) !== ACCESS_CONTROL.requiredRole) {
     redirect(STRATEGIC_ROUTES.unauthorizedRedirect);
   }
 

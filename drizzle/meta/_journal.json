@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1794045329988,
+      "tag": "0000_create_initial_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794062182121,
+      "tag": "0001_petite_doctor_spectrum",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794122624481,
+      "tag": "0002_add_tryout_attempt_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794139915776,
+      "tag": "0003_persist_tryout_question_flags",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794235729355,
+      "tag": "0004_old_wolfsbane",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794300613016,
+      "tag": "0005_faithful_mother_askani",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794307872102,
+      "tag": "0006_foamy_molecule_man",
+      "breakpoints": true
+    }
+  ]
+}

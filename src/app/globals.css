@@ -47,48 +47,86 @@
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
 
-  /* ── Ekspos custom palette ke Tailwind utilities ── */
-  /* Memungkinkan: bg-purple-50, text-teal-600, border-red-200 dst. */
-
-  --color-purple-50:  var(--purple-50);
+  /* Brand violet */
+  --color-purple-50: var(--purple-50);
   --color-purple-100: var(--purple-100);
   --color-purple-200: var(--purple-200);
+  --color-purple-300: var(--purple-300);
   --color-purple-400: var(--purple-400);
+  --color-purple-500: var(--purple-500);
   --color-purple-600: var(--purple-600);
+  --color-purple-700: var(--purple-700);
   --color-purple-800: var(--purple-800);
   --color-purple-900: var(--purple-900);
+  --color-purple-950: var(--purple-950);
+  --color-violet-50: var(--purple-50);
+  --color-violet-100: var(--purple-100);
+  --color-violet-200: var(--purple-200);
+  --color-violet-500: var(--purple-500);
+  --color-indigo-950: var(--purple-950);
+  --color-fuchsia-500: var(--purple-500);
+  --color-blue-400: var(--purple-400);
+  --color-blue-500: var(--purple-500);
+  --color-blue-600: var(--purple-600);
 
-  --color-teal-50:  var(--teal-50);
+  /* Mint success and progress */
+  --color-teal-50: var(--teal-50);
   --color-teal-100: var(--teal-100);
   --color-teal-200: var(--teal-200);
   --color-teal-400: var(--teal-400);
   --color-teal-600: var(--teal-600);
+  --color-teal-700: var(--teal-700);
   --color-teal-800: var(--teal-800);
   --color-teal-900: var(--teal-900);
+  --color-emerald-100: var(--teal-100);
+  --color-emerald-200: var(--teal-200);
+  --color-emerald-300: var(--teal-300);
+  --color-emerald-400: var(--teal-400);
+  --color-emerald-500: var(--teal-500);
+  --color-emerald-600: var(--teal-600);
+  --color-emerald-700: var(--teal-700);
+  --color-sky-500: var(--amber-500);
 
-  --color-red-50:  var(--red-50);
+  /* Gold highlight and caution */
+  --color-amber-50: var(--amber-50);
+  --color-amber-100: var(--amber-100);
+  --color-amber-200: var(--amber-200);
+  --color-amber-300: var(--amber-300);
+  --color-amber-400: var(--amber-400);
+  --color-amber-500: var(--amber-500);
+  --color-amber-600: var(--amber-600);
+  --color-amber-700: var(--amber-700);
+  --color-amber-800: var(--amber-800);
+  --color-amber-900: var(--amber-900);
+  --color-amber-950: var(--amber-950);
+
+  /* Keep errors distinct from the brand colors */
+  --color-red-50: var(--red-50);
   --color-red-100: var(--red-100);
   --color-red-200: var(--red-200);
   --color-red-400: var(--red-400);
+  --color-red-500: var(--red-500);
   --color-red-600: var(--red-600);
+  --color-red-700: var(--red-700);
   --color-red-800: var(--red-800);
   --color-red-900: var(--red-900);
 
-  --color-amber-50:  var(--amber-50);
-  --color-amber-100: var(--amber-100);
-  --color-amber-200: var(--amber-200);
-  --color-amber-400: var(--amber-400);
-  --color-amber-600: var(--amber-600);
-  --color-amber-800: var(--amber-800);
-  --color-amber-900: var(--amber-900);
-
-  --color-gray-50:  var(--gray-50);
+  /* Warm neutral aliases used throughout the existing interface */
+  --color-gray-50: var(--gray-50);
   --color-gray-100: var(--gray-100);
   --color-gray-200: var(--gray-200);
+  --color-gray-300: var(--gray-300);
   --color-gray-400: var(--gray-400);
   --color-gray-600: var(--gray-600);
   --color-gray-800: var(--gray-800);
   --color-gray-900: var(--gray-900);
+  --color-slate-50: var(--gray-50);
+  --color-slate-400: var(--gray-400);
+  --color-slate-500: var(--gray-600);
+  --color-slate-600: var(--gray-700);
+  --color-slate-700: var(--gray-800);
+  --color-slate-950: var(--gray-950);
+  --color-zinc-950: var(--gray-950);
 }
 
 /* ===========================================
@@ -96,163 +134,200 @@
    Semua warna komponen bersumber dari sini.
    =========================================== */
 :root {
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-geist-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
   /* ── Shadcn core tokens ── */
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.148 0.004 228.8);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.148 0.004 228.8);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.148 0.004 228.8);
-  --primary: #534AB7;
-  --primary-foreground: #ffffff;
-  --secondary: #EEEDFE;
-  --secondary-foreground: #26215C;
-  --muted: oklch(0.963 0.002 197.1);
-  --muted-foreground: oklch(0.56 0.021 213.5);
-  --accent: #EEEDFE;
-  --accent-foreground: #534AB7;
-  --destructive: #A32D2D;
-  --border: #AFA9EC;
-  --input: #AFA9EC;
-  --ring: #534AB7;
+  --background: #F7F5FC;
+  --foreground: #241B2E;
+  --card: #FFFFFF;
+  --card-foreground: #2E174D;
+  --popover: #FFFFFF;
+  --popover-foreground: #2E174D;
+  --primary: #5948C8;
+  --primary-foreground: #FFFFFF;
+  --secondary: #EEEAF7;
+  --secondary-foreground: #2E174D;
+  --muted: #F1EEF6;
+  --muted-foreground: #716B7C;
+  --accent: #EEEAF7;
+  --accent-foreground: #5948C8;
+  --destructive: #B42330;
+  --border: #E5DDEE;
+  --input: #D9D0E6;
+  --ring: #5948C8;
   --radius: 0.625rem;
-  --chart-1: oklch(0.905 0.182 98.111);
-  --chart-2: oklch(0.795 0.184 86.047);
-  --chart-3: oklch(0.681 0.162 75.834);
-  --chart-4: oklch(0.554 0.135 66.442);
-  --chart-5: oklch(0.476 0.114 61.907);
-  --sidebar: #EEEDFE;
-  --sidebar-foreground: #26215C;
-  --sidebar-primary: #534AB7;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #CECBF6;
-  --sidebar-accent-foreground: #26215C;
-  --sidebar-border: #AFA9EC;
-  --sidebar-ring: #534AB7;
+  --chart-1: #5948C8;
+  --chart-2: #42BFA0;
+  --chart-3: #F2C15E;
+  --chart-4: #7E68D4;
+  --chart-5: #3D8878;
+  --sidebar: #FBFAFD;
+  --sidebar-foreground: #2E174D;
+  --sidebar-primary: #5948C8;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #EEEAF7;
+  --sidebar-accent-foreground: #2E174D;
+  --sidebar-border: #E5DDEE;
+  --sidebar-ring: #5948C8;
 
   /* ── Purple ramp ── */
-  --purple-50:  #EEEDFE;
-  --purple-100: #CECBF6;
-  --purple-200: #AFA9EC;
-  --purple-400: #7F77DD;
-  --purple-600: #534AB7;
-  --purple-800: #3C3489;
-  --purple-900: #26215C;
+  --purple-50:  #F7F5FC;
+  --purple-100: #F0EBFA;
+  --purple-200: #DDD5EF;
+  --purple-300: #C5B8E4;
+  --purple-400: #9B89DB;
+  --purple-500: #7765D3;
+  --purple-600: #5948C8;
+  --purple-700: #4936AE;
+  --purple-800: #3A2673;
+  --purple-900: #2E174D;
+  --purple-950: #211633;
 
-  /* ── Teal ramp (Benar / Lolos) ── */
-  --teal-50:  #E1F5EE;
-  --teal-100: #9FE1CB;
-  --teal-200: #5DCAA5;
-  --teal-400: #1D9E75;
-  --teal-600: #0F6E56;
-  --teal-800: #085041;
-  --teal-900: #04342C;
+  /* ── Mint ramp ── */
+  --teal-50:  #EDF8F3;
+  --teal-100: #D5F0E4;
+  --teal-200: #AFE3CF;
+  --teal-300: #42BFA0;
+  --teal-400: #2A9876;
+  --teal-500: #228467;
+  --teal-600: #217A60;
+  --teal-700: #1C614C;
+  --teal-800: #164B3C;
+  --teal-900: #10372C;
 
   /* ── Red ramp (Salah / Gagal) ── */
-  --red-50:  #FCEBEB;
-  --red-100: #F7C1C1;
-  --red-200: #F09595;
-  --red-400: #E24B4A;
-  --red-600: #A32D2D;
-  --red-800: #791F1F;
-  --red-900: #501313;
+  --red-50:  #FDF0F0;
+  --red-100: #F9D7D8;
+  --red-200: #F1B1B5;
+  --red-400: #C13B49;
+  --red-500: #B42330;
+  --red-600: #A32230;
+  --red-700: #921E2A;
+  --red-800: #771A25;
+  --red-900: #5E1720;
 
   /* ── Amber ramp (Ragu / Warning) ── */
-  --amber-50:  #FAEEDA;
-  --amber-100: #FAC775;
-  --amber-200: #EF9F27;
-  --amber-400: #BA7517;
-  --amber-600: #854F0B;
-  --amber-800: #633806;
-  --amber-900: #412402;
+  --amber-50:  #FFF8E7;
+  --amber-100: #FCE7B6;
+  --amber-200: #F7D27B;
+  --amber-300: #F2C15E;
+  --amber-400: #DCA63B;
+  --amber-500: #B98522;
+  --amber-600: #8E641C;
+  --amber-700: #6F4E17;
+  --amber-800: #563C14;
+  --amber-900: #402D12;
+  --amber-950: #2B1D0D;
 
-  /* ── Gray ramp (Kosong / Netral) ── */
-  --gray-50:  #F1EFE8;
-  --gray-100: #D3D1C7;
-  --gray-200: #B4B2A9;
-  --gray-400: #888780;
-  --gray-600: #5F5E5A;
-  --gray-800: #444441;
-  --gray-900: #2C2C2A;
+  /* ── Warm neutral ramp ── */
+  --gray-50:  #F7F5FC;
+  --gray-100: #F1EDF6;
+  --gray-200: #E6DFED;
+  --gray-300: #D2C9DD;
+  --gray-400: #A99FB3;
+  --gray-500: #887D94;
+  --gray-600: #716B7C;
+  --gray-700: #574E64;
+  --gray-800: #3F3551;
+  --gray-900: #2E174D;
+  --gray-950: #211633;
 }
 
 .dark {
-  --background: oklch(0.148 0.004 228.8);
-  --foreground: oklch(0.987 0.002 197.1);
-  --card: oklch(0.218 0.008 223.9);
-  --card-foreground: oklch(0.987 0.002 197.1);
-  --popover: oklch(0.218 0.008 223.9);
-  --popover-foreground: oklch(0.987 0.002 197.1);
-  --primary: #7F77DD;
-  --primary-foreground: #ffffff;
-  --secondary: #26215C;
-  --secondary-foreground: #EEEDFE;
-  --muted: oklch(0.275 0.011 216.9);
-  --muted-foreground: oklch(0.723 0.014 214.4);
-  --accent: #26215C;
-  --accent-foreground: #CECBF6;
-  --destructive: #E24B4A;
+  --background: #1F1727;
+  --foreground: #F7F5FC;
+  --card: #282134;
+  --card-foreground: #F7F5FC;
+  --popover: #282134;
+  --popover-foreground: #F7F5FC;
+  --primary: #9B89DB;
+  --primary-foreground: #211633;
+  --secondary: #382E47;
+  --secondary-foreground: #E8E0F2;
+  --muted: #332A40;
+  --muted-foreground: #B8AEC5;
+  --accent: #382E47;
+  --accent-foreground: #E8E0F2;
+  --destructive: #D96A72;
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
-  --ring: #7F77DD;
-  --chart-1: oklch(0.905 0.182 98.111);
-  --chart-2: oklch(0.795 0.184 86.047);
-  --chart-3: oklch(0.681 0.162 75.834);
-  --chart-4: oklch(0.554 0.135 66.442);
-  --chart-5: oklch(0.476 0.114 61.907);
-  --sidebar: oklch(0.218 0.008 223.9);
-  --sidebar-foreground: oklch(0.987 0.002 197.1);
-  --sidebar-primary: #7F77DD;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: oklch(0.275 0.011 216.9);
-  --sidebar-accent-foreground: oklch(0.987 0.002 197.1);
+  --ring: #9B89DB;
+  --chart-1: #B4A6E3;
+  --chart-2: #42BFA0;
+  --chart-3: #F2C15E;
+  --chart-4: #9B89DB;
+  --chart-5: #6BC7A7;
+  --sidebar: #282134;
+  --sidebar-foreground: #F7F5FC;
+  --sidebar-primary: #9B89DB;
+  --sidebar-primary-foreground: #211633;
+  --sidebar-accent: #382E47;
+  --sidebar-accent-foreground: #E8E0F2;
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: #7F77DD;
+  --sidebar-ring: #9B89DB;
 
-  /* ── Purple ramp dark — lebih terang untuk kontras ── */
-  --purple-50:  #26215C;
-  --purple-100: #3C3489;
-  --purple-200: #534AB7;
-  --purple-400: #7F77DD;
-  --purple-600: #AFA9EC;
-  --purple-800: #CECBF6;
-  --purple-900: #EEEDFE;
+  /* ── Brand ramp dark ── */
+  --purple-50:  #241B2E;
+  --purple-100: #2E263A;
+  --purple-200: #3D334D;
+  --purple-300: #574B6A;
+  --purple-400: #766693;
+  --purple-500: #9885C4;
+  --purple-600: #AE9BD9;
+  --purple-700: #C4B8E6;
+  --purple-800: #D8D0EE;
+  --purple-900: #EEEAF7;
+  --purple-950: #211633;
 
-  /* ── Teal ramp dark ── */
-  --teal-50:  #04342C;
-  --teal-100: #085041;
-  --teal-200: #0F6E56;
-  --teal-400: #1D9E75;
-  --teal-600: #5DCAA5;
-  --teal-800: #9FE1CB;
-  --teal-900: #E1F5EE;
+  /* ── Mint ramp dark ── */
+  --teal-50:  #102B24;
+  --teal-100: #153B30;
+  --teal-200: #1C5845;
+  --teal-300: #2A8065;
+  --teal-400: #3AA580;
+  --teal-500: #42BFA0;
+  --teal-600: #6ED0AD;
+  --teal-700: #9BDFC5;
+  --teal-800: #C7EDDD;
+  --teal-900: #EAF8F3;
 
   /* ── Red ramp dark ── */
-  --red-50:  #501313;
-  --red-100: #791F1F;
-  --red-200: #A32D2D;
-  --red-400: #E24B4A;
-  --red-600: #F09595;
-  --red-800: #F7C1C1;
-  --red-900: #FCEBEB;
+  --red-50:  #351015;
+  --red-100: #5E1720;
+  --red-200: #771A25;
+  --red-400: #A32230;
+  --red-500: #B42330;
+  --red-600: #C13B49;
+  --red-700: #D56A74;
+  --red-800: #E6A0A5;
+  --red-900: #F8DFE0;
 
   /* ── Amber ramp dark ── */
-  --amber-50:  #412402;
-  --amber-100: #633806;
-  --amber-200: #854F0B;
-  --amber-400: #BA7517;
-  --amber-600: #EF9F27;
-  --amber-800: #FAC775;
-  --amber-900: #FAEEDA;
+  --amber-50:  #2B1D0D;
+  --amber-100: #402D12;
+  --amber-200: #563C14;
+  --amber-300: #6F4E17;
+  --amber-400: #8E641C;
+  --amber-500: #B98522;
+  --amber-600: #DCA63B;
+  --amber-700: #F2C15E;
+  --amber-800: #F7D27B;
+  --amber-900: #FFF1CD;
+  --amber-950: #FFF8E7;
 
   /* ── Gray ramp dark ── */
-  --gray-50:  #2C2C2A;
-  --gray-100: #444441;
-  --gray-200: #5F5E5A;
-  --gray-400: #888780;
-  --gray-600: #B4B2A9;
-  --gray-800: #D3D1C7;
-  --gray-900: #F1EFE8;
+  --gray-50:  #241B2E;
+  --gray-100: #2D2439;
+  --gray-200: #3D334B;
+  --gray-300: #574B67;
+  --gray-400: #9A8DAC;
+  --gray-500: #B8AEC5;
+  --gray-600: #C9C0D3;
+  --gray-700: #DDD6E5;
+  --gray-800: #EEEAF3;
+  --gray-900: #F7F5FC;
+  --gray-950: #17101F;
 }
 
 @layer base {
@@ -264,5 +339,47 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+@layer utilities {
+  .dark .text-purple-950 {
+    color: var(--purple-900);
+  }
+
+  .hero-caret {
+    animation: hero-caret-blink 1s steps(1, end) infinite;
+  }
+
+  .hero-ribbon-art {
+    animation: hero-ribbon-drift 16s ease-in-out infinite;
+    transform-origin: center;
+  }
+
+  .learning-flow-motion {
+    animation: learning-flow-drift 12s ease-in-out infinite;
+  }
+}
+
+@keyframes hero-caret-blink {
+  0%, 48% { opacity: 1; }
+  49%, 100% { opacity: 0.12; }
+}
+
+@keyframes learning-flow-drift {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-0.6vw); }
+}
+
+@keyframes hero-ribbon-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(-0.45%, 0.35%, 0) scale(1.012); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-caret,
+  .hero-ribbon-art,
+  .learning-flow-motion {
+    animation: none;
   }
 }

@@ -13,18 +13,16 @@ import { CheckCircle2, XCircle, AlertCircle, BarChart3, FileText } from "lucide-
 import { Badge } from "@/components/ui/badge";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { tryoutHistories } from "@/db/database/schema";
+import { questions, tryoutHistories } from "@/db/database/schema";
 import { and, eq, desc } from "drizzle-orm";
+import { z } from "zod";
+import { SKD_TRAINING_THRESHOLDS } from "@/lib/constants/scoring";
 
 // ==========================================
 // KONFIGURASI & TIPE DATA
 // ==========================================
-const APP_CONFIG = { name: "ASNPedia", maxVolumeAllowed: 20 } as const;
-
-const EXAM_THRESHOLDS = {
-  passingGrade: { twk: 65, tiu: 80, tkp: 166 },
-  maxScore: { twk: 150, tiu: 175, tkp: 225 },
-} as const;
+const APP_CONFIG = { name: "ASNPedia" } as const;
+const ChoicesSchema = z.array(z.object({ poin: z.number() }));
 
 interface HasilPageProps {
   params: Promise<{ id: string }>;
@@ -53,6 +51,7 @@ export async function generateMetadata({ params }: HasilPageProps): Promise<Meta
 // HELPER: Progress bar persen
 // ==========================================
 function pct(skor: number, maks: number) {
+  if (maks <= 0) return 0;
   return Math.min(100, Math.round((skor / maks) * 100));
 }
 
@@ -63,58 +62,73 @@ export default async function HasilTryoutPage({ params, searchParams }: HasilPag
   const [p, sp, session] = await Promise.all([params, searchParams, auth()]);
 
   const volumeId = parseInt(p.id, 10);
-  if (isNaN(volumeId) || volumeId < 1 || volumeId > APP_CONFIG.maxVolumeAllowed) notFound();
+  if (isNaN(volumeId) || volumeId < 1) notFound();
 
   if (!session?.user?.id) {
     redirect(`/login?callbackUrl=/tryout/${p.id}/hasil`);
   }
 
   // Ambil riwayat berdasarkan historyId (jika ada) atau pengerjaan terbaru
-  const riwayat = await db.query.tryoutHistories.findFirst({
-    where: and(
-      eq(tryoutHistories.userId, session.user.id),
-      eq(tryoutHistories.packageId, volumeId),
-      sp.historyId ? eq(tryoutHistories.id, sp.historyId) : undefined
-    ),
-    orderBy: [desc(tryoutHistories.endTime)],
-    columns: {
-      id: true,
-      skorTwk: true,
-      skorTiu: true,
-      skorTkp: true,
-      totalSkor: true,
-      isLolos: true,
-    },
-  });
+  const [riwayat, packageQuestions] = await Promise.all([
+    db.query.tryoutHistories.findFirst({
+      where: and(
+        eq(tryoutHistories.userId, session.user.id),
+        eq(tryoutHistories.packageId, volumeId),
+        sp.historyId ? eq(tryoutHistories.id, sp.historyId) : undefined
+      ),
+      orderBy: [desc(tryoutHistories.endTime)],
+      columns: {
+        id: true,
+        skorTwk: true,
+        skorTiu: true,
+        skorTkp: true,
+        totalSkor: true,
+        isLolos: true,
+      },
+    }),
+    db.select({ kategori: questions.kategori, pilihan: questions.pilihan })
+      .from(questions)
+      .where(eq(questions.packageId, volumeId)),
+  ]);
 
   if (!riwayat) notFound();
+
+  const maxScores = { twk: 0, tiu: 0, tkp: 0 };
+  for (const question of packageQuestions) {
+    const parsedChoices = ChoicesSchema.safeParse(question.pilihan);
+    if (!parsedChoices.success) continue;
+    const maximum = Math.max(0, ...parsedChoices.data.map((choice) => choice.poin));
+    if (question.kategori === "TWK") maxScores.twk += maximum;
+    else if (question.kategori === "TIU") maxScores.tiu += maximum;
+    else if (question.kategori === "TKP") maxScores.tkp += maximum;
+  }
 
   const statistikDetail: StatistikSubtest[] = [
     {
       singkatan: "TWK",
       kategori: "Tes Wawasan Kebangsaan",
       skor: riwayat.skorTwk,
-      passingGrade: EXAM_THRESHOLDS.passingGrade.twk,
-      maksimal: EXAM_THRESHOLDS.maxScore.twk,
-      status: riwayat.skorTwk >= EXAM_THRESHOLDS.passingGrade.twk,
+      passingGrade: SKD_TRAINING_THRESHOLDS.twk,
+      maksimal: maxScores.twk,
+      status: riwayat.skorTwk >= SKD_TRAINING_THRESHOLDS.twk,
       keterangan: "Nasionalisme, Integritas, Bela Negara, Pilar Negara, Bahasa Indonesia.",
     },
     {
       singkatan: "TIU",
       kategori: "Tes Inteligensia Umum",
       skor: riwayat.skorTiu,
-      passingGrade: EXAM_THRESHOLDS.passingGrade.tiu,
-      maksimal: EXAM_THRESHOLDS.maxScore.tiu,
-      status: riwayat.skorTiu >= EXAM_THRESHOLDS.passingGrade.tiu,
+      passingGrade: SKD_TRAINING_THRESHOLDS.tiu,
+      maksimal: maxScores.tiu,
+      status: riwayat.skorTiu >= SKD_TRAINING_THRESHOLDS.tiu,
       keterangan: "Kemampuan Verbal, Numerik, dan Figural.",
     },
     {
       singkatan: "TKP",
       kategori: "Tes Karakteristik Pribadi",
       skor: riwayat.skorTkp,
-      passingGrade: EXAM_THRESHOLDS.passingGrade.tkp,
-      maksimal: EXAM_THRESHOLDS.maxScore.tkp,
-      status: riwayat.skorTkp >= EXAM_THRESHOLDS.passingGrade.tkp,
+      passingGrade: SKD_TRAINING_THRESHOLDS.tkp,
+      maksimal: maxScores.tkp,
+      status: riwayat.skorTkp >= SKD_TRAINING_THRESHOLDS.tkp,
       keterangan: "Pelayanan Publik, Jejaring Kerja, Sosial Budaya, TI, Profesionalisme.",
     },
   ];
@@ -167,7 +181,7 @@ export default async function HasilTryoutPage({ params, searchParams }: HasilPag
             riwayat.isLolos ? "text-teal-900" : "text-red-900"
           }`}
         >
-          {riwayat.isLolos ? "Selamat! Kamu lolos" : "Belum lolos kriteria"}
+          {riwayat.isLolos ? "Target latihan tercapai" : "Target latihan belum tercapai"}
         </h2>
         <p
           className={`mt-1.5 text-sm ${
@@ -175,8 +189,8 @@ export default async function HasilTryoutPage({ params, searchParams }: HasilPag
           }`}
         >
           {riwayat.isLolos
-            ? "Skor kamu memenuhi ambang batas standar BKN."
-            : "Skor belum memenuhi passing grade minimum."}
+            ? "Skor kamu mencapai target latihan yang dipakai aplikasi."
+            : "Skor kamu masih di bawah target latihan yang dipakai aplikasi."}
         </p>
 
         {/* Divider */}
@@ -250,7 +264,7 @@ export default async function HasilTryoutPage({ params, searchParams }: HasilPag
                     </div>
                     <div className="flex justify-between text-[10px] text-muted-foreground">
                       <span>0</span>
-                      <span className="text-primary">PG: {item.passingGrade}</span>
+                      <span className="text-primary">Target: {item.passingGrade}</span>
                       <span>{item.maksimal}</span>
                     </div>
                   </div>
@@ -266,7 +280,7 @@ export default async function HasilTryoutPage({ params, searchParams }: HasilPag
                     {item.skor}
                   </span>
                   <span className="text-[11px] text-muted-foreground">
-                    dari {item.maksimal} · min. {item.passingGrade}
+                    dari {item.maksimal} · target {item.passingGrade}
                   </span>
                 </div>
 
@@ -292,12 +306,13 @@ export default async function HasilTryoutPage({ params, searchParams }: HasilPag
 
       {/* ── FOOTER PASSING GRADE ── */}
       <div className="flex flex-wrap justify-center gap-3 rounded-xl border border-purple-200 bg-purple-50 px-6 py-3 text-xs text-primary">
-        <span className="font-semibold">Passing grade BKN:</span>
-        <span className="font-bold">TWK ≥ {EXAM_THRESHOLDS.passingGrade.twk}</span>
+        <span className="font-semibold">Target nilai latihan:</span>
+        <span className="font-bold">TWK ≥ {SKD_TRAINING_THRESHOLDS.twk}</span>
         <span className="text-purple-200">·</span>
-        <span className="font-bold">TIU ≥ {EXAM_THRESHOLDS.passingGrade.tiu}</span>
+        <span className="font-bold">TIU ≥ {SKD_TRAINING_THRESHOLDS.tiu}</span>
         <span className="text-purple-200">·</span>
-        <span className="font-bold">TKP ≥ {EXAM_THRESHOLDS.passingGrade.tkp}</span>
+        <span className="font-bold">TKP ≥ {SKD_TRAINING_THRESHOLDS.tkp}</span>
+        <p className="basis-full text-center text-[11px] text-muted-foreground">Target ini untuk latihan dan bukan ambang seleksi resmi.</p>
       </div>
 
       {/* ── CTA ── */}
