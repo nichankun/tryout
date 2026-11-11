@@ -16,8 +16,8 @@ function requireHttpsUrl(key: string) {
 
   try {
     const url = new URL(value);
-    if (url.protocol !== "https:" || url.username || url.password) {
-      issues.push(`${key} harus berupa URL HTTPS tanpa credential.`);
+    if (url.protocol !== "https:" || url.username || url.password || isLocalhost(url.hostname)) {
+      issues.push(`${key} harus berupa URL publik HTTPS, tanpa credential, dan bukan localhost.`);
       return null;
     }
     return url;
@@ -25,6 +25,10 @@ function requireHttpsUrl(key: string) {
     issues.push(`${key} bukan URL yang valid.`);
     return null;
   }
+}
+
+function isLocalhost(hostname: string) {
+  return ["localhost", "127.0.0.1", "[::1]"].includes(hostname);
 }
 
 const databaseUrl = requireValue("DATABASE_URL");
@@ -44,8 +48,8 @@ if (!authUrlValue) issues.push("BETTER_AUTH_URL belum diisi (AUTH_URL lama masih
 const authUrl = authUrlValue ? (() => {
   try {
     const url = new URL(authUrlValue);
-    if (url.protocol !== "https:" || url.username || url.password) {
-      issues.push("BETTER_AUTH_URL harus berupa URL HTTPS tanpa credential.");
+    if (url.protocol !== "https:" || url.username || url.password || isLocalhost(url.hostname)) {
+      issues.push("BETTER_AUTH_URL harus berupa URL publik HTTPS, tanpa credential, dan bukan localhost.");
       return null;
     }
     return url;
