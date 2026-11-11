@@ -32,8 +32,8 @@ export function DashboardHeader({ userName, userEmail, userImage }: DashboardHea
 
   return (
     <header className="sticky top-0 z-40 w-full shrink-0 border-b border-purple-200/70 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/75">
-      <div className="mx-auto flex h-16 items-center gap-2 px-3 sm:px-4">
-        <SidebarTrigger className="size-10 shrink-0 rounded-xl text-muted-foreground hover:bg-purple-50 hover:text-primary" aria-label="Tampilkan atau sembunyikan navigasi" title="Tampilkan atau sembunyikan navigasi" />
+      <div className="mx-auto flex h-14 items-center gap-2 px-3 md:h-16 sm:px-4">
+        <SidebarTrigger className="hidden size-10 shrink-0 rounded-xl text-muted-foreground hover:bg-purple-50 hover:text-primary md:flex" aria-label="Tampilkan atau sembunyikan navigasi" title="Tampilkan atau sembunyikan navigasi" />
 
         {/* ── Brand Logo ── */}
         <Link

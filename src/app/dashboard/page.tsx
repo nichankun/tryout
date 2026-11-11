@@ -72,13 +72,13 @@ export default async function DashboardPage() {
           {metrics.map((metric) => {
             const Icon = metric.icon;
             return (
-              <Card key={metric.label} className={`flex flex-row items-center gap-4 rounded-2xl border border-purple-100 bg-white px-4 py-4 shadow-[0_8px_26px_-20px_rgba(46,23,77,0.35)] ring-0 sm:px-5 sm:py-4 ${metric.label === "Durasi simulasi" ? "col-span-2 sm:col-span-1" : ""}`}>
-                <span className={`flex size-14 shrink-0 items-center justify-center rounded-2xl ${metric.iconClass}`}>
+              <Card key={metric.label} className={`flex flex-row items-center gap-2.5 rounded-2xl border border-purple-100 bg-white px-2.5 py-3 shadow-[0_8px_26px_-20px_rgba(46,23,77,0.35)] ring-0 sm:gap-4 sm:px-5 sm:py-4 ${metric.label === "Durasi simulasi" ? "col-span-2 sm:col-span-1" : ""}`}>
+                <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl sm:size-14 sm:rounded-2xl ${metric.iconClass}`}>
                   <Icon className="size-6" aria-hidden="true" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-xs font-semibold text-muted-foreground sm:text-sm">{metric.label}</span>
-                  <span className="mt-0.5 block truncate text-2xl font-extrabold tracking-tight text-purple-950 sm:text-[1.75rem]">
+                  <span className="block text-[11px] font-semibold leading-tight text-muted-foreground sm:text-sm">{metric.label}</span>
+                  <span className="mt-0.5 block truncate text-[1.35rem] font-extrabold tracking-tight text-purple-950 sm:text-[1.75rem]">
                     {metric.value}
                   </span>
                 </span>

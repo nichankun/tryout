@@ -41,7 +41,57 @@ function VolumeCardSkeleton() {
 // ==========================================
 export default function DashboardLoading() {
   return (
-    <div className="bg-background min-h-screen text-foreground antialiased">
+    <>
+      <div className="min-h-full bg-[#F7F5FC] md:hidden" aria-hidden="true">
+        <div className="mx-auto flex w-full max-w-lg flex-col gap-6 px-4 py-6">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-9 w-40" />
+              <Skeleton className="h-7 w-20 rounded-full" />
+            </div>
+            <Skeleton className="h-6 w-32" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {Array.from({ length: 2 }).map((_, index) => (
+              <div key={`mobile-metric-${index}`} className="flex items-center gap-2.5 rounded-2xl border border-purple-100 bg-white px-2.5 py-3">
+                <Skeleton className="size-10 shrink-0 rounded-xl" />
+                <div className="min-w-0 space-y-2">
+                  <Skeleton className="h-3 w-16" />
+                  <Skeleton className="h-6 w-10" />
+                </div>
+              </div>
+            ))}
+            <div className="col-span-2 flex items-center gap-3 rounded-2xl border border-purple-100 bg-white px-3 py-3">
+              <Skeleton className="size-10 shrink-0 rounded-xl" />
+              <div className="space-y-2">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-6 w-28" />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex min-h-[250px] flex-col justify-center gap-4 rounded-[1.35rem] border border-purple-200/80 bg-[#F0EBFA] px-5">
+              <Skeleton className="h-3 w-28" />
+              <Skeleton className="h-9 w-44" />
+              <Skeleton className="h-4 w-56 max-w-full" />
+              <Skeleton className="h-11 w-40 rounded-xl" />
+            </div>
+            <div className="min-h-[220px] rounded-[1.35rem] border border-purple-100 bg-white p-5">
+              <Skeleton className="h-6 w-36" />
+              <div className="flex h-[150px] flex-col items-center justify-center gap-3">
+                <Skeleton className="size-12 rounded-2xl" />
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="h-4 w-56 max-w-full" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="hidden min-h-screen bg-background text-foreground antialiased md:block">
 
       {/* 1. SKELETON PANEL NAVBAR */}
       <div className="bg-card border-b border-border h-16 px-4">
@@ -81,6 +131,7 @@ export default function DashboardLoading() {
         </div>
         
       </div>
-    </div>
+      </div>
+    </>
   );
 }

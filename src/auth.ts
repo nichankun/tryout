@@ -33,11 +33,15 @@ if (secret && Buffer.byteLength(secret, "utf8") < 32) {
 
 const trustedOrigins = [appOrigin];
 
-const resend = process.env.RESEND_API_KEY
-  ? new Resend(process.env.RESEND_API_KEY)
+const resendApiKey = process.env.RESEND_API_KEY?.trim();
+const resend = resendApiKey
+  ? new Resend(resendApiKey)
   : null;
-const emailSender = process.env.RESEND_FROM_EMAIL;
+const emailSender = process.env.RESEND_FROM_EMAIL?.trim();
 const supportEmail = process.env.SUPPORT_EMAIL?.trim();
+const googleClientId = process.env.AUTH_GOOGLE_ID?.trim();
+const googleClientSecret = process.env.AUTH_GOOGLE_SECRET?.trim();
+const clientIpHeader = process.env.AUTH_CLIENT_IP_HEADER?.trim();
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (character) => ({
@@ -119,8 +123,8 @@ const betterAuthInstance = betterAuth({
   advanced: {
     database: { generateId: () => randomUUID() },
     ipAddress: {
-      ipAddressHeaders: process.env.AUTH_CLIENT_IP_HEADER
-        ? [process.env.AUTH_CLIENT_IP_HEADER]
+      ipAddressHeaders: clientIpHeader
+        ? [clientIpHeader]
         : [],
     },
     cookiePrefix: "asnpedia",
@@ -205,11 +209,11 @@ const betterAuthInstance = betterAuth({
       });
     },
   },
-  socialProviders: process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET
+  socialProviders: googleClientId && googleClientSecret
     ? {
         google: {
-          clientId: process.env.AUTH_GOOGLE_ID,
-          clientSecret: process.env.AUTH_GOOGLE_SECRET,
+          clientId: googleClientId,
+          clientSecret: googleClientSecret,
           requireEmailVerification: true,
         },
       }

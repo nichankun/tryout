@@ -191,3 +191,38 @@ export function DashboardSidebar({ userName, userEmail, userImage }: DashboardSi
     </Sidebar>
   );
 }
+
+export function DashboardMobileNav() {
+  const pathname = usePathname();
+  const activeItem = getActiveItem(pathname);
+
+  return (
+    <nav
+      aria-label="Navigasi dashboard"
+      className="fixed inset-x-0 bottom-0 z-50 h-[calc(4.5rem+env(safe-area-inset-bottom))] border-t border-purple-100 bg-background/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_-18px_rgba(46,23,77,0.35)] backdrop-blur supports-backdrop-filter:bg-background/85 md:hidden"
+    >
+      <div className="mx-auto flex h-full max-w-lg items-stretch justify-around px-2">
+        {NAV_ITEMS.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeItem === item.id;
+
+          return (
+            <Link
+              key={item.id}
+              href={item.href}
+              aria-current={isActive ? "page" : undefined}
+              className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <span
+                className={`flex min-w-14 items-center justify-center rounded-full px-4 py-1 transition-colors ${isActive ? "bg-primary/10" : ""}`}
+              >
+                <Icon className="size-5" aria-hidden="true" />
+              </span>
+              <span className="truncate">{item.title}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}

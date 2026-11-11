@@ -9,6 +9,9 @@ import {
   Clock3,
   Layers,
   Target,
+  CircleUserRound,
+  House,
+  ListChecks,
 } from "lucide-react";
 import { db } from "@/db";
 import { questions, tryoutPackages } from "@/db/database/schema";
@@ -109,15 +112,16 @@ export default async function HomePage() {
   const availablePackages = packageStats.filter((pkg) => pkg.questionCount > 0);
 
   return (
-    <main className="min-h-screen overflow-hidden bg-background text-foreground">
+    <>
+      <main className="min-h-screen overflow-hidden bg-background pb-[calc(4.75rem+env(safe-area-inset-bottom))] text-foreground lg:pb-0">
       <Link
         href="#paket"
         className="sr-only z-50 rounded-md bg-white px-4 py-3 font-semibold text-purple-950 focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
       >
         Langsung ke paket latihan
       </Link>
-      <section className="relative isolate min-h-[760px] overflow-hidden bg-[radial-gradient(ellipse_at_70%_48%,rgba(187,161,255,0.13),transparent_52%),linear-gradient(115deg,#fbf8ff_0%,#f7f4fc_64%,#f4f0fb_100%)] lg:min-h-[100svh]">
-        <header className="relative z-20 mx-auto flex h-[clamp(5.25rem,7.4vw,7.75rem)] w-full items-center justify-between px-6 pt-[clamp(2rem,2.6vw,2.75rem)] sm:px-10 lg:px-[5.4vw]">
+      <section id="beranda" className="relative isolate min-h-[100svh] scroll-mt-16 overflow-hidden bg-[radial-gradient(ellipse_at_70%_48%,rgba(187,161,255,0.13),transparent_52%),linear-gradient(115deg,#fbf8ff_0%,#f7f4fc_64%,#f4f0fb_100%)] sm:min-h-[760px] lg:min-h-[100svh]">
+        <header className="relative z-20 mx-auto flex h-16 w-full items-center justify-between px-5 pt-0 sm:h-[clamp(5.25rem,7.4vw,7.75rem)] sm:px-10 sm:pt-[clamp(2rem,2.6vw,2.75rem)] lg:px-[5.4vw]">
           <Link href="/" className="relative inline-flex items-center" aria-label="ASNPedia, beranda">
             <span className="relative text-[clamp(2rem,2.65vw,2.75rem)] font-black leading-none tracking-[-0.065em] text-purple-950">
               ASN<span className="text-primary">Pedia</span>
@@ -126,7 +130,7 @@ export default async function HomePage() {
           </Link>
           <Link
             href="/login"
-            className="inline-flex h-10 items-center rounded-full border border-purple-200/80 bg-white/65 px-5 text-sm font-bold text-purple-950 shadow-sm backdrop-blur-sm transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 sm:h-11 sm:px-6"
+            className="inline-flex h-11 items-center rounded-full border border-purple-200/80 bg-white/75 px-5 text-sm font-bold text-purple-950 shadow-sm backdrop-blur-sm transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 sm:px-6"
           >
             Masuk
           </Link>
@@ -143,7 +147,7 @@ export default async function HomePage() {
           />
         </div>
 
-        <div className="relative z-10 mx-auto flex min-h-[calc(760px_-_clamp(5.25rem,7.4vw,7.75rem))] w-full flex-col px-6 pb-12 pt-8 sm:px-10 sm:pt-12 lg:min-h-[calc(100svh_-_7.4vw)] lg:px-[5.4vw] lg:pb-20 lg:pt-[4.2vw]">
+        <div className="relative z-10 mx-auto flex min-h-[calc(100svh_-_4rem)] w-full flex-col px-5 pb-6 pt-6 sm:min-h-[calc(760px_-_clamp(5.25rem,7.4vw,7.75rem))] sm:px-10 sm:pb-12 sm:pt-12 lg:min-h-[calc(100svh_-_7.4vw)] lg:px-[5.4vw] lg:pb-20 lg:pt-[4.2vw]">
           <div className="max-w-[760px]">
             <p className="mb-[clamp(1.25rem,1.9vw,2rem)] flex items-center gap-[clamp(0.75rem,1.2vw,1.25rem)] text-[clamp(0.9rem,1.1vw,1.15rem)] font-extrabold uppercase tracking-[0.2em] text-purple-900">
               <span aria-hidden="true" className="h-[clamp(0.375rem,0.55vw,0.5625rem)] w-[clamp(2.75rem,4.2vw,4.375rem)] rounded-full bg-purple-400" />
@@ -161,12 +165,12 @@ export default async function HomePage() {
               Satu paket lengkap. Progres yang jelas.
             </p>
 
-            <Button asChild className="mt-10 h-[62px] rounded-[14px] bg-primary px-8 text-lg font-bold text-primary-foreground shadow-[0_12px_28px_-14px_rgba(73,54,174,0.75)] transition-all hover:-translate-y-0.5 hover:bg-purple-700 sm:mt-[2.2vw] sm:h-[clamp(3.5rem,4.5vw,4.625rem)] sm:w-[clamp(11rem,16.6vw,277px)] sm:px-6 sm:text-[clamp(1.4rem,1.85vw,1.9rem)]">
+            <Button asChild className="mt-7 h-14 w-full max-w-[22rem] rounded-2xl bg-primary px-6 text-base font-bold text-primary-foreground shadow-[0_12px_28px_-14px_rgba(73,54,174,0.75)] transition-all hover:-translate-y-0.5 hover:bg-purple-700 sm:mt-[2.2vw] sm:h-[clamp(3.5rem,4.5vw,4.625rem)] sm:w-[clamp(11rem,16.6vw,277px)] sm:rounded-[14px] sm:px-6 sm:text-[clamp(1.4rem,1.85vw,1.9rem)]">
               <Link href="#paket">Lihat paket</Link>
             </Button>
           </div>
 
-          <div className="relative mt-10 h-[230px] w-full lg:hidden" aria-hidden="true">
+          <div className="relative mt-7 h-[190px] w-full sm:mt-10 sm:h-[230px] lg:hidden" aria-hidden="true">
             <Image
               src="/hero-ribbon.png"
               alt=""
@@ -180,7 +184,7 @@ export default async function HomePage() {
 
       <section
         id="cara-kerja"
-        className="relative isolate min-h-screen overflow-hidden bg-[radial-gradient(ellipse_at_76%_43%,rgba(187,161,255,0.12),transparent_48%),linear-gradient(115deg,#fbf8ff_0%,#f7f4fc_64%,#f4f0fb_100%)] pb-20 pt-[clamp(4.5rem,16vw,15rem)] sm:pb-24 lg:min-h-[100svh] lg:pb-0"
+        className="relative isolate min-h-0 overflow-hidden bg-[radial-gradient(ellipse_at_76%_43%,rgba(187,161,255,0.12),transparent_48%),linear-gradient(115deg,#fbf8ff_0%,#f7f4fc_64%,#f4f0fb_100%)] pb-12 pt-14 sm:min-h-screen sm:pb-24 sm:pt-[clamp(4.5rem,16vw,15rem)] lg:min-h-[100svh] lg:pb-0"
       >
         <div className="relative z-10 px-[5.4vw]">
           <p className="flex items-center gap-[clamp(0.75rem,1.2vw,1.25rem)] text-[clamp(0.9rem,1.1vw,1.15rem)] font-extrabold uppercase tracking-[0.2em] text-purple-900">
@@ -237,7 +241,7 @@ export default async function HomePage() {
           ))}
         </div>
 
-        <div className="mt-12 space-y-8 px-[5.4vw] lg:hidden">
+        <div className="mt-8 space-y-5 px-5 sm:mt-12 sm:space-y-8 sm:px-[5.4vw] lg:hidden">
           {learningSteps.map(({ number, icon: Icon, title, description }, index) => (
             <article key={number} className="grid grid-cols-[3.75rem_minmax(0,1fr)] gap-5">
               <div className="flex flex-col items-center">
@@ -262,7 +266,7 @@ export default async function HomePage() {
         id="paket"
         className="scroll-mt-20 overflow-hidden bg-[radial-gradient(ellipse_at_76%_36%,rgba(187,161,255,0.12),transparent_48%),linear-gradient(115deg,#fbf8ff_0%,#f7f4fc_64%,#f4f0fb_100%)] py-[clamp(4rem,9vw,9rem)]"
       >
-        <div className="pl-[4.5vw] pr-[3.4vw]">
+        <div className="px-5 sm:px-8 lg:pl-[4.5vw] lg:pr-[3.4vw]">
           <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
             <div>
               <p className="flex items-center gap-[clamp(0.75rem,1.2vw,1.25rem)] text-[clamp(0.9rem,1.1vw,1.15rem)] font-extrabold uppercase tracking-[0.2em] text-purple-900">
@@ -276,14 +280,14 @@ export default async function HomePage() {
                 Satu paket lengkap untuk latihan SKD.
               </p>
             </div>
-            <div className="inline-flex w-fit items-center gap-3 rounded-full bg-purple-100/85 px-5 py-3 text-[clamp(0.95rem,1.25vw,1.25rem)] font-semibold text-purple-900 md:mb-1">
+            <div className="inline-flex w-fit items-center gap-3 rounded-full bg-purple-100/85 px-4 py-2.5 text-sm font-semibold text-purple-900 sm:px-5 sm:py-3 sm:text-[clamp(0.95rem,1.25vw,1.25rem)] md:mb-1">
               <BookOpenCheck className="h-6 w-6 shrink-0 text-primary" aria-hidden />
               {availablePackages.length} paket tersedia
             </div>
           </div>
 
           {availablePackages.length === 0 ? (
-            <Card className="mt-12 rounded-2xl border-dashed border-purple-200 bg-white/70">
+              <Card className="mt-8 rounded-2xl border-dashed border-purple-200 bg-white/70 sm:mt-12">
               <CardContent className="py-14 text-center">
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-100 text-primary">
                   <BookOpenCheck className="h-6 w-6" aria-hidden />
@@ -293,7 +297,7 @@ export default async function HomePage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="-mx-[1.1vw] mt-[clamp(2.5rem,5vw,5rem)] grid items-stretch gap-6 md:grid-cols-2 xl:grid-cols-3 xl:gap-[1.5vw]">
+            <div className="mx-0 mt-8 grid items-stretch gap-4 sm:-mx-[1.1vw] sm:mt-[clamp(2.5rem,5vw,5rem)] sm:gap-6 md:grid-cols-2 xl:grid-cols-3 xl:gap-[1.5vw]">
               {availablePackages.map((pkg, index) => {
                 const cover = landingPackageCovers[index % landingPackageCovers.length];
                 const volumeTitle = pkg.title.match(/^volume\s*(\d+)$/i);
@@ -392,17 +396,39 @@ export default async function HomePage() {
         <div className="mx-auto flex max-w-[1880px] flex-col gap-6 px-5 py-8 sm:px-8 md:px-10 lg:flex-row lg:items-center lg:justify-between lg:gap-8 lg:py-9">
           <div className="max-w-2xl">
             <Link href="/" className="text-lg font-extrabold tracking-tight text-purple-950">ASNPedia</Link>
-            <p className="mt-1.5 text-xs leading-5 text-muted-foreground sm:text-sm">Layanan latihan mandiri. Tidak berafiliasi dengan BKN dan tidak menjamin hasil seleksi resmi.</p>
+            <p className="mt-1.5 text-sm leading-6 text-muted-foreground">Layanan latihan mandiri. Tidak berafiliasi dengan BKN dan tidak menjamin hasil seleksi resmi.</p>
           </div>
-          <nav className="flex flex-wrap gap-x-6 gap-y-3 text-xs font-semibold text-purple-950 sm:text-sm" aria-label="Kebijakan dan bantuan">
+          <nav className="flex flex-wrap gap-x-6 gap-y-3 text-sm font-semibold text-purple-950" aria-label="Kebijakan dan bantuan">
             <Link className="transition-colors hover:text-primary" href="/syarat-ketentuan">Syarat dan ketentuan</Link>
             <Link className="transition-colors hover:text-primary" href="/kebijakan-privasi">Privasi</Link>
             <Link className="transition-colors hover:text-primary" href="/kebijakan-refund">Refund</Link>
             <Link className="transition-colors hover:text-primary" href="/bantuan">Bantuan</Link>
           </nav>
-          <p className="shrink-0 text-xs text-slate-400 sm:text-sm">© {new Date().getFullYear()} ASNPedia</p>
+          <p className="shrink-0 text-sm text-slate-400">© {new Date().getFullYear()} ASNPedia</p>
         </div>
       </footer>
-    </main>
+      </main>
+      <nav
+        aria-label="Navigasi utama"
+        className="fixed inset-x-0 bottom-0 z-50 grid h-[calc(4.75rem+env(safe-area-inset-bottom))] grid-cols-4 border-t border-purple-100 bg-white/95 px-2 pt-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(33,22,51,0.08)] backdrop-blur-xl lg:hidden"
+      >
+        <a href="#beranda" className="flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-2xl text-xs font-semibold text-purple-900 active:bg-purple-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+          <House className="h-5 w-5" aria-hidden="true" />
+          <span>Beranda</span>
+        </a>
+        <a href="#cara-kerja" className="flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-2xl text-xs font-semibold text-purple-900 active:bg-purple-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+          <ListChecks className="h-5 w-5" aria-hidden="true" />
+          <span>Alur</span>
+        </a>
+        <a href="#paket" className="flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-2xl text-xs font-semibold text-purple-900 active:bg-purple-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+          <BookOpenCheck className="h-5 w-5" aria-hidden="true" />
+          <span>Paket</span>
+        </a>
+        <Link href="/login" className="flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-2xl text-xs font-semibold text-purple-900 active:bg-purple-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+          <CircleUserRound className="h-5 w-5" aria-hidden="true" />
+          <span>Akun</span>
+        </Link>
+      </nav>
+    </>
   );
 }

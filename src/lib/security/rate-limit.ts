@@ -27,7 +27,7 @@ export async function consumeRateLimit(input: {
   limit: number;
   windowMs: number;
 }): Promise<RateLimitResult> {
-  const secret = process.env.BETTER_AUTH_SECRET ?? process.env.AUTH_SECRET;
+  const secret = process.env.BETTER_AUTH_SECRET?.trim() || process.env.AUTH_SECRET?.trim();
   if (!secret) {
     return {
       allowed: process.env.NODE_ENV !== "production",
@@ -48,7 +48,12 @@ export async function consumeRateLimit(input: {
       void db
         .delete(rateLimitBuckets)
         .where(lt(rateLimitBuckets.updatedAt, new Date(now.getTime() - 24 * 60 * 60 * 1000)))
-        .catch((error: unknown) => console.error("[rate-limit] Cleanup failed:", error));
+        .catch((error: unknown) => {
+          console.error(
+            "[rate-limit] Cleanup failed:",
+            error instanceof Error ? error.name : "UnknownError",
+          );
+        });
     }
 
     const [bucket] = await db
@@ -73,7 +78,10 @@ export async function consumeRateLimit(input: {
       storageUnavailable: false,
     };
   } catch (error) {
-    console.error("[rate-limit] Storage unavailable:", error);
+    console.error(
+      "[rate-limit] Storage unavailable:",
+      error instanceof Error ? error.name : "UnknownError",
+    );
     return {
       allowed: process.env.NODE_ENV !== "production",
       retryAfterSeconds: Math.max(1, Math.ceil(input.windowMs / 1000)),

@@ -1,6 +1,9 @@
 import type { CSSProperties } from "react";
 import { auth } from "@/auth";
-import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
+import {
+  DashboardMobileNav,
+  DashboardSidebar,
+} from "@/components/dashboard/dashboard-sidebar";
 import { DashboardHeader } from "@/components/dashboard/header";
 import { DashboardFooter } from "@/components/dashboard/footer";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -25,7 +28,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
           userEmail={user?.email ?? ""}
           userImage={user?.image}
         />
-        <SidebarInset className="flex min-h-svh min-w-0 flex-col bg-background text-foreground antialiased">
+        <SidebarInset className="flex min-h-svh min-w-0 flex-col bg-background pb-[calc(4.5rem+env(safe-area-inset-bottom))] text-foreground antialiased md:pb-0">
           <DashboardHeader
             userName={user?.name ?? "Pengguna"}
             userEmail={user?.email ?? ""}
@@ -34,6 +37,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
           <main className="flex min-w-0 flex-1 flex-col">{children}</main>
           <DashboardFooter />
         </SidebarInset>
+        <DashboardMobileNav />
       </SidebarProvider>
     </TooltipProvider>
   );

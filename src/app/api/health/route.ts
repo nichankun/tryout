@@ -13,7 +13,10 @@ export async function GET() {
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
-    console.error("[health] Database probe failed:", error);
+    console.error(
+      "[health] Database probe failed:",
+      error instanceof Error ? error.name : "UnknownError",
+    );
     return NextResponse.json(
       { status: "unavailable" },
       { status: 503, headers: { "Cache-Control": "no-store" } },
