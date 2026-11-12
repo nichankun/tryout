@@ -37,29 +37,61 @@ export default function TryoutClient({ volumeId, packageTitle, questions }: Tryo
   const [isPaused, setIsPaused] = useState(false);
   const [pauseReason, setPauseReason] = useState<"offline" | "hidden" | null>(null);
   const [isPending, startTransition] = useTransition();
+  const startAttemptRequest = useRef<Promise<AttemptResponse> | null>(null);
   const pendingSaves = useRef(new Map<number, Promise<void>>());
 
-  const startAttempt = useCallback(async () => {
-    const response = await fetch("/api/attempts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ packageId: volumeId }),
-      cache: "no-store",
+  const startAttempt = useCallback(() => {
+    if (startAttemptRequest.current) return startAttemptRequest.current;
+
+    const request = (async () => {
+      let response: Response;
+      try {
+        response = await fetch("/api/attempts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ packageId: volumeId }),
+          cache: "no-store",
+        });
+      } catch {
+        throw new Error("Tidak dapat terhubung ke server tryout. Pastikan server berjalan dan coba lagi.");
+      }
+
+      const result = await response.json().catch(() => null) as ({ error?: string } & Partial<AttemptResponse>) | null;
+      if (!response.ok) {
+        const errorCode = result?.error;
+        const retryAfterSeconds = Number(response.headers.get("Retry-After"));
+        const retryAfter = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+          ? `${Math.ceil(retryAfterSeconds / 60)} menit`
+          : "beberapa menit";
+        const errorMessages: Record<string, string> = {
+          UNAUTHORIZED: "Sesi login berakhir. Masuk kembali lalu buka paket tryout.",
+          FORBIDDEN_ORIGIN: "Permintaan sesi ditolak. Muat ulang halaman tryout dari alamat aplikasi.",
+          FORBIDDEN: "Paket ini belum terbuka untuk akun kamu.",
+          INVALID_PAYLOAD: "Data paket tryout tidak valid. Muat ulang halaman.",
+          NO_QUESTIONS: "Paket ini belum memiliki soal.",
+          SERVICE_UNAVAILABLE: "Layanan pembuka sesi sedang tidak tersedia. Coba lagi beberapa saat.",
+          TOO_MANY_ATTEMPTS: `Terlalu banyak percobaan memulai sesi. Coba lagi dalam ${retryAfter}.`,
+          INTERNAL_ERROR: "Server gagal menyiapkan sesi ujian. Coba lagi beberapa saat.",
+        };
+        throw new Error(errorCode
+          ? errorMessages[errorCode] ?? `Sesi gagal dimulai (HTTP ${response.status}, ${errorCode}).`
+          : `Server menolak memulai sesi (HTTP ${response.status}).`);
+      }
+
+      if (!result) throw new Error("Server mengirim data sesi yang tidak valid. Coba muat ulang halaman.");
+
+      const attempt = result as AttemptResponse;
+      if (attempt.status !== "in_progress") {
+        throw new Error("Sesi sebelumnya sudah berakhir. Coba lagi untuk memulai sesi baru.");
+      }
+      return attempt;
+    })();
+
+    startAttemptRequest.current = request;
+    void request.catch(() => {
+      if (startAttemptRequest.current === request) startAttemptRequest.current = null;
     });
-    const result = await response.json();
-
-    if (!response.ok) {
-      const message = result.error === "FORBIDDEN"
-        ? "Paket ini belum terbuka untuk akun kamu."
-        : "Sesi ujian gagal dimulai. Periksa koneksi lalu coba lagi.";
-      throw new Error(message);
-    }
-
-    const attempt = result as AttemptResponse;
-    if (attempt.status !== "in_progress") {
-      throw new Error("Sesi sebelumnya sudah berakhir. Coba lagi untuk memulai sesi baru.");
-    }
-    return attempt;
+    return request;
   }, [volumeId]);
 
   const applyAttempt = useCallback((attempt: AttemptResponse) => {

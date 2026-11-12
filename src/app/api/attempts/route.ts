@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, eq, lte } from "drizzle-orm";
+import { and, eq, gt, lte } from "drizzle-orm";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { db } from "@/db";
@@ -13,6 +13,26 @@ export const dynamic = "force-dynamic";
 const StartAttemptSchema = z.object({
   packageId: z.number().int().positive(),
 });
+
+async function respondWithAttempt(attempt: typeof tryoutAttempts.$inferSelect) {
+  const answers = await db
+    .select({
+      questionId: tryoutAttemptAnswers.questionId,
+      answer: tryoutAttemptAnswers.answer,
+      isFlagged: tryoutAttemptAnswers.isFlagged,
+    })
+    .from(tryoutAttemptAnswers)
+    .where(eq(tryoutAttemptAnswers.attemptId, attempt.id));
+
+  return NextResponse.json({
+    attemptId: attempt.id,
+    status: attempt.status,
+    startedAt: attempt.startedAt.toISOString(),
+    expiresAt: attempt.expiresAt.toISOString(),
+    serverNow: new Date().toISOString(),
+    answers,
+  });
+}
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -36,20 +56,6 @@ export async function POST(request: Request) {
   }
 
   const { packageId } = parsed.data;
-  const rateLimit = await consumeAccountRateLimit({
-    namespace: "attempt-start",
-    headers: request.headers,
-    identifier: session.user.id,
-    limit: 5,
-    windowMs: 10 * 60 * 1000,
-  });
-  if (rateLimit.storageUnavailable) {
-    return NextResponse.json({ error: "SERVICE_UNAVAILABLE" }, { status: 503, headers: { "Retry-After": "60" } });
-  }
-  if (!rateLimit.allowed) {
-    return NextResponse.json({ error: "TOO_MANY_ATTEMPTS" }, { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } });
-  }
-
   const [access, firstQuestion] = await Promise.all([
     db.query.userAccess.findFirst({
       where: and(eq(userAccess.userId, session.user.id), eq(userAccess.packageId, packageId)),
@@ -65,6 +71,33 @@ export async function POST(request: Request) {
   if (!firstQuestion) return NextResponse.json({ error: "NO_QUESTIONS" }, { status: 404 });
 
   const now = new Date();
+  const activeAttempt = await db.query.tryoutAttempts.findFirst({
+    where: and(
+      eq(tryoutAttempts.userId, session.user.id),
+      eq(tryoutAttempts.packageId, packageId),
+      eq(tryoutAttempts.status, "in_progress"),
+      gt(tryoutAttempts.expiresAt, now),
+    ),
+  });
+
+  // Reloading or reopening an active session should resume it without consuming
+  // the limit reserved for creating new attempts.
+  if (activeAttempt) return respondWithAttempt(activeAttempt);
+
+  const rateLimit = await consumeAccountRateLimit({
+    namespace: "attempt-start",
+    headers: request.headers,
+    identifier: session.user.id,
+    limit: 5,
+    windowMs: 10 * 60 * 1000,
+  });
+  if (rateLimit.storageUnavailable) {
+    return NextResponse.json({ error: "SERVICE_UNAVAILABLE" }, { status: 503, headers: { "Retry-After": "60" } });
+  }
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: "TOO_MANY_ATTEMPTS" }, { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } });
+  }
+
   let attempt: typeof tryoutAttempts.$inferSelect;
 
   try {
@@ -123,22 +156,5 @@ export async function POST(request: Request) {
     attempt = activeAttempt;
   }
 
-  const answers = await db
-    .select({
-      questionId: tryoutAttemptAnswers.questionId,
-      answer: tryoutAttemptAnswers.answer,
-      isFlagged: tryoutAttemptAnswers.isFlagged,
-    })
-    .from(tryoutAttemptAnswers)
-    .where(eq(tryoutAttemptAnswers.attemptId, attempt.id));
-
-  const serverNow = new Date();
-  return NextResponse.json({
-    attemptId: attempt.id,
-    status: attempt.status,
-    startedAt: attempt.startedAt.toISOString(),
-    expiresAt: attempt.expiresAt.toISOString(),
-    serverNow: serverNow.toISOString(),
-    answers,
-  });
+  return respondWithAttempt(attempt);
 }

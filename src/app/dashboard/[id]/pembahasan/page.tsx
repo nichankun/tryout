@@ -18,7 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from "@/components/ui/accordion";
-import { CheckCircle2, XCircle, BookOpen } from "lucide-react";
+import { CheckCircle2, XCircle, BookOpen, MinusCircle } from "lucide-react";
 
 // ==========================================
 // KONSTANTA & KONFIGURASI
@@ -188,10 +188,13 @@ export default async function PembahasanPage({ params, searchParams }: Pembahasa
   }
 
   const subtests: SubTest[] = ["TWK", "TIU", "TKP"];
+  const subtestSections = subtests
+    .map((sub) => ({ sub, questions: enrichedSoal.filter((soal) => soal.subTest === sub) }))
+    .filter(({ questions }) => questions.length > 0);
 
   // ── 6. RENDER KOMPONEN UI ──
   return (
-    <div className="container mx-auto flex max-w-4xl flex-col gap-6 px-4 py-8 md:gap-8 md:px-6 md:py-10">
+    <div className="container mx-auto flex max-w-4xl flex-col gap-4 px-4 py-5 md:gap-8 md:px-6 md:py-10">
 
       {/* ── HEADER ── */}
       <div className="flex flex-col gap-1 border-l-4 border-primary pl-4">
@@ -212,49 +215,67 @@ export default async function PembahasanPage({ params, searchParams }: Pembahasa
           {
             label: TEXT_CONTENT.labelCorrect,
             value: totalBenar,
-            card: "bg-teal-50 border-teal-200",
+            card: "border-teal-700 bg-teal-700 dark:border-[#2A8065] dark:bg-[#164B3C]",
             iconBg: "bg-teal-600",
-            valueColor: "text-teal-900",
-            labelColor: "text-teal-600",
+            valueColor: "text-white",
+            labelColor: "text-white/90",
           },
           {
             label: TEXT_CONTENT.labelIncorrect,
             value: totalSalah,
-            card: "bg-red-50 border-red-200",
+            card: "border-red-700 bg-red-700 dark:border-[#771A25] dark:bg-[#5E1720]",
             iconBg: "bg-red-600",
-            valueColor: "text-red-900",
-            labelColor: "text-red-600",
+            valueColor: "text-white",
+            labelColor: "text-white/90",
           },
           {
             label: TEXT_CONTENT.labelEmpty,
             value: totalKosong,
-            card: "bg-gray-50 border-gray-200",
+            card: "border-purple-800 bg-purple-800 dark:border-[#5948C8] dark:bg-[#3A2673]",
             iconBg: "bg-gray-600",
-            valueColor: "text-gray-900",
-            labelColor: "text-gray-600",
+            valueColor: "text-white",
+            labelColor: "text-white/90",
           },
         ].map((s) => (
           <div
             key={s.label}
-            className={`flex flex-col items-center gap-2 rounded-2xl border p-4 md:p-5 ${s.card}`}
+            className={`flex flex-col items-center gap-2 rounded-2xl border p-4 shadow-sm md:p-5 ${s.card}`}
           >
             <span className={`text-3xl font-extrabold md:text-4xl ${s.valueColor}`}>
               {s.value}
             </span>
-            <span className={`text-xs font-semibold ${s.labelColor}`}>
+            <span className={`text-xs font-bold ${s.labelColor}`}>
               {s.label}
             </span>
           </div>
         ))}
       </div>
 
-      {/* ── AKORDION DAFTAR SUBTEST ── */}
-      {subtests.map((sub) => {
-        const soalSub = enrichedSoal.filter((s) => s.subTest === sub);
-        if (soalSub.length === 0) return null;
+      <nav
+        aria-label="Navigasi kategori pembahasan"
+        className="sticky top-0 z-30 -mx-4 border-y border-purple-100 bg-background/95 px-4 py-2 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/85 md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none"
+      >
+        <div className="grid grid-cols-3 gap-2">
+          {subtestSections.map(({ sub, questions }) => (
+            <a
+              key={sub}
+              href={`#subtest-${sub}`}
+              className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-purple-100 bg-white px-2 text-xs font-bold text-purple-900 transition-colors hover:border-purple-200 hover:bg-purple-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              {sub}
+              <span className="font-medium text-muted-foreground">{questions.length}</span>
+            </a>
+          ))}
+        </div>
+      </nav>
 
-        return (
-          <Card key={sub} className="overflow-hidden border-purple-200">
+      {/* ── AKORDION DAFTAR SUBTEST ── */}
+      {subtestSections.map(({ sub, questions: soalSub }) => (
+          <Card
+            key={sub}
+            id={`subtest-${sub}`}
+            className="scroll-mt-14 gap-0 overflow-hidden border-purple-200 py-0 md:scroll-mt-4"
+          >
             {/* Card header — ungu */}
             <CardHeader className={`border-b px-5 py-3.5 ${SUBTEST_CONFIG[sub].header}`}>
               <div className="flex items-center gap-2.5">
@@ -284,10 +305,10 @@ export default async function PembahasanPage({ params, searchParams }: Pembahasa
                       value={String(soal.id)}
                       className="border-none"
                     >
-                      <AccordionTrigger className="px-5 py-3.5 text-sm hover:bg-purple-50/40 hover:no-underline data-[state=open]:bg-purple-50/30 transition-colors">
+                      <AccordionTrigger className="min-h-12 px-4 py-3 text-sm transition-colors hover:bg-purple-50/40 hover:no-underline data-[state=open]:bg-purple-50/30 md:px-5 md:py-3.5">
                         <div className="flex items-center gap-3 text-left w-full">
                           {isKosong ? (
-                            <span className="h-4 w-4 rounded-full border-2 border-muted-foreground/30 shrink-0" />
+                            <MinusCircle className="h-4 w-4 shrink-0 text-muted-foreground/50" aria-label="Belum dijawab" />
                           ) : isBenar ? (
                             <CheckCircle2 className="h-4 w-4 text-teal-600 shrink-0" />
                           ) : (
@@ -315,7 +336,7 @@ export default async function PembahasanPage({ params, searchParams }: Pembahasa
                         </div>
                       </AccordionTrigger>
 
-                      <AccordionContent className="space-y-5 px-5 pb-6 pt-4">
+                      <AccordionContent className="space-y-4 px-4 pb-5 pt-3 md:space-y-5 md:px-5 md:pb-6 md:pt-4">
                         {/* Teks soal */}
                         <p className="select-none text-sm leading-relaxed text-foreground whitespace-pre-line">
                           {soal.pertanyaan}
@@ -343,7 +364,7 @@ export default async function PembahasanPage({ params, searchParams }: Pembahasa
                             return (
                               <div
                                 key={p.opsi}
-                                className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-sm transition-colors ${
+                                className={`flex min-h-11 items-start gap-2.5 rounded-xl border px-3 py-3 text-sm transition-colors md:items-center md:gap-3 md:px-4 ${
                                   isCorrect
                                     ? "border-teal-200 bg-teal-50 font-medium text-teal-900"
                                     : isUserChoice && !isCorrect
@@ -436,8 +457,7 @@ export default async function PembahasanPage({ params, searchParams }: Pembahasa
               </Accordion>
             </CardContent>
           </Card>
-        );
-      })}
+      ))}
     </div>
   );
 }

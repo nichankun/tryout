@@ -10,6 +10,7 @@ import { columns } from "./columns";
 import { DataTable } from "@/components/admin/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { DeleteAllQuestionsButton } from "@/components/admin/delete-all-questions-button";
 import { Plus, BookOpen, Coins, UploadCloud, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 
@@ -54,8 +55,8 @@ export default async function AdminPackageDetailPage({ params }: AdminPackageDet
     <div className="space-y-8 text-foreground antialiased">
       
       {/* HEADER UTAMA & LINK ACTION TAMBAH SOAL */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border pb-4">
-        <div>
+      <div className="flex flex-col gap-4 border-b border-border pb-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2.5 mb-1.5">
             <h1 className="text-2xl font-bold tracking-tight">{currentPackage.title}</h1>
             <Badge variant={currentPackage.isActive ? "default" : "destructive"}>
@@ -66,13 +67,13 @@ export default async function AdminPackageDetailPage({ params }: AdminPackageDet
         </div>
 
         {/* Tombol pemicu navigasi aksi */}
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex shrink-0 items-center gap-2 self-start sm:self-auto">
           {/* Tombol Import Massal */}
           <Link
             href={`/admin/packages/${packageId}/import`}
-            className="h-10 px-4 border border-border bg-card text-foreground font-semibold rounded-xl text-sm shadow-sm hover:bg-muted flex items-center justify-center gap-2 transition-colors cursor-pointer"
+            className="flex h-10 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-border bg-card px-4 text-sm font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
           >
-            <UploadCloud className="w-4 h-4 text-muted-foreground" />
+            <UploadCloud className="h-4 w-4 shrink-0 text-muted-foreground" />
             <span className="hidden sm:inline">Import Massal (.JSON)</span>
             <span className="sm:hidden">Import</span>
           </Link>
@@ -80,12 +81,17 @@ export default async function AdminPackageDetailPage({ params }: AdminPackageDet
           {/* Tombol Tambah Manual */}
           <Link
             href={`/admin/packages/${packageId}/add-question`}
-            className="h-10 px-4 bg-primary text-primary-foreground font-semibold rounded-xl text-sm shadow-sm hover:opacity-90 flex items-center justify-center gap-2 transition-opacity cursor-pointer"
+            className="flex h-10 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="h-4 w-4 shrink-0" />
             <span className="hidden sm:inline">Tambah Soal Manual</span>
             <span className="sm:hidden">Manual</span>
           </Link>
+          <DeleteAllQuestionsButton
+            packageId={packageId}
+            packageTitle={currentPackage.title}
+            questionCount={questionsData.length}
+          />
         </div>
       </div>
 

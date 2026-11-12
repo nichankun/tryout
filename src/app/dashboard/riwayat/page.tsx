@@ -128,37 +128,37 @@ export default async function RiwayatPage() {
       label: TEXT_CONTENT.statTotalExams,
       value: totalUjian,
       icon: BookOpen,
-      card: "lg:bg-purple-700",
-      iconBg: "bg-purple-100 text-primary lg:bg-white/15 lg:text-white",
-      valueColor: "text-purple-950 lg:text-white",
-      labelColor: "text-primary lg:text-white/80",
+      card: "bg-purple-700",
+      iconBg: "bg-white/15 text-white",
+      valueColor: "text-white",
+      labelColor: "text-white/80",
     },
     {
       label: TEXT_CONTENT.statPassed,
       value: totalLolos,
       icon: CheckCircle2,
-      card: "lg:bg-teal-700",
-      iconBg: "bg-teal-100 text-teal-800 lg:bg-white/15 lg:text-white",
-      valueColor: "text-purple-950 lg:text-white",
-      labelColor: "text-teal-700 lg:text-white/80",
+      card: "bg-teal-700",
+      iconBg: "bg-white/15 text-white",
+      valueColor: "text-white",
+      labelColor: "text-white/80",
     },
     {
       label: TEXT_CONTENT.statAvgScore,
       value: rerataSkor,
       icon: TrendingUp,
-      card: "lg:bg-amber-700",
-      iconBg: "bg-amber-100 text-amber-800 lg:bg-white/15 lg:text-white",
-      valueColor: "text-purple-950 lg:text-white",
-      labelColor: "text-amber-700 lg:text-white/80",
+      card: "bg-amber-700",
+      iconBg: "bg-white/15 text-white",
+      valueColor: "text-white",
+      labelColor: "text-white/80",
     },
     {
       label: TEXT_CONTENT.statHighScore,
       value: skorTertinggi,
       icon: Trophy,
-      card: "lg:bg-sky-700",
-      iconBg: "bg-sky-100 text-sky-800 lg:bg-white/15 lg:text-white",
-      valueColor: "text-purple-950 lg:text-white",
-      labelColor: "text-sky-700 lg:text-white/80",
+      card: "bg-sky-700",
+      iconBg: "bg-white/15 text-white",
+      valueColor: "text-white",
+      labelColor: "text-white/80",
     },
   ] as const;
 
@@ -180,7 +180,7 @@ export default async function RiwayatPage() {
           {STAT_CARDS.map((s) => (
             <div
               key={s.label}
-              className={`flex flex-row items-center gap-3 rounded-2xl border border-purple-100 bg-white px-3 py-3 sm:gap-4 sm:px-5 sm:py-4 lg:gap-3 lg:border-transparent lg:px-4 lg:py-3 lg:text-white lg:shadow-none ${s.card}`}
+              className={`flex flex-row items-center gap-3 rounded-2xl border border-transparent px-3 py-3 shadow-[0_8px_26px_-20px_rgba(46,23,77,0.35)] sm:gap-4 sm:px-5 sm:py-4 lg:gap-3 lg:px-4 lg:py-3 lg:shadow-none ${s.card}`}
             >
               <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl sm:size-14 sm:rounded-2xl lg:size-9 lg:rounded-lg ${s.iconBg}`}>
                 <s.icon className="size-5 sm:size-6 lg:size-4" aria-hidden />
@@ -223,7 +223,95 @@ export default async function RiwayatPage() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="w-full overflow-hidden rounded-2xl border border-purple-100 bg-white shadow-none ring-0">
+        <>
+          <section className="space-y-3 lg:hidden" aria-label="Daftar riwayat tryout">
+            <div className="flex items-center gap-2 px-1 py-1 text-sm font-bold text-purple-900">
+              <BarChart3 className="size-4 text-primary" aria-hidden="true" />
+              <span>{TEXT_CONTENT.tableHeaderSummary(totalUjian)}</span>
+            </div>
+
+            {histories.map((item) => {
+              const scoreCards = [
+                {
+                  label: TEXT_CONTENT.thTwk,
+                  score: item.skorTwk,
+                  colors: "bg-purple-50 text-purple-800",
+                  scoreColor: item.skorTwk >= EXAM_THRESHOLDS.passingGrade.twk ? "text-teal-700" : "text-red-600",
+                },
+                {
+                  label: TEXT_CONTENT.thTiu,
+                  score: item.skorTiu,
+                  colors: "bg-teal-50 text-teal-800",
+                  scoreColor: item.skorTiu >= EXAM_THRESHOLDS.passingGrade.tiu ? "text-teal-700" : "text-red-600",
+                },
+                {
+                  label: TEXT_CONTENT.thTkp,
+                  score: item.skorTkp,
+                  colors: "bg-amber-50 text-amber-800",
+                  scoreColor: item.skorTkp >= EXAM_THRESHOLDS.passingGrade.tkp ? "text-teal-700" : "text-red-600",
+                },
+                {
+                  label: TEXT_CONTENT.thTotal,
+                  score: item.totalSkor,
+                  colors: "bg-sky-50 text-sky-800",
+                  scoreColor: "text-purple-950",
+                },
+              ];
+              const StatusIcon = item.isLolos ? CheckCircle2 : XCircle;
+
+              return (
+                <Card
+                  key={item.id}
+                  className="gap-0 rounded-2xl border border-purple-100 bg-white p-4 shadow-[0_8px_26px_-20px_rgba(46,23,77,0.35)]"
+                >
+                  <CardContent className="space-y-4 p-0">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-purple-950">
+                          {item.packageTitle}
+                        </p>
+                        <time className="mt-1 block text-xs text-muted-foreground" dateTime={item.endTime?.toISOString()}>
+                          {formatTanggal(item.endTime)}
+                        </time>
+                      </div>
+                      <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                        item.isLolos
+                          ? "border-teal-200 bg-teal-50 text-teal-700"
+                          : "border-amber-200 bg-amber-50 text-amber-700"
+                      }`}>
+                        <StatusIcon className="size-3.5" aria-hidden="true" />
+                        {item.isLolos ? TEXT_CONTENT.badgePassed : TEXT_CONTENT.badgeFailed}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-2" aria-label="Rincian skor">
+                      {scoreCards.map((scoreCard) => (
+                        <div key={scoreCard.label} className={`rounded-xl px-2 py-2.5 text-center ${scoreCard.colors}`}>
+                          <span className="block text-[10px] font-semibold opacity-80">{scoreCard.label}</span>
+                          <span className={`mt-1 block text-sm font-extrabold ${scoreCard.scoreColor}`}>
+                            {scoreCard.score}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      asChild
+                      className="h-10 w-full justify-between rounded-xl border-purple-200 px-3 font-semibold text-primary hover:bg-purple-50 hover:text-purple-800"
+                    >
+                      <Link href={ROUTES.detailHasil(item.packageId, item.id)}>
+                        {TEXT_CONTENT.btnDetail}
+                        <ChevronRight className="size-4" aria-hidden="true" />
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </section>
+
+        <Card className="hidden w-full gap-0 overflow-hidden rounded-2xl border border-purple-100 bg-white py-0 shadow-none ring-0 lg:block">
           {/* Card header */}
           <CardHeader className="border-b border-purple-200 bg-purple-50 px-4 md:px-5 py-3 md:py-4">
             <div className="flex items-center gap-2">
@@ -235,7 +323,7 @@ export default async function RiwayatPage() {
           </CardHeader>
 
           {/* Menambahkan wrapper overflow-x-auto agar tabel responsif di mobile */}
-          <CardContent className="p-0 overflow-x-auto">
+          <CardContent className="overflow-x-auto p-0">
             <div className="min-w-200">
               <Table>
                 <TableHeader className="bg-purple-50/60">
@@ -340,6 +428,7 @@ export default async function RiwayatPage() {
             </div>
           </CardContent>
         </Card>
+        </>
       )}
 
       {/* ── FOOTER PASSING GRADE ── */}

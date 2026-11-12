@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { logoutAction } from "@/lib/actions/auth";
+import { BrandLogo } from "@/components/brand/brand-logo";
 
 const NAV_ITEMS = [
   { id: "overview", title: "Ringkasan", href: "/dashboard", icon: LayoutDashboard },
@@ -94,12 +95,12 @@ export function DashboardSidebar({ userName, userEmail, userImage }: DashboardSi
               className="h-12 gap-3 rounded-xl px-1 text-white hover:bg-transparent hover:text-white active:bg-transparent"
             >
               <Link href="/dashboard" aria-label="ASNPedia, ringkasan dashboard">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-xs font-black tracking-tight text-white shadow-lg shadow-black/15 group-data-[collapsible=icon]:size-8">
-                  CP
-                </span>
-                <span className="text-xl font-extrabold tracking-tight group-data-[collapsible=icon]:hidden">
-                  ASN<span className="text-purple-300">Pedia</span>
-                </span>
+                <BrandLogo
+                  tone="inverse"
+                  className="gap-3"
+                  markClassName="size-10 group-data-[collapsible=icon]:size-8"
+                  textClassName="text-xl group-data-[collapsible=icon]:hidden"
+                />
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

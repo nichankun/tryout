@@ -134,10 +134,10 @@ export default async function HasilTryoutPage({ params, searchParams }: HasilPag
   ];
 
   return (
-    <div className="container mx-auto flex max-w-4xl flex-col gap-6 px-4 py-8 md:gap-8 md:px-6 md:py-10">
+    <div className="container mx-auto flex max-w-4xl flex-col gap-4 px-4 py-5 md:gap-8 md:px-6 md:py-10">
 
       {/* ── HEADER ── */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-3 md:gap-4">
         <div className="flex flex-col gap-1 border-l-4 border-primary pl-4">
           <h1 className="text-xl font-bold tracking-tight text-foreground md:text-2xl">
             Hasil Analisis Ujian
@@ -148,7 +148,7 @@ export default async function HasilTryoutPage({ params, searchParams }: HasilPag
         </div>
         <Badge
           variant="outline"
-          className="font-mono text-[11px] tracking-wider bg-purple-50 text-primary border-purple-200"
+          className="shrink-0 border-purple-200 bg-purple-50 px-2 py-1 font-mono text-[10px] tracking-wider text-primary md:px-2.5 md:text-[11px]"
         >
           ID: #{riwayat.id.toString().slice(0, 8).toUpperCase()}
         </Badge>
@@ -156,7 +156,7 @@ export default async function HasilTryoutPage({ params, searchParams }: HasilPag
 
       {/* ── STATUS BANNER ── */}
       <div
-        className={`relative overflow-hidden rounded-2xl border p-8 text-center md:p-10 ${
+        className={`relative overflow-hidden rounded-2xl border p-5 text-center md:p-10 ${
           riwayat.isLolos
             ? "border-teal-200 bg-teal-50"
             : "border-red-200 bg-red-50"
@@ -164,20 +164,20 @@ export default async function HasilTryoutPage({ params, searchParams }: HasilPag
       >
         {/* Icon */}
         <div
-          className={`mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full ${
+          className={`mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full md:mb-5 md:h-16 md:w-16 ${
             riwayat.isLolos ? "bg-teal-400" : "bg-red-400"
           }`}
         >
           {riwayat.isLolos ? (
-            <CheckCircle2 className="h-8 w-8 text-white" aria-hidden />
+            <CheckCircle2 className="h-6 w-6 text-white md:h-8 md:w-8" aria-hidden />
           ) : (
-            <XCircle className="h-8 w-8 text-white" aria-hidden />
+            <XCircle className="h-6 w-6 text-white md:h-8 md:w-8" aria-hidden />
           )}
         </div>
 
         {/* Judul status */}
         <h2
-          className={`text-xl font-bold tracking-tight md:text-2xl ${
+          className={`text-lg font-bold tracking-tight md:text-2xl ${
             riwayat.isLolos ? "text-teal-900" : "text-red-900"
           }`}
         >
@@ -195,27 +195,27 @@ export default async function HasilTryoutPage({ params, searchParams }: HasilPag
 
         {/* Divider */}
         <div
-          className={`mx-auto my-5 h-px w-12 ${
+          className={`mx-auto my-3 h-px w-10 md:my-5 md:w-12 ${
             riwayat.isLolos ? "bg-teal-200" : "bg-red-200"
           }`}
         />
 
         {/* Total skor */}
         <div
-          className={`font-mono text-6xl font-bold tracking-tighter md:text-7xl ${
+          className={`font-mono text-5xl font-bold tracking-tighter md:text-7xl ${
             riwayat.isLolos ? "text-teal-800" : "text-red-800"
           }`}
         >
           {riwayat.totalSkor}
         </div>
-        <p className="mt-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+        <p className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground md:mt-2 md:text-[11px]">
           Total Skor SKD
         </p>
       </div>
 
       {/* ── ANALISIS SUBTEST ── */}
-      <Card className="overflow-hidden border-purple-200">
-        <CardHeader className="border-b border-purple-200 bg-purple-50 px-5 py-3.5">
+      <Card className="gap-0 overflow-hidden border-purple-200 py-0">
+        <CardHeader className="border-b border-purple-200 bg-purple-50 px-4 py-3.5 md:px-5">
           <CardTitle className="flex items-center gap-2 text-sm font-bold text-purple-900">
             <BarChart3 className="h-4 w-4 text-primary" aria-hidden />
             Analisis Capaian Nilai
@@ -230,24 +230,31 @@ export default async function HasilTryoutPage({ params, searchParams }: HasilPag
             return (
               <div
                 key={item.singkatan}
-                className="grid grid-cols-1 gap-4 px-5 py-5 transition-colors hover:bg-purple-50/30 md:grid-cols-[1fr_auto_auto] md:items-center"
+                className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2.5 px-4 py-4 transition-colors hover:bg-purple-50/30 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center md:gap-6 md:px-5 md:py-5"
               >
-                {/* Kiri: label + bar */}
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2.5">
+                {/* Keterangan subtes */}
+                <div className="min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2.5">
                     <span className="rounded-full border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-[11px] font-bold text-primary">
                       {item.singkatan}
                     </span>
-                    <span className="text-sm font-semibold text-foreground">
+                    <span className="min-w-0 text-sm font-semibold text-foreground">
                       {item.kategori}
                     </span>
+                    </div>
+                    <span className={`shrink-0 font-mono text-xl font-bold md:hidden ${
+                      item.status ? "text-teal-600" : "text-red-600"
+                    }`}>
+                      {item.skor}
+                    </span>
                   </div>
-                  <p className="text-xs leading-relaxed text-muted-foreground">
+                  <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground md:mt-2">
                     {item.keterangan}
                   </p>
 
                   {/* Progress bar */}
-                  <div className="mt-1 flex flex-col gap-1">
+                  <div className="mt-2.5 flex flex-col gap-1 md:mt-3">
                     <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-purple-200/30">
                       {/* Fill */}
                       <div
@@ -271,7 +278,7 @@ export default async function HasilTryoutPage({ params, searchParams }: HasilPag
                 </div>
 
                 {/* Tengah: skor */}
-                <div className="flex flex-col items-end md:items-end">
+                <div className="hidden flex-col items-end md:flex">
                   <span
                     className={`font-mono text-2xl font-bold ${
                       item.status ? "text-teal-600" : "text-red-600"
@@ -285,7 +292,7 @@ export default async function HasilTryoutPage({ params, searchParams }: HasilPag
                 </div>
 
                 {/* Kanan: badge */}
-                <div>
+                <div className="col-span-2 flex items-center justify-between gap-3 md:col-span-1 md:justify-start">
                   {item.status ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-[11px] font-bold text-teal-600">
                       <CheckCircle2 className="h-3 w-3" />
@@ -297,6 +304,9 @@ export default async function HasilTryoutPage({ params, searchParams }: HasilPag
                       Di bawah target
                     </span>
                   )}
+                  <span className="shrink-0 text-right text-[10px] text-muted-foreground md:hidden">
+                    dari {item.maksimal} · target {item.passingGrade}
+                  </span>
                 </div>
               </div>
             );
@@ -305,22 +315,20 @@ export default async function HasilTryoutPage({ params, searchParams }: HasilPag
       </Card>
 
       {/* ── FOOTER PASSING GRADE ── */}
-      <div className="flex flex-wrap justify-center gap-3 rounded-xl border border-purple-200 bg-purple-50 px-6 py-3 text-xs text-primary">
-        <span className="font-semibold">Target nilai latihan:</span>
-        <span className="font-bold">TWK ≥ {SKD_TRAINING_THRESHOLDS.twk}</span>
-        <span className="text-purple-200">·</span>
-        <span className="font-bold">TIU ≥ {SKD_TRAINING_THRESHOLDS.tiu}</span>
-        <span className="text-purple-200">·</span>
-        <span className="font-bold">TKP ≥ {SKD_TRAINING_THRESHOLDS.tkp}</span>
-        <p className="basis-full text-center text-[11px] text-muted-foreground">Target ini untuk latihan dan bukan ambang seleksi resmi.</p>
+      <div className="grid grid-cols-3 items-center gap-2 rounded-2xl border border-purple-200 bg-purple-50 px-3 py-3 text-xs text-primary md:flex md:flex-wrap md:justify-center md:gap-3 md:px-6">
+        <span className="col-span-3 text-center font-semibold md:w-auto">Target nilai latihan:</span>
+        <span className="rounded-lg bg-white/70 px-2 py-2 text-center font-bold md:bg-transparent md:px-0 md:py-0">TWK ≥ {SKD_TRAINING_THRESHOLDS.twk}</span>
+        <span className="rounded-lg bg-white/70 px-2 py-2 text-center font-bold md:bg-transparent md:px-0 md:py-0">TIU ≥ {SKD_TRAINING_THRESHOLDS.tiu}</span>
+        <span className="rounded-lg bg-white/70 px-2 py-2 text-center font-bold md:bg-transparent md:px-0 md:py-0">TKP ≥ {SKD_TRAINING_THRESHOLDS.tkp}</span>
+        <p className="col-span-3 text-center text-[10px] text-muted-foreground md:basis-full md:text-[11px]">Target ini untuk latihan dan bukan ambang seleksi resmi.</p>
       </div>
 
       {/* ── CTA ── */}
-      <div className="flex justify-center pt-2">
+      <div className="flex justify-center pt-1 md:pt-2">
         <Button
           asChild
           size="lg"
-          className="gap-2 rounded-xl bg-primary px-8 font-bold text-primary-foreground shadow-sm hover:bg-purple-800"
+          className="h-12 w-full gap-2 rounded-xl bg-primary px-5 font-bold text-primary-foreground shadow-sm hover:bg-purple-800 sm:w-auto sm:px-8"
         >
           <Link href={`/dashboard/${p.id}/pembahasan?historyId=${riwayat.id}`}>
             <FileText className="h-4 w-4" />

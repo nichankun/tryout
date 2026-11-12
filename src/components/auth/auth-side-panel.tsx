@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import { BookOpenCheck, Check, ShieldCheck } from "lucide-react";
+import { Check, ShieldCheck } from "lucide-react";
+import { BrandLogo } from "@/components/brand/brand-logo";
 
 interface AuthSidePanelProps {
   title: string;
@@ -26,10 +27,7 @@ export function AuthSidePanel({ title, description, benefits }: AuthSidePanelPro
       </div>
 
       <Link href="/" className="relative z-10 inline-flex w-fit items-center gap-3" aria-label="ASNPedia, beranda">
-        <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-white shadow-lg backdrop-blur-sm">
-          <BookOpenCheck className="h-5 w-5" aria-hidden />
-        </span>
-        <span className="text-xl font-extrabold tracking-tight">ASN<span className="text-violet-200">Pedia</span></span>
+        <BrandLogo tone="inverse" markClassName="size-11" textClassName="text-xl" />
       </Link>
 
       <div className="relative z-10 my-12 max-w-xl">

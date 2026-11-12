@@ -25,13 +25,13 @@ import {
   BookOpen, 
   CreditCard, 
   Settings, 
-  ShieldCheck,
   ScrollText,
   LogOut // 👈 Ditambahkan untuk ikon keluar
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logoutAction } from "@/lib/actions/auth";
+import { BrandMark } from "@/components/brand/brand-logo";
 
 // ==========================================
 // KONSTANTA & KONFIGURASI (Bebas Hardcode)
@@ -73,9 +73,7 @@ export function AppSidebar() {
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground hover:bg-transparent active:bg-transparent cursor-default"
             >
               {/* Container Icon - Menggunakan aspect-square dan size-8 agar presisi saat collapsible=icon */}
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm shrink-0">
-                <ShieldCheck className="size-5" aria-hidden />
-              </div>
+              <BrandMark className="size-8" />
               
               {/* Container Teks - Otomatis tersembunyi dengan rapi berkat selektor internal shadcn */}
               <div className="grid flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden">

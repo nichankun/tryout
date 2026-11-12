@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { SERVICE_FEE } from "@/lib/constants/billing";
 import { TIMER_CONFIG } from "@/types/tryout";
+import { BrandLogo } from "@/components/brand/brand-logo";
 
 export const dynamic = "force-dynamic";
 
@@ -123,10 +124,11 @@ export default async function HomePage() {
       <section id="beranda" className="relative isolate min-h-[100svh] scroll-mt-16 overflow-hidden bg-[radial-gradient(ellipse_at_70%_48%,rgba(187,161,255,0.13),transparent_52%),linear-gradient(115deg,#fbf8ff_0%,#f7f4fc_64%,#f4f0fb_100%)] sm:min-h-[760px] lg:min-h-[100svh]">
         <header className="relative z-20 mx-auto flex h-16 w-full items-center justify-between px-5 pt-0 sm:h-[clamp(5.25rem,7.4vw,7.75rem)] sm:px-10 sm:pt-[clamp(2rem,2.6vw,2.75rem)] lg:px-[5.4vw]">
           <Link href="/" className="relative inline-flex items-center" aria-label="ASNPedia, beranda">
-            <span className="relative text-[clamp(2rem,2.65vw,2.75rem)] font-black leading-none tracking-[-0.065em] text-purple-950">
-              ASN<span className="text-primary">Pedia</span>
-              <span aria-hidden="true" className="absolute -top-[0.45rem] left-[42%] h-[clamp(0.55rem,0.72vw,0.75rem)] w-[clamp(1.5rem,2.4vw,2.5rem)] -rotate-[12deg] rounded-[100%] border-t-[5px] border-amber-400" />
-            </span>
+            <BrandLogo
+              className="gap-2"
+              markClassName="size-9 sm:size-11"
+              textClassName="text-[clamp(1.75rem,2.65vw,2.5rem)] tracking-[-0.055em]"
+            />
           </Link>
           <Link
             href="/login"
@@ -395,7 +397,9 @@ export default async function HomePage() {
       <footer className="border-t border-purple-100/80 bg-white">
         <div className="mx-auto flex max-w-[1880px] flex-col gap-6 px-5 py-8 sm:px-8 md:px-10 lg:flex-row lg:items-center lg:justify-between lg:gap-8 lg:py-9">
           <div className="max-w-2xl">
-            <Link href="/" className="text-lg font-extrabold tracking-tight text-purple-950">ASNPedia</Link>
+            <Link href="/" className="inline-flex items-center" aria-label="ASNPedia, beranda">
+              <BrandLogo className="gap-2" markClassName="size-7" textClassName="text-lg" />
+            </Link>
             <p className="mt-1.5 text-sm leading-6 text-muted-foreground">Layanan latihan mandiri. Tidak berafiliasi dengan BKN dan tidak menjamin hasil seleksi resmi.</p>
           </div>
           <nav className="flex flex-wrap gap-x-6 gap-y-3 text-sm font-semibold text-purple-950" aria-label="Kebijakan dan bantuan">

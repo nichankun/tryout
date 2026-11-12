@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: { default: "ASNPedia — Latihan SKD CPNS", template: "%s | ASNPedia" },
   description: "Platform latihan tryout SKD CPNS dengan hasil skor dan pembahasan.",
+  icons: { icon: "/asnpedia-mark.svg" },
 };
 
 export default function RootLayout({

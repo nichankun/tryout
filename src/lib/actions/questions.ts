@@ -10,10 +10,10 @@
 
 import { requireAdminAccess } from "@/lib/authz";
 import { db } from "@/db";
-import { adminAuditLogs, questions } from "@/db/database/schema";
+import { adminAuditLogs, questions, tryoutAttempts, tryoutPackages } from "@/db/database/schema";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { and, eq, gt } from "drizzle-orm";
 import { createAdminAuditEntry } from "@/lib/security/admin-audit";
 
 // ==========================================
@@ -29,6 +29,8 @@ const ERROR_MESSAGES = {
   internalError: "Terjadi kegagalan sistem pada server database.",
   emptyImport:   "File JSON kosong, tidak ada soal untuk di-import.",
   invalidImage:  "Gambar harus diunggah ke paket yang sama dengan soal.",
+  packageNotFound: "Paket tidak ditemukan.",
+  activeAttempts: "Soal tidak dapat dihapus saat ada peserta yang masih mengerjakan paket ini.",
 } as const;
 
 // ==========================================
@@ -298,6 +300,80 @@ export async function deleteQuestionAction(questionId: number, packageId: number
     });
     revalidatePath(`/admin/packages/${packageId}`);
     return { success: true as const };
+  } catch (error: unknown) {
+    return handleActionError(error);
+  }
+}
+
+// ==========================================
+// ACTION 5: DELETE ALL QUESTIONS IN PACKAGE
+// ==========================================
+export async function deleteAllPackageQuestionsAction(packageId: number) {
+  try {
+    const actor = await requireAdminAccess();
+    const parsedPackageId = z.number().int().positive().safeParse(packageId);
+
+    if (!parsedPackageId.success) {
+      return { success: false as const, error: ERROR_MESSAGES.invalidFormat };
+    }
+
+    const result = await db.transaction(async (tx) => {
+      const [targetPackage] = await tx
+        .select({ id: tryoutPackages.id, title: tryoutPackages.title })
+        .from(tryoutPackages)
+        .where(eq(tryoutPackages.id, parsedPackageId.data))
+        .limit(1);
+
+      if (!targetPackage) {
+        return { status: "missing" as const, deletedCount: 0 };
+      }
+
+      const [activeAttempt] = await tx
+        .select({ id: tryoutAttempts.id })
+        .from(tryoutAttempts)
+        .where(and(
+          eq(tryoutAttempts.packageId, parsedPackageId.data),
+          eq(tryoutAttempts.status, "in_progress"),
+          gt(tryoutAttempts.expiresAt, new Date()),
+        ))
+        .limit(1);
+
+      if (activeAttempt) {
+        return { status: "active" as const, deletedCount: 0 };
+      }
+
+      const deletedQuestions = await tx
+        .delete(questions)
+        .where(eq(questions.packageId, parsedPackageId.data))
+        .returning({ id: questions.id });
+
+      if (deletedQuestions.length > 0) {
+        await tx.insert(adminAuditLogs).values(createAdminAuditEntry(actor, {
+          action: "questions.bulk_deleted",
+          targetType: "package",
+          targetId: String(parsedPackageId.data),
+          metadata: {
+            packageId: parsedPackageId.data,
+            title: targetPackage.title,
+            count: deletedQuestions.length,
+          },
+        }));
+      }
+
+      return { status: "success" as const, deletedCount: deletedQuestions.length };
+    });
+
+    if (result.status === "missing") {
+      return { success: false as const, error: ERROR_MESSAGES.packageNotFound };
+    }
+
+    if (result.status === "active") {
+      return { success: false as const, error: ERROR_MESSAGES.activeAttempts };
+    }
+
+    revalidatePath(`/admin/packages/${parsedPackageId.data}`);
+    revalidatePath("/admin/packages");
+    return { success: true as const, deletedCount: result.deletedCount };
   } catch (error: unknown) {
     return handleActionError(error);
   }
