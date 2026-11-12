@@ -63,7 +63,7 @@ export default async function RegisterPage() {
       />
 
       <section className="flex min-h-screen items-center justify-center px-4 py-8 sm:px-8 lg:bg-white lg:px-10">
-        <div className="w-full max-w-md rounded-[1.75rem] border border-purple-100 bg-white p-6 shadow-xl shadow-purple-950/5 sm:p-8 lg:border-0 lg:p-0 lg:shadow-none">
+        <div className="w-full max-w-md bg-transparent px-2 py-6 sm:rounded-[1.75rem] sm:border sm:border-purple-100 sm:bg-white sm:p-8 sm:shadow-xl sm:shadow-purple-950/5 lg:border-0 lg:bg-white lg:p-0 lg:shadow-none">
           <Link href={ROUTES.home} className="mb-8 inline-flex items-center gap-2.5 lg:hidden" aria-label="ASNPedia, beranda">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
               <BookOpenCheck className="h-4 w-4" aria-hidden />

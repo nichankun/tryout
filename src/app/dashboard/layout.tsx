@@ -29,11 +29,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
           userImage={user?.image}
         />
         <SidebarInset className="flex min-h-svh min-w-0 flex-col bg-background pb-[calc(4.5rem+env(safe-area-inset-bottom))] text-foreground antialiased md:pb-0">
-          <DashboardHeader
-            userName={user?.name ?? "Pengguna"}
-            userEmail={user?.email ?? ""}
-            userImage={user?.image}
-          />
+          <DashboardHeader />
           <main className="flex min-w-0 flex-1 flex-col">{children}</main>
           <DashboardFooter />
         </SidebarInset>

@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   CheckCircle2, XCircle, BarChart3,
-  Clock, ChevronRight, FileText,
+  ChevronRight, FileText, ArrowRight,
   Trophy, TrendingUp, BookOpen,
 } from "lucide-react";
 import {
@@ -34,8 +34,8 @@ const EXAM_THRESHOLDS = {
 } as const;
 
 const ROUTES = {
-  loginRedirect: "/login?callbackUrl=/riwayat",
-  dashboard: "/dashboard",
+  loginRedirect: "/login?callbackUrl=/dashboard/riwayat",
+  packages: "/dashboard/paket",
   detailHasil: (packageId: number, historyId: string) =>
     `/dashboard/${packageId}/hasil?historyId=${historyId}`,
 } as const;
@@ -122,112 +122,108 @@ export default async function RiwayatPage() {
 
   const rerataSkor = totalUjian > 0 ? Math.round(akumulasiSkor / totalUjian) : 0;
 
-  // Konfigurasi stat cards dengan tema warna tegas per metrik
+  // Warna aksen metrik mengikuti ringkasan dashboard.
   const STAT_CARDS = [
     {
       label: TEXT_CONTENT.statTotalExams,
       value: totalUjian,
       icon: BookOpen,
-      card: "bg-purple-50 border-purple-200",
-      iconBg: "bg-primary",
-      valueColor: "text-purple-900",
-      labelColor: "text-primary",
+      card: "lg:bg-purple-700",
+      iconBg: "bg-purple-100 text-primary lg:bg-white/15 lg:text-white",
+      valueColor: "text-purple-950 lg:text-white",
+      labelColor: "text-primary lg:text-white/80",
     },
     {
       label: TEXT_CONTENT.statPassed,
       value: totalLolos,
       icon: CheckCircle2,
-      card: "bg-teal-50 border-teal-200",
-      iconBg: "bg-teal-600",
-      valueColor: "text-teal-900",
-      labelColor: "text-teal-600",
+      card: "lg:bg-teal-700",
+      iconBg: "bg-teal-100 text-teal-800 lg:bg-white/15 lg:text-white",
+      valueColor: "text-purple-950 lg:text-white",
+      labelColor: "text-teal-700 lg:text-white/80",
     },
     {
       label: TEXT_CONTENT.statAvgScore,
       value: rerataSkor,
       icon: TrendingUp,
-      card: "bg-amber-50 border-amber-100",
-      iconBg: "bg-amber-400",
-      valueColor: "text-amber-900",
-      labelColor: "text-amber-600",
+      card: "lg:bg-amber-700",
+      iconBg: "bg-amber-100 text-amber-800 lg:bg-white/15 lg:text-white",
+      valueColor: "text-purple-950 lg:text-white",
+      labelColor: "text-amber-700 lg:text-white/80",
     },
     {
       label: TEXT_CONTENT.statHighScore,
       value: skorTertinggi,
       icon: Trophy,
-      card: "bg-red-50 border-red-200",
-      iconBg: "bg-red-600",
-      valueColor: "text-red-900",
-      labelColor: "text-red-600",
+      card: "lg:bg-sky-700",
+      iconBg: "bg-sky-100 text-sky-800 lg:bg-white/15 lg:text-white",
+      valueColor: "text-purple-950 lg:text-white",
+      labelColor: "text-sky-700 lg:text-white/80",
     },
   ] as const;
 
   return (
-    // Penyesuaian px-4 md:px-6 agar aman di layar HP
-    <div className="container mx-auto flex flex-col gap-6 md:gap-8 px-4 md:px-6 py-6 md:py-10 max-w-5xl">
-
-      {/* ── HEADER ── */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex flex-col gap-1 border-l-4 border-primary pl-4">
-          <div className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-primary" aria-hidden />
-            <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground">
-              {TEXT_CONTENT.title}
-            </h1>
-          </div>
-          <p className="text-sm text-muted-foreground">
+    <div className="min-h-full bg-[#F7F5FC]">
+      <div className="mx-auto flex w-full max-w-[1560px] flex-col gap-6 px-4 py-6 sm:px-6 lg:gap-6 lg:px-8 lg:py-8 xl:px-10">
+        <header>
+          <h1 className="text-2xl font-extrabold tracking-[-0.035em] text-purple-950 sm:text-[2.15rem] lg:text-[2rem]">
+            {TEXT_CONTENT.title}
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base lg:text-sm">
             {TEXT_CONTENT.subtitle}
           </p>
-        </div>
-      </div>
+        </header>
 
-      {/* ── STAT CARDS ── */}
-      {totalUjian > 0 && (
-        <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
+        {/* ── STAT CARDS ── */}
+        {totalUjian > 0 && (
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           {STAT_CARDS.map((s) => (
             <div
               key={s.label}
-              className={`flex flex-col items-center gap-2 md:gap-3 rounded-2xl border p-4 md:p-5 transition-all duration-200 hover:-translate-y-1 ${s.card}`}
+              className={`flex flex-row items-center gap-3 rounded-2xl border border-purple-100 bg-white px-3 py-3 sm:gap-4 sm:px-5 sm:py-4 lg:gap-3 lg:border-transparent lg:px-4 lg:py-3 lg:text-white lg:shadow-none ${s.card}`}
             >
-              <div className={`flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-full ${s.iconBg}`}>
-                <s.icon className="h-4 w-4 md:h-5 md:w-5 text-white" aria-hidden />
-              </div>
-              <div className="flex flex-col items-center text-center">
-                <span className={`text-2xl md:text-3xl font-extrabold ${s.valueColor}`}>
-                  {s.value}
-                </span>
-                <span className={`mt-0.5 text-[10px] md:text-xs font-medium ${s.labelColor}`}>
+              <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl sm:size-14 sm:rounded-2xl lg:size-9 lg:rounded-lg ${s.iconBg}`}>
+                <s.icon className="size-5 sm:size-6 lg:size-4" aria-hidden />
+              </span>
+              <div className="min-w-0">
+                <span className={`block text-xs font-semibold leading-tight sm:text-sm lg:text-xs ${s.labelColor}`}>
                   {s.label}
+                </span>
+                <span className={`mt-0.5 block truncate text-xl font-extrabold tracking-tight sm:text-[1.75rem] lg:text-2xl ${s.valueColor}`}>
+                  {s.value}
                 </span>
               </div>
             </div>
           ))}
-        </div>
-      )}
+          </div>
+        )}
 
       {/* ── TABEL / EMPTY STATE ── */}
       {totalUjian === 0 ? (
-        <Card className="border-purple-200 bg-purple-50 mx-auto w-full max-w-lg">
-          <CardContent className="space-y-3 py-16 md:py-20 text-center">
-            <div className="mx-auto flex h-14 w-14 md:h-16 md:w-16 items-center justify-center rounded-full bg-primary">
-              <FileText className="h-6 w-6 md:h-8 md:w-8 text-white" aria-hidden />
-            </div>
-            <p className="font-semibold text-purple-900">
+        <Card className="w-full gap-0 rounded-2xl border border-purple-100 bg-white py-8 shadow-none ring-0 lg:py-7">
+          <CardContent className="flex flex-col items-center justify-center p-0 text-center">
+            <span className="flex size-10 items-center justify-center rounded-xl bg-purple-50 text-primary lg:size-9">
+              <FileText className="size-5 lg:size-4" aria-hidden />
+            </span>
+            <p className="mt-3 font-bold text-purple-950">
               {TEXT_CONTENT.emptyStateTitle}
             </p>
-            <p className="mx-auto max-w-sm text-xs md:text-sm text-purple-800 px-4">
+            <p className="mx-auto mt-1 max-w-sm px-4 text-sm text-muted-foreground lg:text-xs">
               {TEXT_CONTENT.emptyStateDesc}
             </p>
             <Button
               asChild
-              className="mt-2 bg-primary hover:bg-purple-800 font-semibold text-primary-foreground"
+              className="mt-5 h-10 rounded-xl bg-primary px-4 font-semibold text-primary-foreground hover:bg-purple-800"
             >
-              <Link href={ROUTES.dashboard}>{TEXT_CONTENT.emptyStateBtn}</Link>
+              <Link href={ROUTES.packages}>
+                {TEXT_CONTENT.emptyStateBtn}
+                <ArrowRight className="ml-2 size-4" aria-hidden="true" />
+              </Link>
             </Button>
           </CardContent>
         </Card>
       ) : (
-        <Card className="w-full overflow-hidden border-purple-200 shadow-sm">
+        <Card className="w-full overflow-hidden rounded-2xl border border-purple-100 bg-white shadow-none ring-0">
           {/* Card header */}
           <CardHeader className="border-b border-purple-200 bg-purple-50 px-4 md:px-5 py-3 md:py-4">
             <div className="flex items-center gap-2">
@@ -347,15 +343,18 @@ export default async function RiwayatPage() {
       )}
 
       {/* ── FOOTER PASSING GRADE ── */}
-      <div className="flex flex-wrap justify-center items-center gap-x-3 gap-y-2 rounded-xl border border-purple-200 bg-purple-50 p-4 text-xs text-primary w-full max-w-lg mx-auto md:max-w-none">
-        <span className="font-semibold w-full text-center md:w-auto md:text-left">{TEXT_CONTENT.footerThresholds}</span>
-        <span className="font-bold">TWK ≥ {EXAM_THRESHOLDS.passingGrade.twk}</span>
-        <span className="text-purple-200 hidden md:inline">·</span>
-        <span className="font-bold">TIU ≥ {EXAM_THRESHOLDS.passingGrade.tiu}</span>
-        <span className="text-purple-200 hidden md:inline">·</span>
-        <span className="font-bold">TKP ≥ {EXAM_THRESHOLDS.passingGrade.tkp}</span>
-      </div>
+      {totalUjian > 0 && (
+        <div className="flex w-full flex-wrap items-center justify-center gap-x-3 gap-y-2 rounded-xl border border-purple-100 bg-white px-4 py-3 text-xs text-muted-foreground">
+          <span className="w-full text-center font-semibold text-purple-900 sm:w-auto">{TEXT_CONTENT.footerThresholds}</span>
+          <span className="font-bold text-purple-800">TWK ≥ {EXAM_THRESHOLDS.passingGrade.twk}</span>
+          <span className="hidden text-purple-200 sm:inline">·</span>
+          <span className="font-bold text-purple-800">TIU ≥ {EXAM_THRESHOLDS.passingGrade.tiu}</span>
+          <span className="hidden text-purple-200 sm:inline">·</span>
+          <span className="font-bold text-purple-800">TKP ≥ {EXAM_THRESHOLDS.passingGrade.tkp}</span>
+        </div>
+      )}
 
+      </div>
     </div>
   );
 }

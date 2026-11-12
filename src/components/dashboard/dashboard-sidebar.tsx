@@ -1,9 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BookOpenCheck,
   ChevronDown,
   History,
   LayoutDashboard,
@@ -153,30 +153,20 @@ export function DashboardSidebar({ userName, userEmail, userImage }: DashboardSi
               </Avatar>
               <span className="min-w-0 flex-1 text-left group-data-[collapsible=icon]:hidden">
                 <span className="block truncate text-sm font-semibold">{userName}</span>
-                <span className="block text-[10px] font-medium text-white/55">Akun peserta</span>
+                <span className="block text-[11px] font-medium text-white/55 md:text-[10px]">Akun peserta</span>
               </span>
               <ChevronDown className="size-4 text-white/70 group-data-[collapsible=icon]:hidden" aria-hidden="true" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="top" align="start" className="w-60 rounded-xl border-purple-200 p-1.5 shadow-xl">
-            <DropdownMenuLabel className="px-2.5 py-2 font-normal">
-              <span className="block truncate text-sm font-semibold text-foreground">{userName}</span>
-              {userEmail ? <span className="mt-1 block truncate text-xs text-muted-foreground">{userEmail}</span> : null}
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator className="bg-purple-100" />
-            <DropdownMenuItem asChild className="cursor-pointer rounded-lg focus:bg-purple-50 focus:text-primary">
-              <Link href="/dashboard/profil" onClick={() => isMobile && setOpenMobile(false)}>
-                <UserRound className="size-4 text-primary" aria-hidden="true" />
-                Profil
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild className="cursor-pointer rounded-lg focus:bg-purple-50 focus:text-primary">
-              <Link href="/dashboard/riwayat" onClick={() => isMobile && setOpenMobile(false)}>
-                <BookOpenCheck className="size-4 text-primary" aria-hidden="true" />
-                Riwayat tryout
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator className="bg-purple-100" />
+            {userEmail ? (
+              <>
+                <DropdownMenuLabel className="truncate px-2.5 py-2 font-normal">
+                  {userEmail}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-purple-100" />
+              </>
+            ) : null}
             <DropdownMenuItem
               variant="destructive"
               className="cursor-pointer rounded-lg"
@@ -195,6 +185,11 @@ export function DashboardSidebar({ userName, userEmail, userImage }: DashboardSi
 export function DashboardMobileNav() {
   const pathname = usePathname();
   const activeItem = getActiveItem(pathname);
+  const [pendingNavigation, setPendingNavigation] = useState<{
+    fromPath: string;
+    item: NavItemId;
+  } | null>(null);
+  const pendingItem = pendingNavigation?.fromPath === pathname ? pendingNavigation.item : null;
 
   return (
     <nav
@@ -204,17 +199,30 @@ export function DashboardMobileNav() {
       <div className="mx-auto flex h-full max-w-lg items-stretch justify-around px-2">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
-          const isActive = activeItem === item.id;
+          const isActive = (pendingItem ?? activeItem) === item.id;
 
           return (
             <Link
               key={item.id}
               href={item.href}
               aria-current={isActive ? "page" : undefined}
-              className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+              onClick={(event) => {
+                if (
+                  event.defaultPrevented ||
+                  event.button !== 0 ||
+                  event.metaKey ||
+                  event.ctrlKey ||
+                  event.shiftKey ||
+                  event.altKey ||
+                  item.href === pathname
+                ) return;
+
+                setPendingNavigation({ fromPath: pathname, item: item.id });
+              }}
+              className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[11px] font-semibold touch-manipulation transition-[color,transform] duration-100 ease-out active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary motion-reduce:transition-none ${isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
             >
               <span
-                className={`flex min-w-14 items-center justify-center rounded-full px-4 py-1 transition-colors ${isActive ? "bg-primary/10" : ""}`}
+                className={`flex min-w-14 items-center justify-center rounded-full px-4 py-1 transition-colors duration-100 ${isActive ? "bg-primary/10" : "active:bg-primary/10"}`}
               >
                 <Icon className="size-5" aria-hidden="true" />
               </span>

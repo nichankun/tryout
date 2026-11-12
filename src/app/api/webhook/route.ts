@@ -104,7 +104,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("[Midtrans Webhook Error] Notifikasi gagal diverifikasi atau diproses:", error);
+    console.error(
+      "[Midtrans Webhook] Verification or processing failed:",
+      error instanceof Error ? error.name : "UnknownError",
+    );
     return NextResponse.json({ error: "WEBHOOK_PROCESSING_FAILED" }, { status: 500 });
   }
 }

@@ -5,6 +5,7 @@ import { adminAuditLogs, tryoutPackages } from "@/db/database/schema";
 import { requireAdminAccess } from "@/lib/authz";
 import { createAdminAuditEntry } from "@/lib/security/admin-audit";
 import { consumeAccountRateLimit } from "@/lib/security/rate-limit";
+import { isTrustedRequestOrigin } from "@/lib/security/request-origin";
 import {
   InvalidQuestionImageError,
   QuestionImageStorageConfigurationError,
@@ -16,43 +17,8 @@ export const dynamic = "force-dynamic";
 
 const MAX_REQUEST_SIZE = 4 * 1024 * 1024 + 64 * 1024;
 
-function getExpectedAppOrigin(request: Request) {
-  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.AUTH_URL?.trim();
-
-  if (!configuredUrl) {
-    return process.env.NODE_ENV === "production" ? null : new URL(request.url).origin;
-  }
-
-  try {
-    const url = new URL(configuredUrl);
-    if (
-      !["http:", "https:"].includes(url.protocol) ||
-      (process.env.NODE_ENV === "production" && url.protocol !== "https:")
-    ) {
-      return null;
-    }
-    return url.origin;
-  } catch {
-    return null;
-  }
-}
-
 export async function POST(request: Request) {
-  const expectedOrigin = getExpectedAppOrigin(request);
-  if (!expectedOrigin) {
-    return NextResponse.json({ error: "Alamat aplikasi production belum dikonfigurasi dengan benar." }, { status: 503 });
-  }
-
-  const origin = request.headers.get("origin");
-  let requestOrigin: string;
-  try {
-    if (!origin || origin === "null") throw new Error("missing origin");
-    requestOrigin = new URL(origin).origin;
-  } catch {
-    return NextResponse.json({ error: "Permintaan unggah tidak diizinkan." }, { status: 403 });
-  }
-
-  if (requestOrigin !== expectedOrigin) {
+  if (!isTrustedRequestOrigin(request)) {
     return NextResponse.json({ error: "Permintaan unggah tidak diizinkan." }, { status: 403 });
   }
 

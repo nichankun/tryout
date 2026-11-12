@@ -7,6 +7,8 @@ import { auth } from "@/auth";
 import { db } from "@/db";
 import { orders, questions, tryoutPackages, userAccess } from "@/db/database/schema";
 import { SERVICE_FEE } from "@/lib/constants/billing";
+import { isTrustedRequestOrigin } from "@/lib/security/request-origin";
+import { consumeAccountRateLimit } from "@/lib/security/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +35,23 @@ export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
+  if (!isTrustedRequestOrigin(request)) {
+    return NextResponse.json({ error: "FORBIDDEN_ORIGIN" }, { status: 403 });
+  }
+
+  const rateLimit = await consumeAccountRateLimit({
+    namespace: "payment-create",
+    headers: request.headers,
+    identifier: session.user.id,
+    limit: 5,
+    windowMs: 10 * 60 * 1000,
+  });
+  if (rateLimit.storageUnavailable) {
+    return NextResponse.json({ error: "SERVICE_UNAVAILABLE" }, { status: 503, headers: { "Retry-After": "60" } });
+  }
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: "TOO_MANY_REQUESTS" }, { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } });
   }
 
   let rawBody: unknown;
@@ -105,7 +124,10 @@ export async function POST(request: Request) {
       throw error;
     }
   } catch (error) {
-    console.error("[POST /api/payment] Error:", error);
+    console.error(
+      "[POST /api/payment] Payment processing failed:",
+      error instanceof Error ? error.name : "UnknownError",
+    );
     return NextResponse.json({ error: "PAYMENT_FAILED" }, { status: 502 });
   }
 }

@@ -85,7 +85,7 @@ const VolumeCard = memo(function VolumeCard({
 
         <div className="absolute inset-x-4 bottom-4 text-white sm:inset-x-5 sm:bottom-5">
           <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-white/75">Volume {paddedId}</p>
-          <CardTitle className="mt-1 line-clamp-1 text-xl font-extrabold leading-tight text-white drop-shadow-sm sm:text-2xl">
+          <CardTitle className="mt-1 line-clamp-1 text-lg font-extrabold leading-tight text-white drop-shadow-sm sm:text-2xl">
             {vol.title}
           </CardTitle>
         </div>
@@ -97,7 +97,7 @@ const VolumeCard = memo(function VolumeCard({
             <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
               {isUnavailable ? "Status paket" : isFinished ? "Skor terakhir" : isLocked ? "Harga paket" : "Status akses"}
             </p>
-            <p className="mt-1 truncate text-2xl font-extrabold tracking-tight text-purple-950">
+            <p className="mt-1 truncate text-xl font-extrabold tracking-tight text-purple-950 sm:text-2xl">
               {isUnavailable
                 ? "Segera hadir"
                 : isFinished && vol.lastHistory
@@ -194,17 +194,19 @@ export function TryoutGrid({ volumes }: { volumes: TryoutVolume[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="relative w-full sm:max-w-[300px]">
-        <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-        <Input
-          type="search"
-          placeholder="Cari paket latihan..."
-          aria-label="Cari paket latihan"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          className="h-10 rounded-xl border-purple-100 bg-white pl-10 text-xs shadow-sm placeholder:text-muted-foreground/80"
-        />
-      </div>
+      {volumes.length > 0 ? (
+        <div className="relative w-full sm:max-w-[300px]">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <Input
+            type="search"
+            placeholder="Cari paket latihan..."
+            aria-label="Cari paket latihan"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            className="h-10 rounded-xl border-purple-100 bg-white pl-10 text-xs shadow-sm placeholder:text-muted-foreground/80"
+          />
+        </div>
+      ) : null}
 
       {filtered.length > 0 ? (
         <div className="grid grid-cols-1 items-stretch gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -213,12 +215,12 @@ export function TryoutGrid({ volumes }: { volumes: TryoutVolume[] }) {
           ))}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-purple-200 bg-white/70 py-12 text-center">
-          <span className="flex size-12 items-center justify-center rounded-2xl bg-purple-50 text-primary">
-            <EmptyIcon className="size-5" aria-hidden="true" />
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-purple-100 bg-white py-8 text-center lg:py-7">
+          <span className="flex size-10 items-center justify-center rounded-xl bg-purple-50 text-primary lg:size-9">
+            <EmptyIcon className="size-5 lg:size-4" aria-hidden="true" />
           </span>
-          <h3 className="mt-4 text-base font-bold text-purple-950">{emptyTitle}</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h3 className="mt-3 text-base font-bold text-purple-950">{emptyTitle}</h3>
+          <p className="mt-1 text-sm text-muted-foreground lg:text-xs">
             {emptyDescription}
           </p>
         </div>

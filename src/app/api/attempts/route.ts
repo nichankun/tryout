@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { tryoutAttemptAnswers, tryoutAttempts, questions, userAccess } from "@/db/database/schema";
 import { TIMER_CONFIG } from "@/types/tryout";
 import { consumeAccountRateLimit } from "@/lib/security/rate-limit";
+import { isTrustedRequestOrigin } from "@/lib/security/request-origin";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,9 @@ export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
+  if (!isTrustedRequestOrigin(request)) {
+    return NextResponse.json({ error: "FORBIDDEN_ORIGIN" }, { status: 403 });
   }
 
   let rawBody: unknown;
