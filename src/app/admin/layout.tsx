@@ -6,25 +6,19 @@
  * menginisialisasi provider sidebar collapsible, serta menyediakan shell antarmuka yang konsisten.
  */
 
-import { redirect } from "next/navigation";
-import { auth } from "@/auth";
-import { getDatabaseRole } from "@/lib/authz";
+import type { Metadata } from "next";
+import { requireAdminPageAccess } from "@/lib/authz";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
+
 // ==========================================
 // KONSTANTA & KONFIGURASI (Bebas Hardcode)
 // ==========================================
-const STRATEGIC_ROUTES = {
-  unauthenticatedRedirect: "/login",
-  unauthorizedRedirect: "/dashboard",
-} as const;
-
-const ACCESS_CONTROL = {
-  requiredRole: "ADMIN",
-} as const;
-
 interface AdminLayoutProps {
   children: React.ReactNode;
 }
@@ -33,19 +27,7 @@ interface AdminLayoutProps {
 // KOMPONEN UTAMA
 // ==========================================
 export default async function AdminLayout({ children }: AdminLayoutProps) {
-  
-  // ── 1. Server-side Better Auth session check ──
-  const session = await auth();
-
-  // A. Hadang jika token sesi tidak ditemukan
-  if (!session?.user) {
-    redirect(STRATEGIC_ROUTES.unauthenticatedRedirect);
-  }
-
-  // B. Hadang jika pengguna bukan entitas Administrator Resmi
-  if ((await getDatabaseRole(session.user.id)) !== ACCESS_CONTROL.requiredRole) {
-    redirect(STRATEGIC_ROUTES.unauthorizedRedirect);
-  }
+  await requireAdminPageAccess();
 
   return (
     <TooltipProvider delayDuration={0}>

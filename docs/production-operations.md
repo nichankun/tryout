@@ -11,9 +11,30 @@ Isi secret di dashboard hosting, bukan di source code atau commit Git. Salin daf
 - `RESEND_API_KEY` dan `RESEND_FROM_EMAIL` dari domain email yang sudah diverifikasi.
 - `BUSINESS_LEGAL_NAME`, `BUSINESS_CONTACT_ADDRESS`, `SUPPORT_EMAIL`, `SUPPORT_PHONE`, `POLICY_EFFECTIVE_DATE`.
 - Kunci Midtrans produksi dan `MIDTRANS_IS_PRODUCTION=true` sebelum menerima transaksi nyata.
+- `CRON_SECRET` acak minimal 32 byte untuk melindungi job rekonsiliasi pembayaran.
 - Bucket S3-compatible, region, endpoint bila penyedia memerlukannya, dan access key khusus aplikasi.
 
 Jalankan `pnpm preflight:production` pada environment produksi setelah secret dimasukkan. Pemeriksaan ini memeriksa nama variabel, URL, dan format dasar. Ia tidak menghubungi PostgreSQL, Google, Resend, Midtrans, atau S3 untuk membuktikan credential berfungsi.
+
+Untuk membuat secret rekonsiliasi, jalankan `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"` secara lokal, lalu simpan hasilnya sebagai secret `CRON_SECRET` di Dokploy. Jangan menyimpan hasilnya di repository atau menaruhnya langsung pada command job.
+
+## Pembayaran Midtrans
+
+1. Atur `MIDTRANS_IS_PRODUCTION=true`, lalu simpan Server Key dan Client Key Production di secret Dokploy.
+2. Di Midtrans Dashboard, set **Payment Notification URL** ke `https://<domain-produksi>/api/webhook`. Endpoint harus HTTPS dan dapat diakses dari internet publik tanpa login, Basic Auth, VPN, atau header rahasia tambahan.
+3. Tambahkan **Application Job** di Dokploy untuk service aplikasi. Jalankan setiap lima menit dengan cron `*/5 * * * *` dan command berikut:
+
+   ```sh
+   node -e "fetch(new URL('/api/cron/payments/reconcile',process.env.NEXT_PUBLIC_APP_URL),{method:'POST',headers:{authorization:'Bearer '+process.env.CRON_SECRET},signal:AbortSignal.timeout(180000)}).then(async r=>{const body=await r.text();console.log(body);if(!r.ok)process.exitCode=1}).catch(e=>{console.error(e.name);process.exitCode=1})"
+   ```
+
+   Job memakai `NEXT_PUBLIC_APP_URL` dan `CRON_SECRET` dari environment service. Jalankan sekali secara manual setelah deploy, pastikan respons berisi `success: true`, lalu periksa log schedule Dokploy secara berkala.
+4. Jalankan migration yang menambah data refund, penanda pembayaran ganda, status rekonsiliasi, dan index pembayaran dengan alur bagian database di bawah sebelum membuka checkout.
+5. Lakukan transaksi bernilai kecil setelah Midtrans menyetujui akun Production. Pastikan notifikasi sukses terlihat di Midtrans, order menjadi lunas, dan akses paket terbuka. Uji satu transaksi gagal/kedaluwarsa dan satu refund melalui Dashboard sebelum membuka pembayaran untuk semua pelanggan.
+
+Job rekonsiliasi menanyakan status order pending langsung ke Midtrans, membatalkan order pending lama yang duplikat, dan menutup Snap session yang sudah kedaluwarsa. Order yang masih berstatus gagal di aplikasi tetapi masih pending di Midtrans tetap ditandai untuk sinkronisasi dan terus dipantau sampai status penyedia terminal. Checkout hanya menggunakan satu order aktif per akun dan paket. Bila Midtrans menyatakan pembayaran sedang berlangsung atau statusnya belum dapat dipastikan, checkout menahan pembuatan order baru.
+
+Status refund penuh dan chargeback menghentikan akses paket; refund sebagian tetap memberi akses dan mengurangi nilai pendapatan bersih. Order yang berhasil dibayar lebih dari sekali ditandai **DUPLIKAT · PERLU DICEK** pada daftar transaksi admin. Refund tidak dikirim otomatis oleh aplikasi; periksa order tersebut dan proses pengembalian melalui Midtrans Dashboard agar keputusan finansial tetap ditinjau pengelola. Refund Midtrans hanya tersedia untuk metode tertentu; untuk metode lain atau transaksi di luar periode refund, pengembalian dana perlu dilakukan langsung oleh merchant kepada pelanggan. Lihat [kebijakan refund Midtrans](https://docs.midtrans.com/docs/how-can-i-refund-transaction) sebelum memprosesnya.
 
 Jangan mengaktifkan pendaftaran publik sampai identitas pengelola, alamat kontak, kontak bantuan, tanggal kebijakan, dan halaman kebijakan sudah ditinjau serta diisi dengan data sebenarnya.
 

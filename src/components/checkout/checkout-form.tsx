@@ -10,6 +10,7 @@
 import { useRef, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Script from "next/script";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,12 @@ const SAFE_ERRORS: Record<string, string> = {
   FREE_PACKAGE: "Paket ini tidak memerlukan pembayaran.",
   PACKAGE_UNAVAILABLE: "Paket ini belum memiliki soal yang dapat diakses.",
   INVALID_PHONE:  "Nomor HP tidak valid.",
+  TOO_MANY_REQUESTS: "Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.",
+  SERVICE_UNAVAILABLE: "Layanan pembayaran sedang tidak tersedia. Coba lagi beberapa saat.",
+  PAYMENT_IN_PROGRESS: "Pembayaran sebelumnya sedang disiapkan. Tunggu sebentar lalu coba lagi.",
+  PAYMENT_STATUS_UNAVAILABLE: "Status pembayaran belum bisa dipastikan. Coba lagi beberapa saat.",
+  PAYMENT_RECONCILIATION_REQUIRED: "Ada beberapa order pembayaran yang perlu diselesaikan. Muat ulang beberapa menit lagi.",
+  PAYMENT_REVIEW_REQUIRED: "Pembayaran sedang ditinjau. Hubungi bantuan dengan menyertakan ID pesanan.",
 };
 
 const TEXT_CONTENT = {
@@ -56,6 +63,7 @@ const TEXT_CONTENT = {
   phoneOptionalHint: "(opsional, untuk notifikasi WhatsApp)",
   placeholderPhone: "08123456789",
   btnProcessing: "Memproses...",
+  btnLoadingPayment: "Memuat pembayaran...",
   btnPayPrefix: "Bayar",
   termsAgreementPrefix: "Dengan menekan tombol ini, kamu menyetujui",
   termsLinkText: "Syarat & Ketentuan",
@@ -74,6 +82,8 @@ interface CheckoutFormProps {
   total: number;
   customerName: string;
   customerEmail: string;
+  midtransClientKey: string;
+  midtransIsProduction: boolean;
 }
 
 // ==========================================
@@ -90,12 +100,20 @@ function validateFields(name: string, email: string, phone: string) {
 // ==========================================
 // KOMPONEN UTAMA
 // ==========================================
-export function CheckoutForm({ volumeId, total, customerName, customerEmail }: CheckoutFormProps) {
+export function CheckoutForm({
+  volumeId,
+  total,
+  customerName,
+  customerEmail,
+  midtransClientKey,
+  midtransIsProduction,
+}: CheckoutFormProps) {
   const router = useRouter();
   const nameRef = useRef<HTMLInputElement>(null);
 
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>("qris");
   const [isLoading, setIsLoading]           = useState(false);
+  const [isSnapReady, setIsSnapReady]       = useState(false);
   const [error, setError]                   = useState<string | null>(null);
   const [fieldErrors, setFieldErrors]       = useState<Record<string, string>>({});
 
@@ -107,7 +125,8 @@ export function CheckoutForm({ volumeId, total, customerName, customerEmail }: C
     setError(null);
     setFieldErrors({});
 
-    if (!window.snap) {
+    const snap = window.snap;
+    if (!isSnapReady || !snap) {
       setError(TEXT_CONTENT.paymentUnavailable);
       return;
     }
@@ -123,6 +142,7 @@ export function CheckoutForm({ volumeId, total, customerName, customerEmail }: C
     }
 
     setIsLoading(true);
+    let keepLoadingWhileSnapIsOpen = false;
 
     try {
       const res = await fetch(API_ROUTES.paymentEndpoint, {
@@ -149,13 +169,23 @@ export function CheckoutForm({ volumeId, total, customerName, customerEmail }: C
       }
 
       // Integrasi Pemicu Jendela Popup Midtrans Snap SDK
-      if (result.snapToken && window.snap) {
-        window.snap.pay(result.snapToken, {
-          onSuccess: () => router.push(API_ROUTES.confirmationRedirect(volumeId, result.orderId)),
-          onPending: () => router.push(API_ROUTES.confirmationRedirect(volumeId, result.orderId)),
-          onError:   () => setError(TEXT_CONTENT.midtransError),
+      if (result.snapToken) {
+        snap.pay(result.snapToken, {
+          onSuccess: () => {
+            setIsLoading(false);
+            router.push(API_ROUTES.confirmationRedirect(volumeId, result.orderId));
+          },
+          onPending: () => {
+            setIsLoading(false);
+            router.push(API_ROUTES.confirmationRedirect(volumeId, result.orderId));
+          },
+          onError:   () => {
+            setError(TEXT_CONTENT.midtransError);
+            setIsLoading(false);
+          },
           onClose:   () => setIsLoading(false),
         });
+        keepLoadingWhileSnapIsOpen = true;
         return;
       }
 
@@ -163,12 +193,26 @@ export function CheckoutForm({ volumeId, total, customerName, customerEmail }: C
     } catch {
       setError(TEXT_CONTENT.networkError);
     } finally {
-      setIsLoading(false);
+      if (!keepLoadingWhileSnapIsOpen) setIsLoading(false);
     }
   }
 
   return (
     <div className="space-y-6">
+      {midtransClientKey && (
+        <Script
+          src={midtransIsProduction
+            ? "https://app.midtrans.com/snap/snap.js"
+            : "https://app.sandbox.midtrans.com/snap/snap.js"}
+          data-client-key={midtransClientKey}
+          strategy="afterInteractive"
+          onReady={() => setIsSnapReady(true)}
+          onError={() => {
+            setIsSnapReady(false);
+            setError(TEXT_CONTENT.paymentUnavailable);
+          }}
+        />
+      )}
 
       {/* SEKSI PILIHAN KARTU METODE PEMBAYARAN */}
       <Card className="rounded-2xl border-border bg-card shadow-sm">
@@ -189,6 +233,7 @@ export function CheckoutForm({ volumeId, total, customerName, customerEmail }: C
                   type="button"
                   role="radio"
                   aria-checked={isActive}
+                  disabled={isLoading}
                   onClick={() => setSelectedMethod(key)}
                   className={`flex flex-col items-center py-4 gap-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary
                     ${isActive
@@ -276,27 +321,27 @@ export function CheckoutForm({ volumeId, total, customerName, customerEmail }: C
             </div>
 
             {/* Blok Tampilan Peringatan Error Global */}
-            {error && (
+            {(error || !midtransClientKey) && (
               <div
                 role="alert"
                 aria-live="assertive"
                 className="text-sm text-red-600 bg-red-50 border border-red-200 px-4 py-3 rounded-xl font-medium"
               >
-                {error}
+                {error ?? TEXT_CONTENT.paymentUnavailable}
               </div>
             )}
 
             {/* Tombol Eksekusi Aksi Transaksi Utama */}
             <Button
               type="submit"
-              disabled={isLoading}
-              aria-busy={isLoading}
+              disabled={isLoading || !midtransClientKey || !isSnapReady}
+              aria-busy={isLoading || (Boolean(midtransClientKey) && !isSnapReady)}
               className="w-full h-12 text-base font-bold rounded-xl gap-2 cursor-pointer"
             >
-              {isLoading ? (
+              {isLoading || (Boolean(midtransClientKey) && !isSnapReady) ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" aria-hidden />
-                  {TEXT_CONTENT.btnProcessing}
+                  {isLoading ? TEXT_CONTENT.btnProcessing : TEXT_CONTENT.btnLoadingPayment}
                 </>
               ) : (
                 <>
@@ -330,7 +375,7 @@ export function CheckoutForm({ volumeId, total, customerName, customerEmail }: C
 // Deklarasi Type Global Objek Properti Midtrans Snap SDK Window
 declare global {
   interface Window {
-    snap: {
+    snap?: {
       pay: (
         token: string,
         options: {

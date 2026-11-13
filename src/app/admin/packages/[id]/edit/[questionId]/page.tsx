@@ -7,6 +7,7 @@ import { questions } from "@/db/database/schema";
 import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import EditQuestionFormClient from "./edit-form-client";
+import { requireAdminPageAccess } from "@/lib/authz";
 
 interface EditQuestionPageProps {
   params: Promise<{ id: string; questionId: string }>;
@@ -15,6 +16,8 @@ interface EditQuestionPageProps {
 export const dynamic = "force-dynamic";
 
 export default async function EditQuestionPage({ params }: EditQuestionPageProps) {
+  await requireAdminPageAccess();
+
   const resolvedParams = await params;
   const packageId = parseInt(resolvedParams.id, 10);
   const questionId = parseInt(resolvedParams.questionId, 10);

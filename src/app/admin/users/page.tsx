@@ -7,10 +7,13 @@ import { users } from "@/db/database/schema";
 import { desc } from "drizzle-orm";
 import { columns } from "./columns";
 import { DataTable } from "@/components/admin/data-table";
+import { requireAdminPageAccess } from "@/lib/authz";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminUsersPage() {
+  await requireAdminPageAccess();
+
   // Batasi halaman admin pada 100 akun terbaru.
   const allUsers = await db
     .select({

@@ -24,7 +24,7 @@ export default async function PaymentConfirmationPage({ params, searchParams }: 
 
   const order = await db.query.orders.findFirst({
     where: and(eq(orders.id, query.orderId), eq(orders.packageId, packageId), eq(orders.userId, session.user.id)),
-    columns: { id: true, status: true, amount: true, paidAt: true },
+    columns: { id: true, status: true, amount: true, paidAt: true, reconciliationRequired: true },
     with: { package: { columns: { title: true } } },
   });
   if (!order) notFound();
@@ -39,6 +39,7 @@ export default async function PaymentConfirmationPage({ params, searchParams }: 
           status: order.status,
           amount: order.amount,
           paidAt: order.paidAt?.toISOString() ?? null,
+          reconciliationRequired: order.reconciliationRequired,
           packageTitle: order.package?.title ?? "Paket Tryout",
         }}
       />

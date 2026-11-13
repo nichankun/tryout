@@ -41,7 +41,7 @@ export const ExamTimer = React.memo(({ initialTimeLeft, isDisabled, onExpire }: 
     <div
       role="timer"
       aria-label={`Sisa waktu ${minutes} menit ${seconds} detik`}
-      className={`flex items-center gap-2.5 rounded-lg border-2 px-4 py-1.5 font-mono text-base font-bold tracking-wider shadow-sm transition-all ${
+      className={`flex items-center gap-2.5 rounded-lg border-2 px-4 py-1.5 font-mono text-sm font-semibold tracking-wider shadow-sm transition-all ${
         isWarning
           ? "animate-pulse border-destructive bg-destructive/10 text-destructive shadow-destructive/20"
           : "border-primary/40 bg-primary/10 text-primary"

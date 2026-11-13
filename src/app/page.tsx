@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { asc, count, eq } from "drizzle-orm";
@@ -20,24 +19,40 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { SERVICE_FEE } from "@/lib/constants/billing";
 import { TIMER_CONFIG } from "@/types/tryout";
 import { BrandLogo } from "@/components/brand/brand-logo";
+import { createPublicPageMetadata, SITE_URL } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "ASNPedia — Tryout dan Latihan SKD",
-  description: "Pilih paket latihan SKD, kerjakan simulasi, dan pelajari skor serta pembahasan soal.",
-  openGraph: {
-    title: "ASNPedia — Tryout dan Latihan SKD",
-    description: "Pilih paket latihan SKD, kerjakan simulasi, dan pelajari skor serta pembahasan soal.",
-    type: "website",
-    locale: "id_ID",
-    siteName: "ASNPedia",
-  },
-  twitter: {
-    card: "summary",
-    title: "ASNPedia — Tryout dan Latihan SKD",
-    description: "Pilih paket latihan SKD, kerjakan simulasi, dan pelajari skor serta pembahasan soal.",
-  },
+const homeTitle = "Tryout SKD CPNS Online";
+const homeDescription =
+  "Persiapkan SKD CPNS dengan latihan TWK, TIU, dan TKP berbatas waktu. Kerjakan simulasi, cek skor, dan pelajari pembahasan soal.";
+
+export const metadata = createPublicPageMetadata({
+  title: homeTitle,
+  description: homeDescription,
+  path: "/",
+});
+
+const structuredData = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${SITE_URL}/#organization`,
+      name: "ASNPedia",
+      url: SITE_URL,
+      logo: `${SITE_URL}/asnpedia-mark.svg`,
+      description: homeDescription,
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      name: "ASNPedia",
+      url: SITE_URL,
+      inLanguage: "id-ID",
+      publisher: { "@id": `${SITE_URL}/#organization` },
+    },
+  ],
 };
 
 const currency = new Intl.NumberFormat("id-ID", {
@@ -84,16 +99,16 @@ const learningSteps = [
 
 const landingPackageCovers = [
   {
-    image: "/package-covers/landing-nalar.png",
-    alt: "Balok dan bentuk geometri transparan dalam nuansa lavender",
+    image: "/package-covers/landing-nalar-blue.png",
+    alt: "Balok dan bentuk geometri transparan dalam nuansa biru",
   },
   {
-    image: "/package-covers/landing-fokus.png",
+    image: "/package-covers/landing-fokus-blue.png",
     alt: "Lingkaran fokus dan jalur cahaya keemasan",
   },
   {
-    image: "/package-covers/landing-progres.png",
-    alt: "Tangga progres dengan pita ungu dan titik mint",
+    image: "/package-covers/landing-progres-blue.png",
+    alt: "Tangga progres dengan pita biru dan titik mint",
   },
 ] as const;
 
@@ -114,6 +129,12 @@ export default async function HomePage() {
 
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(structuredData).replace(/</g, "\\u003c"),
+        }}
+      />
       <main className="min-h-screen overflow-hidden bg-background pb-[calc(4.75rem+env(safe-area-inset-bottom))] text-foreground lg:pb-0">
       <Link
         href="#paket"
@@ -121,13 +142,13 @@ export default async function HomePage() {
       >
         Langsung ke paket latihan
       </Link>
-      <section id="beranda" className="relative isolate min-h-[100svh] scroll-mt-16 overflow-hidden bg-[radial-gradient(ellipse_at_70%_48%,rgba(187,161,255,0.13),transparent_52%),linear-gradient(115deg,#fbf8ff_0%,#f7f4fc_64%,#f4f0fb_100%)] sm:min-h-[760px] lg:min-h-[100svh]">
+      <section id="beranda" className="relative isolate min-h-[100svh] scroll-mt-16 overflow-hidden bg-[radial-gradient(ellipse_at_70%_48%,rgba(107,174,222,0.13),transparent_52%),linear-gradient(115deg,#fbfdff_0%,#f3f8fd_64%,#edf5fc_100%)] sm:min-h-[760px] lg:min-h-[100svh]">
         <header className="relative z-20 mx-auto flex h-16 w-full items-center justify-between px-5 pt-0 sm:h-[clamp(5.25rem,7.4vw,7.75rem)] sm:px-10 sm:pt-[clamp(2rem,2.6vw,2.75rem)] lg:px-[5.4vw]">
           <Link href="/" className="relative inline-flex items-center" aria-label="ASNPedia, beranda">
             <BrandLogo
               className="gap-2"
-              markClassName="size-9 sm:size-11"
-              textClassName="text-[clamp(1.75rem,2.65vw,2.5rem)] tracking-[-0.055em]"
+              markClassName="size-8 sm:size-9"
+              textClassName="text-[clamp(1.35rem,1.8vw,1.65rem)] tracking-[-0.04em]"
             />
           </Link>
           <Link
@@ -140,7 +161,7 @@ export default async function HomePage() {
 
         <div className="pointer-events-none absolute inset-x-0 top-[clamp(5.25rem,7.4vw,7.75rem)] bottom-0 z-0 hidden overflow-hidden lg:block" aria-hidden="true">
           <Image
-            src="/hero-ribbon.png"
+            src="/hero-ribbon-blue.png"
             alt=""
             fill
             preload
@@ -151,30 +172,30 @@ export default async function HomePage() {
 
         <div className="relative z-10 mx-auto flex min-h-[calc(100svh_-_4rem)] w-full flex-col px-5 pb-6 pt-6 sm:min-h-[calc(760px_-_clamp(5.25rem,7.4vw,7.75rem))] sm:px-10 sm:pb-12 sm:pt-12 lg:min-h-[calc(100svh_-_7.4vw)] lg:px-[5.4vw] lg:pb-20 lg:pt-[4.2vw]">
           <div className="max-w-[760px]">
-            <p className="mb-[clamp(1.25rem,1.9vw,2rem)] flex items-center gap-[clamp(0.75rem,1.2vw,1.25rem)] text-[clamp(0.9rem,1.1vw,1.15rem)] font-extrabold uppercase tracking-[0.2em] text-purple-900">
+            <p className="mb-[clamp(1.25rem,1.9vw,2rem)] flex items-center gap-[clamp(0.75rem,1.2vw,1.25rem)] text-[clamp(0.8rem,0.95vw,1rem)] font-bold uppercase tracking-[0.14em] text-purple-900">
               <span aria-hidden="true" className="h-[clamp(0.375rem,0.55vw,0.5625rem)] w-[clamp(2.75rem,4.2vw,4.375rem)] rounded-full bg-purple-400" />
               SKD CPNS
             </p>
 
-            <h1 className="text-[clamp(2.75rem,6.7vw,7rem)] font-black leading-[1.12] tracking-[-0.045em] text-purple-950">
-              <span className="block">Pahami</span>
-              <span className="mt-2 block pb-[0.08em] bg-gradient-to-r from-[#4936AE] via-[#5948C8] to-[#7958E5] bg-clip-text text-transparent">
-                progresmu.<span aria-hidden="true" className="hero-caret ml-[0.12em] inline-block h-[0.88em] w-[3px] translate-y-[0.08em] bg-[#8F21FF] align-baseline shadow-[0_0_13px_3px_rgba(143,33,255,0.7)] sm:w-1" />
+            <h1 className="text-[clamp(2rem,2.65vw,3rem)] font-bold leading-[1.12] tracking-[-0.035em] text-purple-950">
+              <span className="block">Tryout SKD CPNS</span>
+              <span className="mt-1 block pb-[0.08em] bg-gradient-to-r from-[#0E4B7F] via-[#1769AA] to-[#3D8DCE] bg-clip-text text-transparent">
+                lebih terarah.<span aria-hidden="true" className="hero-caret ml-[0.12em] inline-block h-[0.88em] w-[3px] translate-y-[0.08em] bg-[#1D84D1] align-baseline shadow-[0_0_13px_3px_rgba(29,132,209,0.55)] sm:w-1" />
               </span>
             </h1>
 
-            <p className="mt-7 text-lg font-medium leading-8 tracking-[-0.025em] text-purple-950 sm:text-[clamp(1.15rem,1.8vw,1.9rem)] sm:leading-[1.35]">
+            <p className="mt-5 max-w-xl text-base font-normal leading-7 text-purple-950 sm:text-[clamp(1rem,1.2vw,1.125rem)] sm:leading-relaxed">
               Satu paket lengkap. Progres yang jelas.
             </p>
 
-            <Button asChild className="mt-7 h-14 w-full max-w-[22rem] rounded-2xl bg-primary px-6 text-base font-bold text-primary-foreground shadow-[0_12px_28px_-14px_rgba(73,54,174,0.75)] transition-all hover:-translate-y-0.5 hover:bg-purple-700 sm:mt-[2.2vw] sm:h-[clamp(3.5rem,4.5vw,4.625rem)] sm:w-[clamp(11rem,16.6vw,277px)] sm:rounded-[14px] sm:px-6 sm:text-[clamp(1.4rem,1.85vw,1.9rem)]">
+            <Button asChild className="mt-6 h-12 w-full max-w-[20rem] rounded-xl bg-primary px-5 text-base font-semibold text-primary-foreground shadow-[0_12px_28px_-14px_rgba(13,77,129,0.72)] transition-all hover:-translate-y-0.5 hover:bg-purple-700 sm:mt-7 sm:h-[clamp(3rem,3.4vw,3.5rem)] sm:w-[clamp(10rem,13vw,15rem)] sm:rounded-xl sm:px-5 sm:text-[clamp(1rem,1.05vw,1.125rem)]">
               <Link href="#paket">Lihat paket</Link>
             </Button>
           </div>
 
           <div className="relative mt-7 h-[190px] w-full sm:mt-10 sm:h-[230px] lg:hidden" aria-hidden="true">
             <Image
-              src="/hero-ribbon.png"
+              src="/hero-ribbon-blue.png"
               alt=""
               fill
               sizes="100vw"
@@ -186,22 +207,22 @@ export default async function HomePage() {
 
       <section
         id="cara-kerja"
-        className="relative isolate min-h-0 overflow-hidden bg-[radial-gradient(ellipse_at_76%_43%,rgba(187,161,255,0.12),transparent_48%),linear-gradient(115deg,#fbf8ff_0%,#f7f4fc_64%,#f4f0fb_100%)] pb-12 pt-14 sm:min-h-screen sm:pb-24 sm:pt-[clamp(4.5rem,16vw,15rem)] lg:min-h-[100svh] lg:pb-0"
+        className="relative isolate min-h-0 overflow-hidden bg-[radial-gradient(ellipse_at_76%_43%,rgba(107,174,222,0.12),transparent_48%),linear-gradient(115deg,#fbfdff_0%,#f3f8fd_64%,#edf5fc_100%)] pb-12 pt-14 sm:min-h-screen sm:pb-24 sm:pt-[clamp(4.5rem,16vw,15rem)] lg:min-h-[100svh] lg:pb-0"
       >
         <div className="relative z-10 px-[5.4vw]">
-          <p className="flex items-center gap-[clamp(0.75rem,1.2vw,1.25rem)] text-[clamp(0.9rem,1.1vw,1.15rem)] font-extrabold uppercase tracking-[0.2em] text-purple-900">
+          <p className="flex items-center gap-[clamp(0.75rem,1.2vw,1.25rem)] text-[clamp(0.8rem,0.95vw,1rem)] font-bold uppercase tracking-[0.14em] text-purple-900">
             <span aria-hidden="true" className="h-[clamp(0.375rem,0.55vw,0.5625rem)] w-[clamp(2.75rem,4.2vw,4.375rem)] rounded-full bg-purple-400" />
             Alur latihan
           </p>
-          <h2 className="mt-[clamp(1.5rem,3vw,3rem)] text-[clamp(2.25rem,4.5vw,4.5rem)] font-black leading-[1.02] tracking-[-0.06em] text-purple-950">
-            Dari latihan, jadi <span className="bg-gradient-to-r from-[#4936AE] via-[#5948C8] to-[#7958E5] bg-clip-text text-transparent">progres.</span>
+          <h2 className="mt-[clamp(1rem,1.7vw,1.5rem)] text-[clamp(1.75rem,2.5vw,2.75rem)] font-bold leading-[1.12] tracking-[-0.035em] text-purple-950">
+            Dari latihan, jadi <span className="bg-gradient-to-r from-[#0E4B7F] via-[#1769AA] to-[#3D8DCE] bg-clip-text text-transparent">progres.</span>
           </h2>
         </div>
 
         <div className="learning-flow-motion relative -mt-[2.6vw] hidden h-[38vw] min-h-[390px] w-full overflow-hidden lg:block">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-[27.6vw]" aria-hidden="true">
             <Image
-              src="/learning-wave.png"
+              src="/learning-wave-blue.png"
               alt=""
               fill
               sizes="100vw"
@@ -220,23 +241,23 @@ export default async function HomePage() {
               style={{ left: position, top }}
             >
               <span
-                className={`flex h-[5.1vw] w-[5.1vw] items-center justify-center rounded-full border-[5px] bg-white/95 shadow-[0_8px_24px_rgba(73,54,174,0.15)] ring-[5px] ring-purple-200/65 ${
+                className={`flex h-[5.1vw] w-[5.1vw] items-center justify-center rounded-full border-[5px] bg-white/95 shadow-[0_8px_24px_rgba(21,95,160,0.15)] ring-[5px] ring-purple-200/65 ${
                   tone === "mint"
                     ? "border-white text-teal-600 shadow-[0_8px_24px_rgba(66,191,160,0.2)] ring-teal-200/70"
                     : "border-white text-purple-700"
                 }`}
               >
-                <span className="text-[clamp(1.25rem,2vw,1.9rem)] font-black tracking-[-0.04em]">{number}</span>
+                <span className="text-[clamp(1.1rem,1.35vw,1.375rem)] font-bold tracking-[-0.025em]">{number}</span>
               </span>
               <span aria-hidden="true" className="w-px bg-primary/55" style={{ height: connector }} />
               <Icon
                 className={`h-[2.8vw] w-[2.8vw] stroke-[2.2] ${tone === "mint" ? "text-teal-600" : "text-primary"}`}
                 aria-hidden
               />
-              <h3 className="text-[clamp(1.25rem,2.2vw,2.6rem)] font-extrabold leading-tight tracking-[-0.04em] text-purple-950" style={{ marginTop: titleGap }}>
+              <h3 className="text-[clamp(1.125rem,1.4vw,1.375rem)] font-bold leading-snug tracking-tight text-purple-950" style={{ marginTop: titleGap }}>
                 {title}
               </h3>
-              <p className="mt-2 max-w-[20em] text-[clamp(1rem,1.55vw,1.6rem)] leading-[1.4] text-purple-950/90">
+              <p className="mt-2 max-w-[22em] text-[clamp(0.95rem,1.05vw,1.125rem)] leading-relaxed text-purple-950/90">
                 {description}
               </p>
             </article>
@@ -247,7 +268,7 @@ export default async function HomePage() {
           {learningSteps.map(({ number, icon: Icon, title, description }, index) => (
             <article key={number} className="grid grid-cols-[3.75rem_minmax(0,1fr)] gap-5">
               <div className="flex flex-col items-center">
-                <span className="flex h-14 w-14 items-center justify-center rounded-full border-4 border-white bg-white text-lg font-black text-primary shadow-md shadow-purple-950/10 ring-4 ring-purple-200/60">
+                <span className="flex h-14 w-14 items-center justify-center rounded-full border-4 border-white bg-white text-base font-bold text-primary shadow-md shadow-purple-950/10 ring-4 ring-purple-200/60">
                   {number}
                 </span>
                 {index < learningSteps.length - 1 && <span aria-hidden="true" className="my-2 h-10 w-px bg-primary/40" />}
@@ -255,7 +276,7 @@ export default async function HomePage() {
               <div className="pb-3 pt-1">
                 <div className="flex items-center gap-3 text-primary">
                   <Icon className="h-5 w-5" aria-hidden />
-                  <h3 className="text-xl font-extrabold tracking-tight text-purple-950">{title}</h3>
+                  <h3 className="text-lg font-bold tracking-tight text-purple-950">{title}</h3>
                 </div>
                 <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">{description}</p>
               </div>
@@ -266,24 +287,24 @@ export default async function HomePage() {
 
       <section
         id="paket"
-        className="scroll-mt-20 overflow-hidden bg-[radial-gradient(ellipse_at_76%_36%,rgba(187,161,255,0.12),transparent_48%),linear-gradient(115deg,#fbf8ff_0%,#f7f4fc_64%,#f4f0fb_100%)] py-[clamp(4rem,9vw,9rem)]"
+        className="scroll-mt-20 overflow-hidden bg-[radial-gradient(ellipse_at_76%_36%,rgba(107,174,222,0.12),transparent_48%),linear-gradient(115deg,#fbfdff_0%,#f3f8fd_64%,#edf5fc_100%)] py-[clamp(4rem,9vw,9rem)]"
       >
         <div className="px-5 sm:px-8 lg:pl-[4.5vw] lg:pr-[3.4vw]">
           <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="flex items-center gap-[clamp(0.75rem,1.2vw,1.25rem)] text-[clamp(0.9rem,1.1vw,1.15rem)] font-extrabold uppercase tracking-[0.2em] text-purple-900">
+              <p className="flex items-center gap-[clamp(0.75rem,1.2vw,1.25rem)] text-[clamp(0.8rem,0.95vw,1rem)] font-bold uppercase tracking-[0.14em] text-purple-900">
                 <span aria-hidden="true" className="h-[clamp(0.375rem,0.55vw,0.5625rem)] w-[clamp(2.75rem,4.2vw,4.375rem)] rounded-full bg-purple-400" />
                 Mulai dari sini
               </p>
-              <h2 className="mt-[clamp(1.25rem,2vw,2rem)] text-[clamp(2.25rem,4vw,4rem)] font-black leading-[1.02] tracking-[-0.06em] text-purple-950">
-                Pilih paket <span className="bg-gradient-to-r from-[#4936AE] via-[#5948C8] to-[#7958E5] bg-clip-text text-transparent">latihanmu</span>
+              <h2 className="mt-[clamp(1rem,1.5vw,1.5rem)] text-[clamp(1.75rem,2.5vw,2.75rem)] font-bold leading-[1.12] tracking-[-0.035em] text-purple-950">
+                Pilih paket <span className="bg-gradient-to-r from-[#0E4B7F] via-[#1769AA] to-[#3D8DCE] bg-clip-text text-transparent">latihanmu</span>
               </h2>
-              <p className="mt-3 text-[clamp(1rem,1.5vw,1.5rem)] leading-[1.4] text-muted-foreground">
+              <p className="mt-3 text-[clamp(1rem,1.1vw,1.125rem)] leading-relaxed text-muted-foreground">
                 Satu paket lengkap untuk latihan SKD.
               </p>
             </div>
-            <div className="inline-flex w-fit items-center gap-3 rounded-full bg-purple-100/85 px-4 py-2.5 text-sm font-semibold text-purple-900 sm:px-5 sm:py-3 sm:text-[clamp(0.95rem,1.25vw,1.25rem)] md:mb-1">
-              <BookOpenCheck className="h-6 w-6 shrink-0 text-primary" aria-hidden />
+            <div className="inline-flex w-fit items-center gap-2.5 rounded-full bg-purple-100/85 px-4 py-2 text-sm font-semibold text-purple-900 sm:px-4 sm:py-2.5 sm:text-base md:mb-1">
+              <BookOpenCheck className="h-5 w-5 shrink-0 text-primary" aria-hidden />
               {availablePackages.length} paket tersedia
             </div>
           </div>
@@ -310,7 +331,7 @@ export default async function HomePage() {
                 return (
                   <Card
                     key={pkg.id}
-                    className="group flex h-full flex-col gap-0 overflow-hidden rounded-[1.7rem] border border-purple-200/80 bg-white py-0 shadow-[0_14px_36px_-22px_rgba(48,16,86,0.3)] transition-all duration-300 hover:-translate-y-1 hover:border-purple-300 hover:shadow-[0_20px_44px_-20px_rgba(48,16,86,0.28)]"
+                    className="group flex h-full flex-col gap-0 overflow-hidden rounded-[1.7rem] border border-purple-200/80 bg-white py-0 shadow-[0_14px_36px_-22px_rgba(16,62,103,0.22)] transition-all duration-300 hover:-translate-y-1 hover:border-purple-300 hover:shadow-[0_20px_44px_-20px_rgba(16,62,103,0.24)]"
                   >
                     <div className="relative aspect-[2.08/1] overflow-hidden bg-purple-100">
                       <Image
@@ -323,27 +344,27 @@ export default async function HomePage() {
                     </div>
 
                     <CardHeader className="gap-0 px-6 pb-0 pt-5 sm:px-8 sm:pt-6">
-                      <CardTitle className="line-clamp-2 break-words text-[clamp(1.5rem,2.3vw,2.25rem)] font-extrabold leading-tight tracking-[-0.045em] text-purple-950" title={pkg.title}>
+                      <CardTitle className="line-clamp-2 break-words text-[clamp(1.25rem,1.55vw,1.5rem)] font-bold leading-snug tracking-tight text-purple-950" title={pkg.title}>
                         {displayTitle}
                       </CardTitle>
-                      <span className="mt-3 inline-flex w-fit items-center rounded-full bg-purple-100 px-4 py-1.5 text-[clamp(0.9rem,1.2vw,1.15rem)] font-bold leading-none text-primary">
+                      <span className="mt-3 inline-flex w-fit items-center rounded-full bg-purple-100 px-3 py-1.5 text-sm font-semibold leading-none text-primary">
                         TWK <span className="mx-2 text-purple-300">·</span> TIU <span className="mx-2 text-purple-300">·</span> TKP
                       </span>
                     </CardHeader>
 
                     <CardContent className="mt-5 px-6 pb-0 sm:px-8">
-                      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-[clamp(0.95rem,1.3vw,1.25rem)] font-medium text-purple-950">
+                      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-[clamp(0.875rem,1vw,1rem)] font-medium text-purple-950">
                         <div className="flex items-center gap-3 whitespace-nowrap">
-                          <Layers className="h-6 w-6 shrink-0 text-primary" aria-hidden />
+                          <Layers className="h-5 w-5 shrink-0 text-primary" aria-hidden />
                           <span><strong className="font-bold">{pkg.questionCount}</strong> soal</span>
                         </div>
                         <span aria-hidden="true" className="h-8 w-px bg-purple-200" />
                         <div className="flex items-center justify-end gap-3 whitespace-nowrap">
-                          <Clock3 className="h-6 w-6 shrink-0 text-primary" aria-hidden />
+                          <Clock3 className="h-5 w-5 shrink-0 text-primary" aria-hidden />
                           <span>{Math.round(TIMER_CONFIG.durationSeconds / 60)} menit</span>
                         </div>
                       </div>
-                      <p className="mt-[clamp(1.5rem,2.2vw,2.25rem)] text-[clamp(1.75rem,2.3vw,2.4rem)] font-black leading-none tracking-[-0.04em] text-purple-950">
+                      <p className="mt-6 text-[clamp(1.5rem,1.8vw,1.75rem)] font-bold leading-none tracking-tight text-purple-950">
                         {pkg.price === 0 ? "Gratis" : currency.format(pkg.price)}
                       </p>
                       {pkg.price > 0 && SERVICE_FEE > 0 && (
@@ -354,7 +375,7 @@ export default async function HomePage() {
                     </CardContent>
 
                     <CardFooter className="mt-auto px-6 pb-6 pt-7 sm:px-7 sm:pb-7">
-                      <Button asChild className="h-[clamp(3.5rem,4vw,3.75rem)] w-full rounded-[14px] bg-primary text-[clamp(1rem,1.4vw,1.375rem)] font-bold text-primary-foreground shadow-[0_10px_24px_-14px_rgba(73,54,174,0.75)] transition-all hover:bg-purple-700 group-hover:shadow-primary/25">
+                      <Button asChild className="h-12 w-full rounded-xl bg-primary text-[clamp(1rem,1.05vw,1.125rem)] font-semibold text-primary-foreground shadow-[0_10px_24px_-14px_rgba(13,77,129,0.72)] transition-all hover:bg-purple-700 group-hover:shadow-primary/25">
                         <Link href={`/checkout/${pkg.id}`}>
                           {pkg.price === 0 ? "Mulai paket" : "Lihat paket"}
                           <ArrowRight className="ml-3 h-5 w-5 transition-transform group-hover:translate-x-1" aria-hidden />
@@ -370,10 +391,10 @@ export default async function HomePage() {
       </section>
 
       <section className="px-4 pb-14 pt-16 md:px-6 md:pb-16 md:pt-20 xl:px-10" aria-labelledby="signup-heading">
-        <div className="relative isolate mx-auto flex min-h-[17rem] max-w-[1800px] items-center overflow-hidden rounded-[2rem] bg-[linear-gradient(112deg,#29143f_0%,#3e2578_48%,#5b43c8_100%)] px-7 py-10 text-white shadow-[0_28px_70px_-36px_rgba(68,44,139,0.72)] sm:rounded-[2.5rem] sm:px-10 md:min-h-[19rem] md:px-14 lg:px-[5.2%]">
-          <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_78%_20%,rgba(151,112,255,0.42),transparent_42%),radial-gradient(ellipse_at_42%_115%,rgba(176,119,255,0.22),transparent_42%)]" />
+        <div className="relative isolate mx-auto flex min-h-[17rem] max-w-[1800px] items-center overflow-hidden rounded-[2rem] bg-[linear-gradient(112deg,#0A3357_0%,#0F5D9A_48%,#287EBB_100%)] px-7 py-10 text-white shadow-[0_28px_70px_-36px_rgba(12,68,112,0.65)] sm:rounded-[2.5rem] sm:px-10 md:min-h-[19rem] md:px-14 lg:px-[5.2%]">
+          <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_78%_20%,rgba(97,167,223,0.4),transparent_42%),radial-gradient(ellipse_at_42%_115%,rgba(65,145,205,0.22),transparent_42%)]" />
           <Image
-            src="/learning-wave.png"
+            src="/learning-wave-blue.png"
             alt=""
             fill
             sizes="100vw"
@@ -384,10 +405,10 @@ export default async function HomePage() {
           <div className="relative flex w-full flex-col gap-8 sm:flex-row sm:items-center sm:justify-between sm:gap-10">
             <div className="max-w-3xl">
               <p className="text-[0.68rem] font-bold uppercase tracking-[0.22em] text-purple-100 sm:text-xs">Satu langkah kecil hari ini</p>
-              <h2 id="signup-heading" className="mt-3 text-[1.65rem] font-extrabold leading-tight tracking-tight sm:text-3xl lg:text-[2.2rem]">Mulai latihanmu dengan lebih terarah.</h2>
+              <h2 id="signup-heading" className="mt-3 text-[1.35rem] font-bold leading-snug tracking-tight sm:text-[1.6rem] lg:text-[1.85rem]">Mulai latihanmu dengan lebih terarah.</h2>
               <p className="mt-3 text-sm leading-6 text-purple-100/90 sm:text-base">Simpan sesi dan pantau progresmu dalam satu akun.</p>
             </div>
-            <Button asChild size="lg" className="h-14 w-full shrink-0 rounded-2xl bg-white px-7 text-base font-bold text-purple-950 shadow-lg shadow-black/10 hover:bg-purple-50 sm:w-auto sm:min-w-[16rem]">
+            <Button asChild size="lg" className="h-12 w-full shrink-0 rounded-xl bg-white px-6 text-sm font-semibold text-purple-950 shadow-lg shadow-black/10 hover:bg-purple-50 sm:h-[3.25rem] sm:w-auto sm:min-w-[14rem] sm:text-base">
               <Link href="/register">Buat akun gratis <ArrowRight className="ml-3 h-5 w-5" aria-hidden /></Link>
             </Button>
           </div>
@@ -414,7 +435,7 @@ export default async function HomePage() {
       </main>
       <nav
         aria-label="Navigasi utama"
-        className="fixed inset-x-0 bottom-0 z-50 grid h-[calc(4.75rem+env(safe-area-inset-bottom))] grid-cols-4 border-t border-purple-100 bg-white/95 px-2 pt-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(33,22,51,0.08)] backdrop-blur-xl lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-50 grid h-[calc(4.75rem+env(safe-area-inset-bottom))] grid-cols-4 border-t border-purple-100 bg-white/95 px-2 pt-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(14,54,86,0.08)] backdrop-blur-xl lg:hidden"
       >
         <a href="#beranda" className="flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-2xl text-xs font-semibold text-purple-900 active:bg-purple-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
           <House className="h-5 w-5" aria-hidden="true" />

@@ -1,9 +1,14 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { PolicyPage } from "@/components/legal/policy-page";
 import { getLegalConfig } from "@/lib/legal-config";
+import { createPublicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "Syarat dan Ketentuan" };
+export const metadata = createPublicPageMetadata({
+  title: "Syarat dan Ketentuan",
+  description:
+    "Ketentuan penggunaan ASNPedia untuk latihan mandiri, simulasi SKD CPNS, akses paket, dan transaksi.",
+  path: "/syarat-ketentuan",
+});
 
 export default function TermsPage() {
   const { operatorName } = getLegalConfig();

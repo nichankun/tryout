@@ -8,8 +8,11 @@ export type OrderRow = {
   customerEmail: string;
   packageName: string;
   amount: number;
-  status: "pending" | "paid" | "failed";
+  status: "pending" | "paid" | "failed" | "partially_refunded" | "refunded" | "disputed";
   paidAt: Date | null;
+  refundAmount: number;
+  duplicatePayment: boolean;
+  reconciliationRequired: boolean;
 };
 
 export const columns: ColumnDef<OrderRow>[] = [
@@ -40,11 +43,26 @@ export const columns: ColumnDef<OrderRow>[] = [
     accessorKey: "status",
     header: "Status",
     cell: ({ row }) => {
-      const status = row.getValue("status") as string;
+      const status = row.original.status;
+      const statusLabels = {
+        pending: "MENUNGGU",
+        paid: "LUNAS",
+        failed: "GAGAL",
+        partially_refunded: "REFUND SEBAGIAN",
+        refunded: "REFUND PENUH",
+        disputed: "SENGKETA",
+      } as const;
       return (
-        <Badge variant={status === "paid" ? "default" : status === "pending" ? "secondary" : "destructive"}>
-          {status.toUpperCase()}
-        </Badge>
+        <div className="flex flex-wrap gap-1">
+          <Badge variant={status === "paid" ? "default" : status === "pending" || status === "partially_refunded" ? "secondary" : "destructive"}>
+            {statusLabels[status]}
+          </Badge>
+          {row.original.duplicatePayment && <Badge variant="destructive">DUPLIKAT · PERLU DICEK</Badge>}
+          {row.original.reconciliationRequired && <Badge variant="outline">PERLU SINKRONISASI</Badge>}
+          {row.original.refundAmount > 0 && (
+            <Badge variant="outline">Refund Rp {row.original.refundAmount.toLocaleString("id-ID")}</Badge>
+          )}
+        </div>
       );
     },
   },

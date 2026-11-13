@@ -7,12 +7,15 @@ import { tryoutPackages, questions } from "@/db/database/schema";
 import { count } from "drizzle-orm";
 import { columns } from "./columns";
 import { DataTable } from "@/components/admin/data-table";
+import { requireAdminPageAccess } from "@/lib/authz";
 import { Plus } from "lucide-react"; // ✅ Menambahkan import ikon
 import Link from "next/link"; // ✅ Menambahkan import Link
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPackagesPage() {
+  await requireAdminPageAccess();
+
   // Ambil seluruh daftar volume paket simulasi
   const [packagesData, questionCounts] = await Promise.all([
     db.select().from(tryoutPackages).orderBy(tryoutPackages.id),

@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { db } from "@/db";
 import { adminAuditLogs } from "@/db/database/schema";
+import { requireAdminPageAccess } from "@/lib/authz";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,8 @@ function formatMetadata(metadata: Record<string, unknown> | null) {
 }
 
 export default async function AdminActivityPage() {
+  await requireAdminPageAccess();
+
   const activity = await db
     .select()
     .from(adminAuditLogs)

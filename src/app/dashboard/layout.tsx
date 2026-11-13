@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import type { Metadata } from "next";
 import { auth } from "@/auth";
 import {
   DashboardMobileNav,
@@ -8,6 +9,10 @@ import { DashboardHeader } from "@/components/dashboard/header";
 import { DashboardFooter } from "@/components/dashboard/footer";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 interface DashboardLayoutProps {
   children: React.ReactNode;

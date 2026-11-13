@@ -42,7 +42,7 @@ function VolumeCardSkeleton() {
 export default function DashboardLoading() {
   return (
     <>
-      <div className="min-h-full bg-[#F7F5FC] md:hidden" aria-hidden="true">
+      <div className="min-h-full bg-purple-50 md:hidden" aria-hidden="true">
         <div className="mx-auto flex w-full max-w-lg flex-col gap-6 px-4 py-6">
           <div className="space-y-4">
             <div className="flex items-center gap-3">
@@ -73,7 +73,7 @@ export default function DashboardLoading() {
           </div>
 
           <div className="space-y-4">
-            <div className="flex min-h-[250px] flex-col justify-center gap-4 rounded-[1.35rem] border border-purple-200/80 bg-[#F0EBFA] px-5">
+            <div className="flex min-h-[250px] flex-col justify-center gap-4 rounded-[1.35rem] border border-purple-200/80 bg-purple-100 px-5">
               <Skeleton className="h-3 w-28" />
               <Skeleton className="h-9 w-44" />
               <Skeleton className="h-4 w-56 max-w-full" />

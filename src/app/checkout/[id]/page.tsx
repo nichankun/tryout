@@ -20,7 +20,6 @@ import { CheckoutForm } from "@/components/checkout/checkout-form";
 import { Separator } from "@/components/ui/separator";
 import { SERVICE_FEE } from "@/lib/constants/billing";
 import { TIMER_CONFIG } from "@/types/tryout";
-import Script from "next/script";
 
 // ==========================================
 // KONSTANTA & KONFIGURASI
@@ -161,16 +160,6 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
   ];
 
   return (
-    <>
-    {process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY && (
-      <Script
-        src={process.env.MIDTRANS_IS_PRODUCTION === "true"
-          ? "https://app.midtrans.com/snap/snap.js"
-          : "https://app.sandbox.midtrans.com/snap/snap.js"}
-        data-client-key={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY}
-        strategy="afterInteractive"
-      />
-    )}
     <div className="min-h-screen bg-background text-foreground py-10 px-4 md:px-8">
       <div className="max-w-4xl mx-auto space-y-8">
 
@@ -242,6 +231,8 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
               total={totalPembayaran}
               customerName={session.user.name ?? ""}
               customerEmail={session.user.email ?? ""}
+              midtransClientKey={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY ?? ""}
+              midtransIsProduction={process.env.MIDTRANS_IS_PRODUCTION === "true"}
             />
           </div>
 
@@ -279,6 +270,5 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
         </div>
       </div>
     </div>
-    </>
   );
 }

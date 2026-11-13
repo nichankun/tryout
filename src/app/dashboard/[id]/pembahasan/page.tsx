@@ -231,7 +231,7 @@ export default async function PembahasanPage({ params, searchParams }: Pembahasa
           {
             label: TEXT_CONTENT.labelEmpty,
             value: totalKosong,
-            card: "border-purple-800 bg-purple-800 dark:border-[#5948C8] dark:bg-[#3A2673]",
+            card: "border-purple-800 bg-purple-800 dark:border-[#1769AA] dark:bg-[#0E4B7F]",
             iconBg: "bg-gray-600",
             valueColor: "text-white",
             labelColor: "text-white/90",
@@ -241,7 +241,7 @@ export default async function PembahasanPage({ params, searchParams }: Pembahasa
             key={s.label}
             className={`flex flex-col items-center gap-2 rounded-2xl border p-4 shadow-sm md:p-5 ${s.card}`}
           >
-            <span className={`text-3xl font-extrabold md:text-4xl ${s.valueColor}`}>
+            <span className={`text-2xl font-bold md:text-3xl ${s.valueColor}`}>
               {s.value}
             </span>
             <span className={`text-xs font-bold ${s.labelColor}`}>

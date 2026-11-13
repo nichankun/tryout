@@ -105,6 +105,11 @@ if (env.MIDTRANS_IS_PRODUCTION?.trim().toLowerCase() !== "true") {
   issues.push("MIDTRANS_IS_PRODUCTION harus bernilai true untuk menerima pembayaran produksi.");
 }
 
+const cronSecret = requireValue("CRON_SECRET");
+if (cronSecret && Buffer.byteLength(cronSecret, "utf8") < 32) {
+  issues.push("CRON_SECRET harus memiliki panjang minimal 32 byte.");
+}
+
 requireValue("QUESTION_IMAGE_S3_BUCKET");
 requireValue("QUESTION_IMAGE_S3_REGION");
 requireValue("QUESTION_IMAGE_S3_ACCESS_KEY_ID");

@@ -7,16 +7,22 @@ import { orders, users, tryoutPackages } from "@/db/database/schema";
 import { eq, desc } from "drizzle-orm";
 import { columns } from "./columns";
 import { DataTable } from "@/components/admin/data-table";
+import { requireAdminPageAccess } from "@/lib/authz";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminOrdersPage() {
+  await requireAdminPageAccess();
+
   const allOrders = await db
     .select({
       id: orders.id,
       amount: orders.amount,
       status: orders.status,
       paidAt: orders.paidAt,
+      refundAmount: orders.refundAmount,
+      duplicatePayment: orders.duplicatePayment,
+      reconciliationRequired: orders.reconciliationRequired,
       customerEmail: users.email,
       packageName: tryoutPackages.title,
     })

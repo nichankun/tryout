@@ -1,7 +1,12 @@
-import type { Metadata } from "next";
 import { PolicyPage } from "@/components/legal/policy-page";
+import { createPublicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "Kebijakan Refund" };
+export const metadata = createPublicPageMetadata({
+  title: "Kebijakan Refund",
+  description:
+    "Pelajari cara mengajukan bantuan untuk pembayaran ganda, akses paket SKD, pembatalan, dan pengembalian dana ASNPedia.",
+  path: "/kebijakan-refund",
+});
 
 export default function RefundPolicyPage() {
   return (

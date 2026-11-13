@@ -95,7 +95,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </Link>
 
           <div className="space-y-2">
-            <h1 className="text-3xl font-extrabold tracking-tight text-purple-950">
+            <h1 className="text-[clamp(1.5rem,1.7vw,1.75rem)] font-bold leading-tight tracking-[-0.03em] text-purple-950">
               {APP_CONFIG.title}
             </h1>
             <p className="text-sm leading-6 text-slate-500">

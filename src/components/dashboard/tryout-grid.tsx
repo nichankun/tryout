@@ -61,7 +61,7 @@ const VolumeCard = memo(function VolumeCard({
         : "Paket sudah terbuka. Mulai simulasi dan tinjau hasil latihanmu.";
 
   return (
-    <Card className="group flex h-full flex-col gap-0 overflow-hidden rounded-[1.4rem] border border-purple-100 bg-white p-0 shadow-[0_12px_34px_-24px_rgba(46,23,77,0.34)] ring-0 transition-all duration-300 hover:-translate-y-1 hover:border-purple-200 hover:shadow-[0_20px_42px_-24px_rgba(46,23,77,0.42)] motion-reduce:transform-none motion-reduce:transition-none">
+    <Card className="group flex h-full flex-col gap-0 overflow-hidden rounded-[1.4rem] border border-purple-100 bg-white p-0 shadow-[0_12px_34px_-24px_rgba(16,55,89,0.22)] ring-0 transition-all duration-300 hover:-translate-y-1 hover:border-purple-200 hover:shadow-[0_20px_42px_-24px_rgba(16,55,89,0.28)] motion-reduce:transform-none motion-reduce:transition-none">
       <div className="relative aspect-[1.95/1] overflow-hidden bg-purple-950">
         <Image
           src={cover.image}
@@ -85,7 +85,7 @@ const VolumeCard = memo(function VolumeCard({
 
         <div className="absolute inset-x-4 bottom-4 text-white sm:inset-x-5 sm:bottom-5">
           <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-white/75">Volume {paddedId}</p>
-          <CardTitle className="mt-1 line-clamp-1 text-lg font-extrabold leading-tight text-white drop-shadow-sm sm:text-2xl">
+          <CardTitle className="mt-1 line-clamp-1 text-lg font-bold leading-tight text-white drop-shadow-sm sm:text-[1.375rem]">
             {vol.title}
           </CardTitle>
         </div>
@@ -97,7 +97,7 @@ const VolumeCard = memo(function VolumeCard({
             <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
               {isUnavailable ? "Status paket" : isFinished ? "Skor terakhir" : isLocked ? "Harga paket" : "Status akses"}
             </p>
-            <p className="mt-1 truncate text-xl font-extrabold tracking-tight text-purple-950 sm:text-2xl">
+            <p className="mt-1 truncate text-lg font-bold tracking-tight text-purple-950 sm:text-xl">
               {isUnavailable
                 ? "Segera hadir"
                 : isFinished && vol.lastHistory
@@ -203,7 +203,7 @@ export function TryoutGrid({ volumes }: { volumes: TryoutVolume[] }) {
             aria-label="Cari paket latihan"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            className="h-10 rounded-xl border-purple-100 bg-white pl-10 text-xs shadow-sm placeholder:text-muted-foreground/80"
+            className="h-10 rounded-xl border-purple-100 bg-white pl-10 text-sm shadow-sm placeholder:text-muted-foreground/80"
           />
         </div>
       ) : null}
@@ -219,7 +219,7 @@ export function TryoutGrid({ volumes }: { volumes: TryoutVolume[] }) {
           <span className="flex size-10 items-center justify-center rounded-xl bg-purple-50 text-primary lg:size-9">
             <EmptyIcon className="size-5 lg:size-4" aria-hidden="true" />
           </span>
-          <h3 className="mt-3 text-base font-bold text-purple-950">{emptyTitle}</h3>
+          <h3 className="mt-3 text-base font-semibold text-purple-950">{emptyTitle}</h3>
           <p className="mt-1 text-sm text-muted-foreground lg:text-xs">
             {emptyDescription}
           </p>

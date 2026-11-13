@@ -202,7 +202,7 @@ export default async function HasilTryoutPage({ params, searchParams }: HasilPag
 
         {/* Total skor */}
         <div
-          className={`font-mono text-5xl font-bold tracking-tighter md:text-7xl ${
+          className={`font-mono text-5xl font-semibold tracking-tighter md:text-6xl ${
             riwayat.isLolos ? "text-teal-800" : "text-red-800"
           }`}
         >

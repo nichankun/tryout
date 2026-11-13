@@ -1,8 +1,13 @@
-import type { Metadata } from "next";
 import { PolicyPage } from "@/components/legal/policy-page";
 import { getLegalConfig } from "@/lib/legal-config";
+import { createPublicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "Kebijakan Privasi" };
+export const metadata = createPublicPageMetadata({
+  title: "Kebijakan Privasi",
+  description:
+    "Baca cara ASNPedia mengumpulkan, menggunakan, menyimpan, dan melindungi data akun, latihan, serta transaksi.",
+  path: "/kebijakan-privasi",
+});
 
 export default function PrivacyPolicyPage() {
   const { operatorName } = getLegalConfig();

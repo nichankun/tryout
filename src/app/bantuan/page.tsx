@@ -1,11 +1,16 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { Mail, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getLegalConfig } from "@/lib/legal-config";
+import { createPublicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "Bantuan" };
+export const metadata = createPublicPageMetadata({
+  title: "Bantuan Pelanggan",
+  description:
+    "Hubungi tim bantuan ASNPedia untuk kendala akun, akses paket latihan SKD CPNS, materi, dan transaksi.",
+  path: "/bantuan",
+});
 
 export default function HelpPage() {
   const contact = getLegalConfig();
@@ -43,7 +48,7 @@ export default function HelpPage() {
             </div>
           </section>
 
-          <section className="rounded-xl bg-[#F7F5FC] p-4">
+          <section className="rounded-xl bg-purple-50 p-4">
             <h2 className="text-sm font-semibold">Prosedur dan waktu penanganan</h2>
             <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-sm leading-6 text-muted-foreground">
               <li>Kirim email akun, ID pesanan bila terkait transaksi, waktu kejadian, dan langkah yang sudah dicoba.</li>

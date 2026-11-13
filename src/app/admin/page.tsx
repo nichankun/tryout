@@ -11,10 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LayoutDashboard, Users, CreditCard, ShoppingBag } from "lucide-react";
 import Link from "next/link";
+import { requireAdminPageAccess } from "@/lib/authz";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
+  await requireAdminPageAccess();
+
   // ── 1. AGREGASI DATA STATISTIK ──
   const [userCount] = await db.select({ count: sql<number>`count(*)` }).from(users);
   const [orderCount] = await db.select({ count: sql<number>`count(*)` }).from(orders);
@@ -23,13 +26,18 @@ export default async function AdminDashboardPage() {
     .from(tryoutPackages)
     .where(eq(tryoutPackages.isActive, true));
   
-  // Jumlah nominal transaksi berstatus lunas (termasuk biaya layanan).
+  // Pendapatan bersih: transaksi lunas dikurangi refund penuh maupun sebagian.
   const [revenueResult] = await db
-    .select({ total: sql<number>`sum(${orders.amount})` })
-    .from(orders)
-    .where(eq(orders.status, "paid"));
+    .select({
+      total: sql<string>`coalesce(sum(case
+        when ${orders.status} = 'paid' then ${orders.amount}
+        when ${orders.status} = 'partially_refunded' then ${orders.amount} - ${orders.refundAmount}
+        else 0
+      end), 0)::text`,
+    })
+    .from(orders);
 
-  const totalRevenue = revenueResult?.total ?? 0;
+  const totalRevenue = BigInt(revenueResult?.total ?? "0");
 
   // ── 2. AMBIL LOG AKTIVITAS TERBARU (JOIN) ──
   const recentTransactions = await db
@@ -37,6 +45,7 @@ export default async function AdminDashboardPage() {
       id: orders.id,
       amount: orders.amount,
       status: orders.status,
+      duplicatePayment: orders.duplicatePayment,
       customerName: users.name,
       packageName: tryoutPackages.title,
     })
@@ -47,7 +56,7 @@ export default async function AdminDashboardPage() {
     .limit(5);
 
   const stats = [
-    { title: "Nominal Transaksi Lunas", value: `Rp ${totalRevenue.toLocaleString("id-ID")}`, icon: CreditCard, color: "text-emerald-500" },
+    { title: "Perkiraan Pendapatan Bersih", value: `Rp ${totalRevenue.toLocaleString("id-ID")}`, icon: CreditCard, color: "text-emerald-500" },
     { title: "Total Pengguna", value: userCount.count, icon: Users, color: "text-blue-500" },
     { title: "Transaksi Masuk", value: orderCount.count, icon: ShoppingBag, color: "text-amber-500" },
     { title: "Paket Tryout Aktif", value: packageCount.count, icon: LayoutDashboard, color: "text-violet-500" },
@@ -100,9 +109,12 @@ export default async function AdminDashboardPage() {
                     <TableCell>{tx.packageName}</TableCell>
                     <TableCell>Rp {tx.amount.toLocaleString("id-ID")}</TableCell>
                     <TableCell className="text-right">
-                      <Badge variant={tx.status === "paid" ? "default" : tx.status === "pending" ? "secondary" : "destructive"}>
-                        {tx.status.toUpperCase()}
-                      </Badge>
+                      <div className="flex flex-wrap justify-end gap-1">
+                        <Badge variant={tx.status === "paid" ? "default" : tx.status === "pending" || tx.status === "partially_refunded" ? "secondary" : "destructive"}>
+                          {tx.status.replaceAll("_", " ").toUpperCase()}
+                        </Badge>
+                        {tx.duplicatePayment && <Badge variant="destructive">DUPLIKAT · PERLU DICEK</Badge>}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

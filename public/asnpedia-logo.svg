@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 194 48" fill="none">
-  <rect width="48" height="48" rx="15" fill="#5948C8" />
+  <rect width="48" height="48" rx="15" fill="#1769AA" />
   <path
     d="M13.5 35 22.1 15.1c.7-1.7 3.1-1.7 3.8 0L34.5 35"
     stroke="#fff"
@@ -17,10 +17,10 @@
   <text
     x="60"
     y="33"
-    fill="#211633"
+    fill="#082F50"
     font-family="Inter, ui-sans-serif, system-ui, sans-serif"
     font-size="27"
     font-weight="800"
     letter-spacing="-1.1"
-  >ASN<tspan fill="#5948C8">Pedia</tspan></text>
+  >ASN<tspan fill="#1769AA">Pedia</tspan></text>
 </svg>

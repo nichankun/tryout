@@ -4,6 +4,7 @@
  */
 
 import { notFound, redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { eq, and, asc } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/db";
@@ -28,6 +29,10 @@ type SanitizedQuestion = {
 };
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 // ==========================================
 // MAIN COMPONENT

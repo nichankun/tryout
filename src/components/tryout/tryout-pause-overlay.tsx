@@ -37,12 +37,12 @@ export const TryoutPauseOverlay = React.memo(({
       </div>
 
       {/* Judul */}
-      <h2 className="mb-3 text-2xl font-bold text-foreground md:text-3xl">
+      <h2 className="mb-3 text-xl font-bold leading-tight tracking-tight text-foreground md:text-2xl">
         Ujian Terhenti Sementara
       </h2>
 
       {/* Deskripsi */}
-      <p className="mb-8 max-w-lg text-base leading-relaxed text-muted-foreground md:text-lg">
+      <p className="mb-8 max-w-lg text-[15px] leading-relaxed text-muted-foreground sm:text-base">
         {isOffline
           ? "Koneksi internet terputus. Waktu ujian tetap berjalan dan jawaban hanya tersimpan setelah tersambung kembali. Periksa jaringan sebelum melanjutkan."
           : "Sistem mendeteksi Anda berpindah dari halaman ujian. Waktu ujian tetap berjalan. Kembali ke halaman untuk melanjutkan."}

@@ -163,13 +163,13 @@ export default async function RiwayatPage() {
   ] as const;
 
   return (
-    <div className="min-h-full bg-[#F7F5FC]">
+    <div className="min-h-full bg-purple-50">
       <div className="mx-auto flex w-full max-w-[1560px] flex-col gap-6 px-4 py-6 sm:px-6 lg:gap-6 lg:px-8 lg:py-8 xl:px-10">
         <header>
-          <h1 className="text-2xl font-extrabold tracking-[-0.035em] text-purple-950 sm:text-[2.15rem] lg:text-[2rem]">
+          <h1 className="text-[clamp(1.625rem,2vw,2rem)] font-bold leading-tight tracking-[-0.035em] text-purple-950">
             {TEXT_CONTENT.title}
           </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base lg:text-sm">
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-[0.9375rem]">
             {TEXT_CONTENT.subtitle}
           </p>
         </header>
@@ -180,7 +180,7 @@ export default async function RiwayatPage() {
           {STAT_CARDS.map((s) => (
             <div
               key={s.label}
-              className={`flex flex-row items-center gap-3 rounded-2xl border border-transparent px-3 py-3 shadow-[0_8px_26px_-20px_rgba(46,23,77,0.35)] sm:gap-4 sm:px-5 sm:py-4 lg:gap-3 lg:px-4 lg:py-3 lg:shadow-none ${s.card}`}
+              className={`flex flex-row items-center gap-3 rounded-2xl border border-transparent px-3 py-3 shadow-[0_8px_26px_-20px_rgba(16,55,89,0.22)] sm:gap-4 sm:px-5 sm:py-4 lg:gap-3 lg:px-4 lg:py-3 lg:shadow-none ${s.card}`}
             >
               <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl sm:size-14 sm:rounded-2xl lg:size-9 lg:rounded-lg ${s.iconBg}`}>
                 <s.icon className="size-5 sm:size-6 lg:size-4" aria-hidden />
@@ -189,7 +189,7 @@ export default async function RiwayatPage() {
                 <span className={`block text-xs font-semibold leading-tight sm:text-sm lg:text-xs ${s.labelColor}`}>
                   {s.label}
                 </span>
-                <span className={`mt-0.5 block truncate text-xl font-extrabold tracking-tight sm:text-[1.75rem] lg:text-2xl ${s.valueColor}`}>
+                <span className={`mt-0.5 block truncate text-xl font-bold tracking-tight sm:text-2xl ${s.valueColor}`}>
                   {s.value}
                 </span>
               </div>
@@ -262,7 +262,7 @@ export default async function RiwayatPage() {
               return (
                 <Card
                   key={item.id}
-                  className="gap-0 rounded-2xl border border-purple-100 bg-white p-4 shadow-[0_8px_26px_-20px_rgba(46,23,77,0.35)]"
+                  className="gap-0 rounded-2xl border border-purple-100 bg-white p-4 shadow-[0_8px_26px_-20px_rgba(16,55,89,0.22)]"
                 >
                   <CardContent className="space-y-4 p-0">
                     <div className="flex items-start justify-between gap-3">
@@ -288,7 +288,7 @@ export default async function RiwayatPage() {
                       {scoreCards.map((scoreCard) => (
                         <div key={scoreCard.label} className={`rounded-xl px-2 py-2.5 text-center ${scoreCard.colors}`}>
                           <span className="block text-[10px] font-semibold opacity-80">{scoreCard.label}</span>
-                          <span className={`mt-1 block text-sm font-extrabold ${scoreCard.scoreColor}`}>
+                          <span className={`mt-1 block text-sm font-bold ${scoreCard.scoreColor}`}>
                             {scoreCard.score}
                           </span>
                         </div>
@@ -382,7 +382,7 @@ export default async function RiwayatPage() {
 
                       {/* Total skor */}
                       <TableCell className="text-center px-4">
-                        <span className="text-base font-extrabold text-foreground">
+                        <span className="text-base font-bold text-foreground">
                           {item.totalSkor}
                         </span>
                       </TableCell>

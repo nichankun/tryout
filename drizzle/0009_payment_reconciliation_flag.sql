@@ -1,0 +1,2 @@
+ALTER TABLE "orders" ADD COLUMN "reconciliation_required" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+CREATE INDEX "orders_reconciliation_required_idx" ON "orders" USING btree ("created_at") WHERE "orders"."reconciliation_required" = true;

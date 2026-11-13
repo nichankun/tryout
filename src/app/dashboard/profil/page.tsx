@@ -27,13 +27,13 @@ export default async function DashboardProfilePage() {
     .toUpperCase();
 
   return (
-    <div className="min-h-full bg-[#F7F5FC]">
+    <div className="min-h-full bg-purple-50">
       <div className="mx-auto w-full max-w-4xl space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
         <header>
-          <h1 className="text-2xl font-extrabold tracking-[-0.035em] text-purple-950 sm:text-[2.15rem] lg:text-[2rem]">
+          <h1 className="text-[clamp(1.625rem,2vw,2rem)] font-bold leading-tight tracking-[-0.035em] text-purple-950">
             Profil
           </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base lg:text-sm">
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-[0.9375rem]">
             Informasi akun yang digunakan untuk masuk ke ASNPedia.
           </p>
         </header>
@@ -70,7 +70,7 @@ export default async function DashboardProfilePage() {
                   <UserRound className="size-4 text-primary" aria-hidden="true" />
                   Nama peserta
                 </div>
-                <p className="text-lg font-extrabold text-purple-950">{name}</p>
+                <p className="text-base font-semibold text-purple-950">{name}</p>
                 {session.user.email ? (
                   <p className="inline-flex items-center gap-2 text-sm text-muted-foreground">
                     <Mail className="size-4 text-primary" aria-hidden="true" />

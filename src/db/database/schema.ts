@@ -18,7 +18,7 @@ import { relations, sql } from "drizzle-orm";
 // KONSTANTA ENUM & TYPE DEFINITIONS
 // ==========================================
 export const USER_ROLES = ["USER", "ADMIN"] as const;
-export const ORDER_STATUSES = ["pending", "paid", "failed"] as const;
+export const ORDER_STATUSES = ["pending", "paid", "failed", "partially_refunded", "refunded", "disputed"] as const;
 export const QUESTION_CATEGORIES = ["TWK", "TIU", "TKP"] as const;
 export const TRYOUT_ATTEMPT_STATUSES = ["in_progress", "expired", "completed"] as const;
 
@@ -233,7 +233,7 @@ export const tryoutPackages = pgTable("tryout_packages", {
 export const orders = pgTable(
   "orders", 
   {
-    id:            text("id").primaryKey(), // format: ASN-{packageId}-{timestamp}
+    id:            text("id").primaryKey(), // format: ASN-{packageId}-{UUID}
     userId:        uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     packageId:     integer("package_id").notNull().references(() => tryoutPackages.id),
     amount:        integer("amount").notNull(),
@@ -241,6 +241,9 @@ export const orders = pgTable(
     paymentMethod: text("payment_method"),
     snapToken:     text("snap_token"),
     transactionId: text("transaction_id"),
+    refundAmount:  integer("refund_amount").notNull().default(0),
+    duplicatePayment: boolean("duplicate_payment").notNull().default(false),
+    reconciliationRequired: boolean("reconciliation_required").notNull().default(false),
     paidAt:        timestamp("paid_at"),
     createdAt:     timestamp("created_at").defaultNow(),
   },
@@ -248,6 +251,15 @@ export const orders = pgTable(
     // OPTIMASI: Sangat penting untuk dashboard histori pesanan pengguna
     userIdIdx: index("orders_user_id_idx").on(table.userId),
     packageIdIdx: index("orders_package_id_idx").on(table.packageId),
+    pendingCreatedAtIdx: index("orders_pending_created_at_idx")
+      .on(table.createdAt)
+      .where(sql`${table.status} = 'pending'`),
+    userPackagePendingIdx: index("orders_user_package_pending_idx")
+      .on(table.userId, table.packageId, table.createdAt)
+      .where(sql`${table.status} = 'pending'`),
+      reconciliationRequiredIdx: index("orders_reconciliation_required_idx")
+        .on(table.createdAt)
+        .where(sql`${table.reconciliationRequired} = true`),
   })
 );
 

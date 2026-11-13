@@ -75,14 +75,14 @@ export function DashboardSidebar({ userName, userEmail, userImage }: DashboardSi
       variant="sidebar"
       className="border-sidebar-border"
       style={{
-        "--sidebar": "#211633",
-        "--sidebar-foreground": "#F8F5FF",
-        "--sidebar-primary": "#7765D3",
+        "--sidebar": "#064B87",
+        "--sidebar-foreground": "#F5FAFF",
+        "--sidebar-primary": "#1B78BD",
         "--sidebar-primary-foreground": "#FFFFFF",
-        "--sidebar-accent": "rgba(119, 101, 211, 0.36)",
+        "--sidebar-accent": "rgba(45, 129, 196, 0.38)",
         "--sidebar-accent-foreground": "#FFFFFF",
         "--sidebar-border": "rgba(255, 255, 255, 0.1)",
-        "--sidebar-ring": "#9B89DB",
+        "--sidebar-ring": "#91C9F0",
       } as React.CSSProperties}
     >
       <SidebarHeader className="px-4 pb-7 pt-6 group-data-[collapsible=icon]:px-2">
@@ -195,7 +195,7 @@ export function DashboardMobileNav() {
   return (
     <nav
       aria-label="Navigasi dashboard"
-      className="fixed inset-x-0 bottom-0 z-50 h-[calc(4.5rem+env(safe-area-inset-bottom))] border-t border-purple-100 bg-background/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_-18px_rgba(46,23,77,0.35)] backdrop-blur supports-backdrop-filter:bg-background/85 md:hidden"
+      className="fixed inset-x-0 bottom-0 z-50 h-[calc(4.5rem+env(safe-area-inset-bottom))] border-t border-purple-100 bg-background/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_-18px_rgba(16,55,89,0.22)] backdrop-blur supports-backdrop-filter:bg-background/85 md:hidden"
     >
       <div className="mx-auto flex h-full max-w-lg items-stretch justify-around px-2">
         {NAV_ITEMS.map((item) => {

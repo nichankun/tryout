@@ -7,6 +7,7 @@ declare module "midtrans-client" {
     createTransactionToken(parameter: Record<string, unknown>): Promise<string>;
     
     transaction: {
+      status(transactionId: string): Promise<unknown>;
       // Diubah: notificationPayload berbentuk objek JSON, dan kembalian Promise-nya diubah ke unknown agar aman saat di-parsing
       notification(notificationPayload: Record<string, unknown>): Promise<unknown>;
     };

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { submitTryoutAction } from "@/lib/actions/tryout";
 import type { AnswerStatus, Question, UserAnswer } from "@/types/tryout";
@@ -306,42 +307,46 @@ export default function TryoutClient({ volumeId, packageTitle, questions }: Tryo
 
   return (
     <TooltipProvider>
-      <div className="relative flex min-h-screen flex-col bg-background font-sans text-foreground antialiased">
-        <TryoutPauseOverlay isPaused={isPaused} pauseReason={pauseReason} onResume={() => setIsPaused(false)} />
+      <Sheet>
+        <div className="relative flex min-h-screen flex-col bg-background font-sans text-foreground antialiased">
+          <TryoutPauseOverlay isPaused={isPaused} pauseReason={pauseReason} onResume={() => setIsPaused(false)} />
 
-        <TryoutHeader
-          packageTitle={packageTitle}
-          isPending={isPending}
-          initialTime={initialTime}
-          onAutoSubmit={() => handleSubmitUjian(true)}
-        />
+          <TryoutHeader
+            packageTitle={packageTitle}
+            isPending={isPending}
+            initialTime={initialTime}
+            currentQuestionNumber={currentIdx + 1}
+            totalQuestions={questions.length}
+            onAutoSubmit={() => handleSubmitUjian(true)}
+          />
 
-        {saveError && (
-          <div role="alert" className="mx-auto mt-3 w-full max-w-5xl rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            {saveError}
-          </div>
-        )}
+          {saveError && (
+            <div role="alert" className="mx-auto mt-3 w-full max-w-5xl rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              {saveError}
+            </div>
+          )}
 
-        <TryoutMain
-          isPaused={isPaused}
-          isPending={isPending}
-          questions={questions}
-          currentQuestion={currentQuestion}
-          currentIdx={currentIdx}
-          activeId={activeId}
-          setActiveId={setActiveId}
-          currentAnswer={currentAnswer}
-          answeredCount={answeredCount}
-          flaggedCount={flaggedCount}
-          unansweredCount={unansweredCount}
-          progressPercent={progressPercent}
-          onAnswer={handleAnswer}
-          onFlag={handleFlag}
-          onSubmit={() => handleSubmitUjian(false)}
-          getNavStyle={getNavStyle}
-          getNavLabel={getNavLabel}
-        />
-      </div>
+          <TryoutMain
+            isPaused={isPaused}
+            isPending={isPending}
+            questions={questions}
+            currentQuestion={currentQuestion}
+            currentIdx={currentIdx}
+            activeId={activeId}
+            setActiveId={setActiveId}
+            currentAnswer={currentAnswer}
+            answeredCount={answeredCount}
+            flaggedCount={flaggedCount}
+            unansweredCount={unansweredCount}
+            progressPercent={progressPercent}
+            onAnswer={handleAnswer}
+            onFlag={handleFlag}
+            onSubmit={() => handleSubmitUjian(false)}
+            getNavStyle={getNavStyle}
+            getNavLabel={getNavLabel}
+          />
+        </div>
+      </Sheet>
     </TooltipProvider>
   );
 }

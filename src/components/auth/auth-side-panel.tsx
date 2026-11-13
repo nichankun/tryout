@@ -14,7 +14,7 @@ export function AuthSidePanel({ title, description, benefits }: AuthSidePanelPro
     <aside className="relative hidden min-h-screen flex-col justify-between overflow-hidden bg-purple-950 p-10 text-white lg:flex xl:p-14">
       <div className="absolute inset-0">
         <Image
-          src="/tryout-hero.png"
+          src="/tryout-hero-blue.png"
           alt=""
           fill
           preload
@@ -34,7 +34,7 @@ export function AuthSidePanel({ title, description, benefits }: AuthSidePanelPro
         <span className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-3.5 py-2 text-[10px] font-extrabold uppercase tracking-[0.18em] text-violet-100 backdrop-blur-sm">
           Persiapan SKD CPNS
         </span>
-        <h2 className="mt-6 text-4xl font-black leading-[1.08] tracking-tight xl:text-5xl">{title}</h2>
+        <h2 className="mt-6 text-[clamp(2rem,2.4vw,2.75rem)] font-bold leading-[1.12] tracking-[-0.035em]">{title}</h2>
         <p className="mt-5 max-w-lg text-base leading-7 text-violet-100/85">{description}</p>
 
         <ul className="mt-8 grid gap-3">

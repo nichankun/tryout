@@ -13,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { DeleteAllQuestionsButton } from "@/components/admin/delete-all-questions-button";
 import { Plus, BookOpen, Coins, UploadCloud, TriangleAlert } from "lucide-react";
 import Link from "next/link";
+import { requireAdminPageAccess } from "@/lib/authz";
 
 interface AdminPackageDetailPageProps {
   params: Promise<{ id: string }>;
@@ -21,6 +22,8 @@ interface AdminPackageDetailPageProps {
 export const dynamic = "force-dynamic";
 
 export default async function AdminPackageDetailPage({ params }: AdminPackageDetailPageProps) {
+  await requireAdminPageAccess();
+
   const resolvedParams = await params;
   const packageId = parseInt(resolvedParams.id, 10);
 

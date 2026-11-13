@@ -1,0 +1,2 @@
+CREATE INDEX "orders_pending_created_at_idx" ON "orders" USING btree ("created_at") WHERE "orders"."status" = 'pending';--> statement-breakpoint
+CREATE INDEX "orders_user_package_pending_idx" ON "orders" USING btree ("user_id","package_id","created_at") WHERE "orders"."status" = 'pending';

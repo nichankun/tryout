@@ -13,19 +13,19 @@ export default async function DashboardPackagesPage() {
   const { availableCount, volumes } = await getDashboardTryoutData(session.user.id);
 
   return (
-    <div className="min-h-full bg-[#F7F5FC]">
+    <div className="min-h-full bg-purple-50">
       <div className="mx-auto flex w-full max-w-[1560px] flex-col gap-6 px-4 py-6 sm:px-6 lg:gap-6 lg:px-8 lg:py-8 xl:px-10">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-2xl font-extrabold tracking-[-0.035em] text-purple-950 sm:text-[2.15rem] lg:text-[2rem]">
+              <h1 className="text-[clamp(1.625rem,2vw,2rem)] font-bold leading-tight tracking-[-0.035em] text-purple-950">
                 Paket tryout
               </h1>
               <Badge className="h-6 rounded-full border-0 bg-purple-100 px-2.5 text-[10px] font-bold tracking-wide text-primary hover:bg-purple-100 sm:h-7 sm:px-3 sm:text-[11px]">
                 {availableCount} paket tersedia
               </Badge>
             </div>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base lg:text-sm">
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-[0.9375rem]">
               Pilih paket untuk melihat akses, jumlah soal, dan memulai simulasi SKD.
             </p>
           </div>

@@ -15,13 +15,11 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Sheet,
   SheetClose,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
 } from "@/components/ui/sheet";
 import {
   AlertDialog,
@@ -168,7 +166,7 @@ function QuestionControls({
         }}
         disabled={currentIdx === 0}
         className={isMobile
-          ? "h-11 w-full border-purple-200 px-2 text-primary hover:bg-purple-50 hover:text-purple-800"
+          ? "h-10 w-full border-purple-200 px-2 text-primary hover:bg-purple-50 hover:text-purple-800"
           : "border-purple-200 text-primary hover:bg-purple-50 hover:text-purple-800"}
       >
         <ChevronLeft className="mr-1 h-4 w-4" />
@@ -181,7 +179,7 @@ function QuestionControls({
             type="button"
             variant={isFlagged ? "default" : "outline"}
             aria-label={flagLabel}
-            className={`${isMobile ? "h-11 w-full px-2" : ""} ${
+            className={`${isMobile ? "h-10 w-full px-2" : ""} ${
               isFlagged
                 ? "border-amber-100 bg-amber-50 text-amber-600 hover:bg-amber-100/40"
                 : "border-amber-100/50 text-amber-600 hover:bg-amber-50/60"
@@ -207,7 +205,7 @@ function QuestionControls({
         }}
         disabled={currentIdx === questions.length - 1}
         className={isMobile
-          ? "h-11 w-full bg-primary px-2 text-primary-foreground hover:bg-purple-800"
+          ? "h-10 w-full bg-primary px-2 text-primary-foreground hover:bg-purple-800"
           : "bg-primary text-primary-foreground hover:bg-purple-800"}
       >
         {isMobile ? "Lanjut" : TEXT_CONTENT.actionNext}
@@ -264,69 +262,50 @@ export const TryoutMain = React.memo((props: TryoutMainProps) => {
             </div>
           </div>
 
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                className="sticky top-[4.5rem] z-30 flex h-11 w-full items-center justify-between border-purple-200 bg-card shadow-sm lg:hidden"
-                aria-label={`Buka navigasi soal. Soal ${currentIdx + 1} dari ${questions.length} sedang dibuka.`}
-              >
-                <span className="inline-flex items-center gap-2 font-bold text-purple-900">
-                  <LayoutGrid className="size-4 text-primary" aria-hidden="true" />
-                  Navigasi soal
-                </span>
-                <span className="rounded-full bg-purple-100 px-2.5 py-1 text-xs font-bold text-primary">
-                  {String(currentIdx + 1).padStart(2, "0")} / {questions.length}
-                </span>
-              </Button>
-            </SheetTrigger>
-            <SheetContent
-              side="bottom"
-              showCloseButton={false}
-              className="h-[82dvh] max-h-[82dvh] gap-0 rounded-t-2xl border-purple-200 p-0 lg:hidden"
-            >
-              <SheetHeader className="shrink-0 border-b border-purple-100 pr-4">
-                <SheetTitle className="text-lg font-extrabold text-purple-950">Navigasi soal</SheetTitle>
-                <SheetDescription>
-                  {answeredCount} terjawab · {flaggedCount} ragu-ragu · {unansweredCount} belum dijawab
-                </SheetDescription>
-              </SheetHeader>
-              <ScrollArea className="min-h-0 flex-1 px-4 py-4">
-                <div className="grid grid-cols-5 gap-2 pb-2 sm:grid-cols-7">
-                  {questions.map((question, idx) => {
-                    return (
-                      <SheetClose asChild key={question.id}>
-                        <button
-                          type="button"
-                          aria-label={`Soal ${idx + 1}, ${getNavLabel(question.id)}`}
-                          aria-current={question.id === activeId ? "step" : undefined}
-                          onClick={() => goToQuestion(question.id)}
-                          className={`h-11 w-full rounded-lg font-mono text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${getNavStyle(question.id)}`}
-                        >
-                          {String(idx + 1).padStart(2, "0")}
-                        </button>
-                      </SheetClose>
-                    );
-                  })}
-                </div>
-              </ScrollArea>
-              <div className="flex shrink-0 flex-wrap gap-x-4 gap-y-2 border-t border-purple-100 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] text-xs font-medium text-muted-foreground">
-                <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded bg-primary" />Sedang dibuka</span>
-                <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded bg-purple-200" />Terjawab</span>
-                <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded bg-amber-500" />Ragu-ragu</span>
-                <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded border border-border bg-card" />Belum</span>
-                <SheetClose asChild>
-                  <Button type="button" variant="outline" className="ml-auto h-9 rounded-lg px-3 text-xs">
-                    Tutup navigasi
-                  </Button>
-                </SheetClose>
+          <SheetContent
+            side="bottom"
+            showCloseButton={false}
+            className="h-[82dvh] max-h-[82dvh] gap-0 rounded-t-2xl border-purple-200 p-0 lg:hidden"
+          >
+            <SheetHeader className="shrink-0 border-b border-purple-100 pr-4">
+              <SheetTitle className="text-base font-semibold text-purple-950">Navigasi soal</SheetTitle>
+              <SheetDescription>
+                {answeredCount} terjawab · {flaggedCount} ragu-ragu · {unansweredCount} belum dijawab
+              </SheetDescription>
+            </SheetHeader>
+            <ScrollArea className="min-h-0 flex-1 px-4 py-4">
+              <div className="grid grid-cols-5 gap-2 pb-2 sm:grid-cols-7">
+                {questions.map((question, idx) => {
+                  return (
+                    <SheetClose asChild key={question.id}>
+                      <button
+                        type="button"
+                        aria-label={`Soal ${idx + 1}, ${getNavLabel(question.id)}`}
+                        aria-current={question.id === activeId ? "step" : undefined}
+                        onClick={() => goToQuestion(question.id)}
+                        className={`h-11 w-full rounded-lg font-mono text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${getNavStyle(question.id)}`}
+                      >
+                        {String(idx + 1).padStart(2, "0")}
+                      </button>
+                    </SheetClose>
+                  );
+                })}
               </div>
-            </SheetContent>
-          </Sheet>
-
+            </ScrollArea>
+            <div className="flex shrink-0 flex-wrap gap-x-4 gap-y-2 border-t border-purple-100 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] text-xs font-medium text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded bg-primary" />Sedang dibuka</span>
+              <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded bg-purple-200" />Terjawab</span>
+              <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded bg-amber-500" />Ragu-ragu</span>
+              <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded border border-border bg-card" />Belum</span>
+              <SheetClose asChild>
+                <Button type="button" variant="outline" className="ml-auto h-9 rounded-lg px-3 text-xs">
+                  Tutup navigasi
+                </Button>
+              </SheetClose>
+            </div>
+          </SheetContent>
           {/* Card soal */}
-          <Card ref={questionCardRef} className="scroll-mt-32 overflow-hidden border-purple-200 bg-card shadow-sm lg:scroll-mt-24">
+          <Card ref={questionCardRef} className="scroll-mt-16 overflow-hidden border-purple-200 bg-card shadow-sm lg:scroll-mt-24">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-purple-200 bg-purple-50 px-4 py-3 sm:px-5">
               <div className="flex items-center gap-2">
                 <BookOpen className="h-4 w-4 text-primary" aria-hidden />
@@ -339,9 +318,9 @@ export const TryoutMain = React.memo((props: TryoutMainProps) => {
               </span>
             </CardHeader>
 
-            <CardContent className="space-y-5 p-4 pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:p-6 sm:pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:p-8 md:pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-8">
+            <CardContent className="space-y-5 p-4 pb-[calc(3.75rem+env(safe-area-inset-bottom))] sm:p-6 sm:pb-[calc(3.75rem+env(safe-area-inset-bottom))] md:p-8 md:pb-[calc(3.75rem+env(safe-area-inset-bottom))] lg:pb-8">
               {/* Teks Pertanyaan */}
-              <p className="select-none whitespace-pre-line text-[15px] leading-6 text-foreground sm:text-base sm:leading-relaxed">
+              <p className="select-none whitespace-pre-line text-[15px] leading-6 text-foreground sm:leading-relaxed">
                 {currentQuestion?.pertanyaan}
               </p>
 
@@ -388,7 +367,7 @@ export const TryoutMain = React.memo((props: TryoutMainProps) => {
                       <RadioGroupItem value={opt.opsi} id={`opt-${opt.opsi}`} className="mt-1" />
                       <div className="flex flex-col flex-1 gap-2">
                         <span
-                          className={`text-[15px] leading-6 sm:text-sm sm:leading-normal ${
+                          className={`text-[15px] leading-6 sm:leading-relaxed ${
                             isSelected ? "font-semibold text-primary" : "text-foreground"
                           }`}
                         >
@@ -446,17 +425,17 @@ export const TryoutMain = React.memo((props: TryoutMainProps) => {
               <div className="grid grid-cols-3 divide-x divide-purple-100 overflow-hidden rounded-xl border border-purple-100 bg-purple-50/30 text-xs lg:gap-2 lg:divide-x-0 lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent">
                 <div className="flex flex-col items-center gap-0.5 px-1 py-2 lg:gap-1 lg:rounded-xl lg:border lg:border-purple-200 lg:bg-purple-50 lg:p-2.5">
                   <CheckCircle2 className="h-4 w-4 text-teal-600" aria-hidden />
-                  <span className="font-extrabold text-teal-600">{answeredCount}</span>
+                  <span className="text-sm font-semibold text-teal-600">{answeredCount}</span>
                   <span className="text-primary">{TEXT_CONTENT.statusAnswered}</span>
                 </div>
                 <div className="flex flex-col items-center gap-0.5 bg-amber-50/60 px-1 py-2 lg:gap-1 lg:rounded-xl lg:border lg:border-amber-100 lg:bg-amber-50 lg:p-2.5">
                   <AlertCircle className="h-4 w-4 text-amber-600" aria-hidden />
-                  <span className="font-extrabold text-amber-600">{flaggedCount}</span>
+                  <span className="text-sm font-semibold text-amber-600">{flaggedCount}</span>
                   <span className="text-amber-600">{TEXT_CONTENT.statusFlagged}</span>
                 </div>
                 <div className="flex flex-col items-center gap-0.5 px-1 py-2 lg:gap-1 lg:rounded-xl lg:border lg:border-gray-200 lg:bg-gray-50 lg:p-2.5">
                   <span className="h-4 w-4 rounded border-2 border-gray-400" />
-                  <span className="font-extrabold text-gray-900">{unansweredCount}</span>
+                  <span className="text-sm font-semibold text-gray-900">{unansweredCount}</span>
                   <span className="text-gray-600">{TEXT_CONTENT.statusUnanswered}</span>
                 </div>
               </div>
@@ -504,7 +483,7 @@ export const TryoutMain = React.memo((props: TryoutMainProps) => {
 
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-purple-100 bg-background/95 px-3 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-[0_-6px_18px_rgba(35,20,65,0.10)] backdrop-blur supports-[backdrop-filter]:bg-background/85 lg:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-purple-100 bg-background/95 px-3 pt-1.5 pb-[calc(0.375rem+env(safe-area-inset-bottom))] shadow-[0_-6px_18px_rgba(13,58,96,0.10)] backdrop-blur supports-[backdrop-filter]:bg-background/85 lg:hidden">
         <div className="mx-auto max-w-7xl">
           <QuestionControls
             layout="mobile"

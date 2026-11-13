@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { SKD_TRAINING_THRESHOLDS } from "@/lib/constants/scoring";
+import { requireAdminPageAccess } from "@/lib/authz";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,8 @@ const SETTINGS_CONFIG = {
 // KOMPONEN UTAMA
 // ==========================================
 export default async function AdminSettingsPage() {
+  await requireAdminPageAccess();
+
   // Melakukan pengecekan kesiapan kunci Environment Kredensial sistem secara berkala
   const midtransStatus = {
     serverKeyExist: !!process.env.MIDTRANS_SERVER_KEY,

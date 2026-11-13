@@ -10,7 +10,7 @@ export default function TryoutNotFound() {
           <FileX className="w-7 h-7 text-primary" />
         </div>
         <div className="space-y-2">
-          <h1 className="text-xl font-bold text-foreground">Soal Belum Tersedia</h1>
+          <h1 className="text-lg font-semibold tracking-tight text-foreground">Soal Belum Tersedia</h1>
           <p className="text-sm text-muted-foreground leading-relaxed">
             Volume ini belum memiliki soal. Silakan pilih volume lain atau coba lagi nanti.
           </p>
